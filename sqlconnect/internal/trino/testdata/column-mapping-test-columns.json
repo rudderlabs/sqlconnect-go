@@ -1,0 +1,19 @@
+{
+    "_order": "int",
+    "_int": "int",
+    "_tinyint": "int",
+    "_smallint": "int",
+    "_integer": "int",
+    "_bigint": "int",
+    "_real": "float",
+    "_double": "float",
+    "_decimal": "float",
+    "_varchar": "string",
+    "_char": "string",
+    "_varbinary": "string",
+    "_boolean": "boolean",
+    "_date": "datetime",
+    "_timestamp": "datetime",
+    "_array": "json",
+    "_map": "json"
+}
