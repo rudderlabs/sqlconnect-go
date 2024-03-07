@@ -16,6 +16,8 @@
     "_double": "float",
     "_boolean": "boolean",
     "_string": "string",
+    "_char": "string",
+    "_varchar": "string",
     "_binary": "string",
     "_date": "datetime",
     "_timestamp": "datetime",
