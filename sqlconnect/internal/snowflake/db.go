@@ -17,7 +17,7 @@ const (
 	defaultRudderSchema = "_RUDDERSTACK"
 )
 
-// NewDB creates a new postgres-specific client
+// NewDB creates a new snowflake db client
 func NewDB(configJSON json.RawMessage) (*DB, error) {
 	var config Config
 	err := config.Parse(configJSON)

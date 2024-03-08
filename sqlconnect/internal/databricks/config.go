@@ -27,9 +27,8 @@ func (c *Config) Parse(configJson json.RawMessage) error {
 	if err != nil {
 		return err
 	}
-	// if catalog is empty from the UI, use default "hive_metastore"
 	if c.Catalog == "" {
-		c.Catalog = "hive_metastore"
+		c.Catalog = "hive_metastore" // default catalog
 	}
 	return nil
 }

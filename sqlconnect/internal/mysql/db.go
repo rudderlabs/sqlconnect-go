@@ -17,7 +17,7 @@ const (
 	defaultRudderSchema = "_rudderstack"
 )
 
-// NewDB creates a new postgres-specific client
+// NewDB creates a new mysql db client
 func NewDB(configJSON json.RawMessage) (*DB, error) {
 	var config Config
 	err := config.Parse(configJSON)

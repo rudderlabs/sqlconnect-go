@@ -20,7 +20,7 @@ const (
 	defaultRudderSchema = "rudderstack_"
 )
 
-// NewDB creates a new client
+// NewDB creates a new bigquery db client
 func NewDB(configJSON json.RawMessage) (*DB, error) {
 	var config Config
 	err := config.Parse(configJSON)

@@ -15,10 +15,9 @@ import (
 const (
 	DatabaseType        = "databricks"
 	defaultRudderSchema = "_rudderstack"
-	userAgentEntry      = "Rudderstack"
 )
 
-// NewDB creates a new postgres-specific client
+// NewDB creates a new databricks db client
 func NewDB(configJson json.RawMessage) (*DB, error) {
 	var config Config
 	err := config.Parse(configJson)
@@ -37,7 +36,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 			config.MinRetryWaitTime,
 			config.MaxRetryWaitTime,
 		),
-		databricks.WithUserAgentEntry(userAgentEntry),
+		databricks.WithUserAgentEntry("Rudderstack"),
 	)
 	if err != nil {
 		return nil, err
