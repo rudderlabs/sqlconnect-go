@@ -38,7 +38,7 @@ type RelationRef struct {
 	Type    RelationType `json:"type,omitempty"`    // the relation's type
 }
 
-func (t *RelationRef) String() string {
+func (t RelationRef) String() string {
 	if t.Catalog != "" && t.Schema != "" {
 		return fmt.Sprintf("%s.%s.%s", t.Catalog, t.Schema, t.Name)
 	}

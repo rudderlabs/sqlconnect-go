@@ -30,9 +30,7 @@ func (c Config) ConnectionString() (dsn string, err error) {
 		Database:  c.DBName,
 		Warehouse: c.Warehouse,
 		Schema:    c.Schema,
-		// since omitempty is not used, default value of role would be "" (empty string).
-		// this will ensure backwards compatibility, check line 137 on dsn.go (if cfg.Role != "" {params.Add("role", cfg.Role)})
-		Role: c.Role,
+		Role:      c.Role,
 	}
 
 	if c.KeepSessionAlive {
