@@ -19,9 +19,9 @@ func TestMysqlDB(t *testing.T) {
 	require.NoError(t, err, "it should be able to create a docker pool")
 
 	mysqlResource, err := mysqlresource.Setup(pool, t)
-	require.NoError(t, err, "it should be able to create a postgres resource")
+	require.NoError(t, err, "it should be able to create a mysql resource")
 	port, err := strconv.Atoi(mysqlResource.Port)
-	require.NoError(t, err, "it should be able to convert postgres port to int")
+	require.NoError(t, err, "it should be able to convert the port to int")
 	config := mysql.Config{
 		Host:               mysqlResource.Host,
 		Port:               port,

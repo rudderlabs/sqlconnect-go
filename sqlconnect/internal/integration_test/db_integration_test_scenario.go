@@ -121,7 +121,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				require.NoError(t, err, "it should be able to drop a schema")
 			})
 
-			t.Run("invalid schema naem", func(t *testing.T) {
+			t.Run("invalid schema name", func(t *testing.T) {
 				err := db.DropSchema(ctx, sqlconnect.SchemaRef{Name: "nonexistent"})
 				require.Error(t, err, "it shouldn't be able to drop a non-existent schema")
 			})
