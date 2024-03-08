@@ -16,7 +16,16 @@ Sqlconnect provides a uniform client interface for accessing multiple warehouses
 go get github.com/rudderlabs/sqlconnect-go
 ```
 
+## API
+
+All available `DB` methods can be found [here](sqlconnect/db.go)
+
 ## Usage
+
+**Loading all necessary db drivers**
+```go
+import _ "github.com/rudderlabs/sqlconnect-go/sqlconnect/config"
+```
 
 **Creating a new DB client**
 ```go
