@@ -24,7 +24,7 @@ func TestDialect(t *testing.T) {
 		quoted := d.QuoteTable(sqlconnect.NewRelationRef("table"))
 		require.Equal(t, `"table"`, quoted, "table name should be quoted with double quotes")
 
-		quoted = d.QuoteTable(sqlconnect.NewRelationRef("table", sqlconnect.WithSchema("schema")))
+		quoted = d.QuoteTable(sqlconnect.NewSchemaTableRef("schema", "table"))
 		require.Equal(t, `"schema"."table"`, quoted, "schema and table name should be quoted with double quotes")
 	})
 }

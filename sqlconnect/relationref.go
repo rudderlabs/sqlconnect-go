@@ -23,6 +23,11 @@ func NewRelationRef(name string, options ...Option) RelationRef {
 	}
 }
 
+// NewSchemaTableRef creates a new RelationRef with a schema and a table
+func NewSchemaTableRef(schema, table string) RelationRef {
+	return NewRelationRef(table, WithSchema(schema))
+}
+
 type RelationType string
 
 const (
