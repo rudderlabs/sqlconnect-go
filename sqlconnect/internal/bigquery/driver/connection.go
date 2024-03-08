@@ -59,7 +59,7 @@ func (connection *bigQueryConnection) Begin() (driver.Tx, error) {
 	return nil, fmt.Errorf("bigquery: transactions are not supported")
 }
 
-func (connection *bigQueryConnection) query(query string) (*bigquery.Query, error) {
+func (connection *bigQueryConnection) query(query string) (*bigquery.Query, error) { // nolint: unparam
 	return connection.client.Query(query), nil
 }
 

@@ -73,11 +73,11 @@ func jsonRowMapper(databaseTypeName string, value any) any {
 			return v.Num().Int64()
 		}
 	case civil.Date:
-		return time.Date(int(v.Year), time.Month(v.Month), int(v.Day), 0, 0, 0, 0, time.UTC)
+		return time.Date(v.Year, v.Month, v.Day, 0, 0, 0, 0, time.UTC)
 	case civil.Time:
-		return time.Date(0, 1, 1, int(v.Hour), int(v.Minute), int(v.Second), int(v.Nanosecond), time.UTC)
+		return time.Date(0, 1, 1, v.Hour, v.Minute, v.Second, v.Nanosecond, time.UTC)
 	case civil.DateTime:
-		return time.Date(int(v.Date.Year), time.Month(v.Date.Month), int(v.Date.Day), int(v.Time.Hour), int(v.Time.Minute), int(v.Time.Second), int(v.Time.Nanosecond), time.UTC)
+		return time.Date(v.Date.Year, v.Date.Month, v.Date.Day, v.Time.Hour, v.Time.Minute, v.Time.Second, v.Time.Nanosecond, time.UTC)
 	case *bigquery.IntervalValue:
 		return v.ToDuration()
 	case []uint8:

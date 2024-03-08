@@ -183,7 +183,7 @@ func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) 
 // ListColumnsForSqlQuery returns a list of columns for the given sql query
 func (db *DB) ListColumnsForSqlQuery(ctx context.Context, sql string) ([]sqlconnect.ColumnRef, error) {
 	var res []sqlconnect.ColumnRef
-	rows, err := db.DB.QueryContext(ctx, sql)
+	rows, err := db.DB.QueryContext(ctx, sql) // nolint:rowserrcheck
 	if err != nil {
 		return nil, fmt.Errorf("querying list columns for sql query: %w", err)
 	}

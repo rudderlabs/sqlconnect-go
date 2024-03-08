@@ -86,7 +86,7 @@ func (statement bigQueryStatement) buildQuery(args []driver.Value) (*bigquery.Qu
 	return query, err
 }
 
-func (statement bigQueryStatement) buildParameters(args []driver.Value) ([]bigquery.QueryParameter, error) {
+func (statement bigQueryStatement) buildParameters(args []driver.Value) ([]bigquery.QueryParameter, error) { // nolint: unparam
 	if args == nil {
 		return nil, nil
 	}
