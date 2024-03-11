@@ -6,15 +6,13 @@ import (
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql" // mysql driver
-	"github.com/samber/lo"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
 const (
-	DatabaseType        = "mysql"
-	defaultRudderSchema = "_rudderstack"
+	DatabaseType = "mysql"
 )
 
 // NewDB creates a new mysql db client
@@ -37,7 +35,6 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
-			lo.Ternary(config.RudderSchema != "", config.RudderSchema, defaultRudderSchema),
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {

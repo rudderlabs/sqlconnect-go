@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	DatabaseType        = "snowflake"
-	defaultRudderSchema = "_RUDDERSTACK"
+	DatabaseType = "snowflake"
 )
 
 // NewDB creates a new snowflake db client
@@ -37,7 +36,6 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
-			lo.Ternary(config.RudderSchema != "", config.RudderSchema, defaultRudderSchema),
 			base.WithDialect(dialect{}),
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),

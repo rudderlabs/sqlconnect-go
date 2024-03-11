@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	DatabaseType        = "databricks"
-	defaultRudderSchema = "_rudderstack"
+	DatabaseType = "databricks"
 )
 
 // NewDB creates a new databricks db client
@@ -48,7 +47,6 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
-			lo.Ternary(config.RudderSchema != "", config.RudderSchema, defaultRudderSchema),
 			base.WithDialect(dialect{}),
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),

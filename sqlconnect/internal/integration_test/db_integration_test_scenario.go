@@ -58,11 +58,6 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 	})
 
-	t.Run("get rudder schema", func(t *testing.T) {
-		rudderSchema := db.GetRudderSchema()
-		require.Equal(t, schema.Name, rudderSchema, "it should be able to get the rudder schema")
-	})
-
 	t.Run("schema admin", func(t *testing.T) {
 		t.Run("schema doesn't exist", func(t *testing.T) {
 			exists, err := db.SchemaExists(ctx, schema)

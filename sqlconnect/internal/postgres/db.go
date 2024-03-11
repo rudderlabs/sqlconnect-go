@@ -5,15 +5,13 @@ import (
 	"encoding/json"
 
 	_ "github.com/lib/pq" // postgres driver
-	"github.com/samber/lo"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
 const (
-	DatabaseType        = "postgres"
-	defaultRudderSchema = "_rudderstack"
+	DatabaseType = "postgres"
 )
 
 // NewDB creates a new postgres db client
@@ -32,7 +30,6 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
-			lo.Ternary(config.RudderSchema != "", config.RudderSchema, defaultRudderSchema),
 			base.WithColumnTypeMappings(getColumnTypeMappings(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 		),

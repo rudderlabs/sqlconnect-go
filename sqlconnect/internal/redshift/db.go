@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	_ "github.com/lib/pq" // postgres driver
-	"github.com/samber/lo"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
@@ -14,8 +13,7 @@ import (
 )
 
 const (
-	DatabaseType        = "redshift"
-	defaultRudderSchema = "_rudderstack"
+	DatabaseType = "redshift"
 )
 
 // NewDB creates a new redshift db client
@@ -34,7 +32,6 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
-			lo.Ternary(config.RudderSchema != "", config.RudderSchema, defaultRudderSchema),
 			base.WithColumnTypeMappings(getColumnTypeMappings(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {

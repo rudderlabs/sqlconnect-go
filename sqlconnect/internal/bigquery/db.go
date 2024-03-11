@@ -16,8 +16,7 @@ import (
 )
 
 const (
-	DatabaseType        = "bigquery"
-	defaultRudderSchema = "rudderstack_"
+	DatabaseType = "bigquery"
 )
 
 // NewDB creates a new bigquery db client
@@ -33,7 +32,6 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
-			lo.Ternary(config.RudderSchema != "", config.RudderSchema, defaultRudderSchema),
 			base.WithDialect(dialect{}),
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),

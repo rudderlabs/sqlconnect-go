@@ -46,8 +46,6 @@ type sqlDB interface {
 type SchemaAdmin interface {
 	// CreateSchema creates a schema
 	CreateSchema(ctx context.Context, schema SchemaRef) error
-	// GetRudderSchema returns the name of the rudder schema
-	GetRudderSchema() string
 	// GetSchemas returns a list of schemas
 	ListSchemas(ctx context.Context) ([]SchemaRef, error)
 	// SchemaExists returns true if the schema exists

@@ -16,9 +16,6 @@ type Config struct {
 	Catalog  string `json:"catalog"`
 	User     string `json:"user"`
 	Password string `json:"password"`
-
-	// RudderSchema is used to override the default rudder schema name during tests
-	RudderSchema string `json:"rudderSchema"`
 }
 
 func (c Config) ConnectionString() (string, error) {

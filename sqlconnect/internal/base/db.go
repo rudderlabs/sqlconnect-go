@@ -9,7 +9,7 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
-func NewDB(db *sql.DB, rudderSchema string, opts ...Option) *DB {
+func NewDB(db *sql.DB, opts ...Option) *DB {
 	d := &DB{
 		DB:      db,
 		Dialect: dialect{},
@@ -19,7 +19,6 @@ func NewDB(db *sql.DB, rudderSchema string, opts ...Option) *DB {
 		jsonRowMapper: func(databaseTypeName string, value any) any {
 			return value
 		},
-		rudderSchema: rudderSchema,
 		sqlCommands: SQLCommands{
 			CreateSchema: func(schema string) string { return fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %[1]s", schema) },
 			ListSchemas: func() (string, string) {
@@ -69,7 +68,6 @@ type DB struct {
 	*sql.DB
 	sqlconnect.Dialect
 
-	rudderSchema     string
 	columnTypeMapper func(ColumnType) string // map from database type to rudder type
 	jsonRowMapper    func(databaseTypeName string, value any) any
 	sqlCommands      SQLCommands

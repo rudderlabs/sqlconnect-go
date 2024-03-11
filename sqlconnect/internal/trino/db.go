@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	DatabaseType        = "trino"
-	defaultRudderSchema = "_rudderstack"
+	DatabaseType = "trino"
 )
 
 // NewDB creates a new trino db client
@@ -38,7 +37,6 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
-			lo.Ternary(config.RudderSchema != "", config.RudderSchema, defaultRudderSchema),
 			base.WithColumnTypeMapper(columnTypeMapper),
 			base.WithJsonRowMapper(jsonRowMapper),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {

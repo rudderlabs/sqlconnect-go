@@ -17,9 +17,7 @@ type Config struct {
 	MaxRetryWaitTime time.Duration `json:"maxRetryWaitTime"`
 	MaxConnIdleTime  time.Duration `json:"maxConnIdleTime"`
 
-	// RudderSchema is used to override the default rudder schema name during tests
-	RudderSchema      string `json:"rudderSchema"`
-	UseLegacyMappings bool   `json:"useLegacyMappings"`
+	UseLegacyMappings bool `json:"useLegacyMappings"`
 }
 
 func (c *Config) Parse(configJson json.RawMessage) error {

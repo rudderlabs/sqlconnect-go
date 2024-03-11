@@ -16,10 +16,8 @@ type Config struct {
 	Schema    string `json:"schema"`
 	Role      string `json:"role"`
 
-	// RudderSchema is used to override the default rudder schema name during tests
-	RudderSchema      string `json:"rudderSchema"`
-	KeepSessionAlive  bool   `json:"keepSessionAlive"`
-	UseLegacyMappings bool   `json:"useLegacyMappings"`
+	KeepSessionAlive  bool `json:"keepSessionAlive"`
+	UseLegacyMappings bool `json:"useLegacyMappings"`
 }
 
 func (c Config) ConnectionString() (dsn string, err error) {

@@ -10,11 +10,6 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
-// GetRudderSchema returns the name of the rudder schema
-func (db *DB) GetRudderSchema() string {
-	return db.rudderSchema
-}
-
 // CreateSchema creates a schema
 func (db *DB) CreateSchema(ctx context.Context, schema sqlconnect.SchemaRef) error {
 	if _, err := db.ExecContext(ctx, db.sqlCommands.CreateSchema(db.QuoteIdentifier(schema.Name))); err != nil {

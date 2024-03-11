@@ -17,9 +17,7 @@ type Config struct {
 
 	// SkipHostValidation is used to skip host validation during tests
 	SkipHostValidation bool `json:"skipHostValidation"`
-	// RudderSchema is used to override the default rudder schema name during tests
-	RudderSchema      string `json:"rudderSchema"`
-	UseLegacyMappings bool   `json:"useLegacyMappings"`
+	UseLegacyMappings  bool `json:"useLegacyMappings"`
 }
 
 func (c Config) ConnectionString() (string, error) {
