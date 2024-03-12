@@ -52,25 +52,25 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
 				cmds.ListSchemas = func() (string, string) { return "SHOW SCHEMAS", "schema_name" }
-				cmds.SchemaExists = func(schema string) string { return fmt.Sprintf(`SHOW SCHEMAS LIKE '%s'`, schema) }
+				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string { return fmt.Sprintf(`SHOW SCHEMAS LIKE '%s'`, schema) }
 
-				cmds.CreateTestTable = func(table string) string {
+				cmds.CreateTestTable = func(table base.QuotedIdentifier) string {
 					return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %[1]s (c1 INT, c2 STRING)", table)
 				}
-				cmds.ListTables = func(schema string) []lo.Tuple2[string, string] {
+				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SHOW TABLES IN %s", schema), B: "tableName"},
+						{A: fmt.Sprintf("SHOW TABLES IN `%s`", schema), B: "tableName"},
 					}
 				}
-				cmds.ListTablesWithPrefix = func(schema, prefix string) []lo.Tuple2[string, string] {
+				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SHOW TABLES IN %[1]s LIKE '%[2]s'", schema, prefix+"*"), B: "tableName"},
+						{A: fmt.Sprintf("SHOW TABLES IN `%[1]s` LIKE '%[2]s'", schema, prefix+"*"), B: "tableName"},
 					}
 				}
-				cmds.TableExists = func(schema, table string) string {
-					return fmt.Sprintf("SHOW TABLES IN %[1]s LIKE '%[2]s'", schema, table)
+				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
+					return fmt.Sprintf("SHOW TABLES IN `%[1]s` LIKE '%[2]s'", schema, table)
 				}
-				cmds.ListColumns = func(schema, table string) (string, string, string) {
+				cmds.ListColumns = func(schema, table base.UnquotedIdentifier) (string, string, string) {
 					return fmt.Sprintf("DESCRIBE TABLE `%[1]s`.`%[2]s`", schema, table), "col_name", "data_type"
 				}
 				return cmds

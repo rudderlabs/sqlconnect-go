@@ -12,7 +12,7 @@ import (
 
 // CreateSchema creates a schema
 func (db *DB) CreateSchema(ctx context.Context, schema sqlconnect.SchemaRef) error {
-	if _, err := db.ExecContext(ctx, db.sqlCommands.CreateSchema(db.QuoteIdentifier(schema.Name))); err != nil {
+	if _, err := db.ExecContext(ctx, db.sqlCommands.CreateSchema(QuotedIdentifier(db.QuoteIdentifier(schema.Name)))); err != nil {
 		return fmt.Errorf("creating schema %s: %w", schema, err)
 	}
 	return nil
@@ -66,7 +66,7 @@ func (db *DB) ListSchemas(ctx context.Context) ([]sqlconnect.SchemaRef, error) {
 
 // SchemaExists returns true if the schema exists
 func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef) (bool, error) {
-	rows, err := db.QueryContext(ctx, db.sqlCommands.SchemaExists(schemaRef.Name))
+	rows, err := db.QueryContext(ctx, db.sqlCommands.SchemaExists(UnquotedIdentifier(schemaRef.Name)))
 	if err != nil {
 		return false, fmt.Errorf("querying schema exists: %w", err)
 	}
@@ -80,7 +80,7 @@ func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef) 
 
 // DropSchema drops a schema
 func (db *DB) DropSchema(ctx context.Context, schemaRef sqlconnect.SchemaRef) error {
-	if _, err := db.ExecContext(ctx, db.sqlCommands.DropSchema(db.QuoteIdentifier(schemaRef.Name))); err != nil {
+	if _, err := db.ExecContext(ctx, db.sqlCommands.DropSchema(QuotedIdentifier(db.QuoteIdentifier(schemaRef.Name)))); err != nil {
 		return fmt.Errorf("dropping schema: %w", err)
 	}
 	return nil

@@ -38,7 +38,7 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 				cmds.ListSchemas = func() (string, string) {
 					return "SELECT schema_name FROM svv_redshift_schemas", "schema_name"
 				}
-				cmds.SchemaExists = func(schema string) string {
+				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SELECT schema_name FROM svv_redshift_schemas WHERE schema_name = '%[1]s'", schema)
 				}
 				return cmds

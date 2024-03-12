@@ -20,40 +20,42 @@ func NewDB(db *sql.DB, opts ...Option) *DB {
 			return value
 		},
 		sqlCommands: SQLCommands{
-			CreateSchema: func(schema string) string { return fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %[1]s", schema) },
+			CreateSchema: func(schema QuotedIdentifier) string {
+				return fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %[1]s", schema)
+			},
 			ListSchemas: func() (string, string) {
 				return "SELECT schema_name FROM information_schema.schemata", "schema_name"
 			},
-			SchemaExists: func(schema string) string {
+			SchemaExists: func(schema UnquotedIdentifier) string {
 				return fmt.Sprintf("SELECT schema_name FROM information_schema.schemata where schema_name = '%[1]s'", schema)
 			},
-			DropSchema: func(schema string) string { return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema) },
-			CreateTestTable: func(table string) string {
+			DropSchema: func(schema QuotedIdentifier) string { return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema) },
+			CreateTestTable: func(table QuotedIdentifier) string {
 				return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %[1]s (c1 INT, c2 VARCHAR(255))", table)
 			},
-			ListTables: func(schema string) []lo.Tuple2[string, string] {
+			ListTables: func(schema UnquotedIdentifier) []lo.Tuple2[string, string] {
 				return []lo.Tuple2[string, string]{
 					{A: fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema = '%[1]s'", schema), B: "table_name"},
 				}
 			},
-			ListTablesWithPrefix: func(schema, prefix string) []lo.Tuple2[string, string] {
+			ListTablesWithPrefix: func(schema UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 				return []lo.Tuple2[string, string]{
 					{A: fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='%[1]s' AND table_name LIKE '%[2]s'", schema, prefix+"%"), B: "table_name"},
 				}
 			},
-			TableExists: func(schema, table string) string {
+			TableExists: func(schema, table UnquotedIdentifier) string {
 				return fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='%[1]s' and table_name = '%[2]s'", schema, table)
 			},
-			ListColumns: func(schema, table string) (string, string, string) {
+			ListColumns: func(schema, table UnquotedIdentifier) (string, string, string) {
 				return fmt.Sprintf("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '%[1]s' AND table_name = '%[2]s'", schema, table), "column_name", "data_type"
 			},
-			CountTableRows: func(table string) string { return fmt.Sprintf("SELECT COUNT(*) FROM %[1]s", table) },
-			DropTable:      func(table string) string { return fmt.Sprintf("DROP TABLE IF EXISTS %[1]s", table) },
-			TruncateTable:  func(table string) string { return fmt.Sprintf("TRUNCATE TABLE %[1]s", table) },
-			RenameTable: func(schema, oldName, newName string) string {
+			CountTableRows: func(table QuotedIdentifier) string { return fmt.Sprintf("SELECT COUNT(*) FROM %[1]s", table) },
+			DropTable:      func(table QuotedIdentifier) string { return fmt.Sprintf("DROP TABLE IF EXISTS %[1]s", table) },
+			TruncateTable:  func(table QuotedIdentifier) string { return fmt.Sprintf("TRUNCATE TABLE %[1]s", table) },
+			RenameTable: func(schema, oldName, newName QuotedIdentifier) string {
 				return fmt.Sprintf("ALTER TABLE %[1]s.%[2]s RENAME TO %[3]s", schema, oldName, newName)
 			},
-			MoveTable: func(schema, oldName, newName string) string {
+			MoveTable: func(schema, oldName, newName QuotedIdentifier) string {
 				return fmt.Sprintf("CREATE TABLE %[1]s.%[3]s AS SELECT * FROM %[1]s.%[2]s", schema, oldName, newName)
 			},
 		},
@@ -95,33 +97,37 @@ func (db *DB) SqlDB() *sql.DB {
 	return db.DB
 }
 
-type SQLCommands struct {
-	// Provides the SQL command to create a schema
-	CreateSchema func(schema string) string
-	// Provides the SQL command to list all schemas
-	ListSchemas func() (sql, columnName string)
-	// Provides the SQL command to check if a schema exists
-	SchemaExists func(schema string) string
-	// Provides the SQL command to drop a schema
-	DropSchema func(schema string) string
-	// Provides the SQL command to create a test table
-	CreateTestTable func(table string) string
-	// Provides the SQL command(s) to list all tables in a schema along with the column name that contains the table name in the result set
-	ListTables func(schema string) (sqlAndColumnNamePairs []lo.Tuple2[string, string])
-	// Provides the SQL command(s) to list all tables in a schema with a prefix along with the column name that contains the table name in the result set
-	ListTablesWithPrefix func(schema, prefix string) []lo.Tuple2[string, string]
-	// Provides the SQL command to check if a table exists
-	TableExists func(schema, table string) string
-	// Provides the SQL command to list all columns in a table along with the column names in the result set that point to the name and type
-	ListColumns func(schema, table string) (sql, nameCol, typeCol string)
-	// Provides the SQL command to count the rows in a table
-	CountTableRows func(table string) string
-	// Provides the SQL command to drop a table
-	DropTable func(table string) string
-	// Provides the SQL command to truncate a table
-	TruncateTable func(table string) string
-	// Provides the SQL command to rename a table
-	RenameTable func(schema, oldName, newName string) string
-	// Provides the SQL command to move a table
-	MoveTable func(schema, oldName, newName string) string
-}
+type (
+	QuotedIdentifier   string // A quoted identifier is a string that is quoted, e.g. "my_table"
+	UnquotedIdentifier string // An unquoted identifier is a string that is not quoted, e.g. my_table
+	SQLCommands        struct {
+		// Provides the SQL command to create a schema
+		CreateSchema func(schema QuotedIdentifier) string
+		// Provides the SQL command to list all schemas
+		ListSchemas func() (sql, columnName string)
+		// Provides the SQL command to check if a schema exists
+		SchemaExists func(schema UnquotedIdentifier) string
+		// Provides the SQL command to drop a schema
+		DropSchema func(schema QuotedIdentifier) string
+		// Provides the SQL command to create a test table
+		CreateTestTable func(table QuotedIdentifier) string
+		// Provides the SQL command(s) to list all tables in a schema along with the column name that contains the table name in the result set
+		ListTables func(schema UnquotedIdentifier) (sqlAndColumnNamePairs []lo.Tuple2[string, string])
+		// Provides the SQL command(s) to list all tables in a schema with a prefix along with the column name that contains the table name in the result set
+		ListTablesWithPrefix func(schema UnquotedIdentifier, prefix string) []lo.Tuple2[string, string]
+		// Provides the SQL command to check if a table exists
+		TableExists func(schema, table UnquotedIdentifier) string
+		// Provides the SQL command to list all columns in a table along with the column names in the result set that point to the name and type
+		ListColumns func(schema, table UnquotedIdentifier) (sql, nameCol, typeCol string)
+		// Provides the SQL command to count the rows in a table
+		CountTableRows func(table QuotedIdentifier) string
+		// Provides the SQL command to drop a table
+		DropTable func(table QuotedIdentifier) string
+		// Provides the SQL command to truncate a table
+		TruncateTable func(table QuotedIdentifier) string
+		// Provides the SQL command to rename a table
+		RenameTable func(schema, oldName, newName QuotedIdentifier) string
+		// Provides the SQL command to move a table
+		MoveTable func(schema, oldName, newName QuotedIdentifier) string
+	}
+)

@@ -40,21 +40,21 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 			base.WithColumnTypeMapper(columnTypeMapper),
 			base.WithJsonRowMapper(jsonRowMapper),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
-				cmds.ListTables = func(schema string) []lo.Tuple2[string, string] {
+				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SHOW TABLES FROM %[1]s", schema), B: "tableName"},
+						{A: fmt.Sprintf(`SHOW TABLES FROM %[1]s`, schema), B: "tableName"},
 					}
 				}
-				cmds.ListTablesWithPrefix = func(schema, prefix string) []lo.Tuple2[string, string] {
+				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SHOW TABLES FROM %[1]s LIKE '%[2]s'", schema, prefix+"%"), B: "tableName"},
+						{A: fmt.Sprintf(`SHOW TABLES FROM "%[1]s" LIKE '%[2]s'`, schema, prefix+"%"), B: "tableName"},
 					}
 				}
-				cmds.TableExists = func(schema, table string) string {
-					return fmt.Sprintf("SHOW TABLES FROM %[1]s LIKE '%[2]s'", schema, table)
+				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
+					return fmt.Sprintf(`SHOW TABLES FROM "%[1]s" LIKE '%[2]s'`, schema, table)
 				}
-				cmds.TruncateTable = func(table string) string {
-					return fmt.Sprintf("DELETE FROM %[1]s", table)
+				cmds.TruncateTable = func(table base.QuotedIdentifier) string {
+					return fmt.Sprintf(`DELETE FROM %[1]s`, table)
 				}
 				return cmds
 			}),

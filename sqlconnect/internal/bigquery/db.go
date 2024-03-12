@@ -36,23 +36,23 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
-				cmds.CreateTestTable = func(table string) string {
+				cmds.CreateTestTable = func(table base.QuotedIdentifier) string {
 					return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %[1]s (c1 INT, c2 STRING)", table)
 				}
-				cmds.ListTables = func(schema string) []lo.Tuple2[string, string] {
+				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
 						{A: fmt.Sprintf("SELECT table_name FROM `%[1]s`.INFORMATION_SCHEMA.TABLES", schema), B: "table_name"},
 					}
 				}
-				cmds.ListTablesWithPrefix = func(schema, prefix string) []lo.Tuple2[string, string] {
+				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
 						{A: fmt.Sprintf("SELECT table_name FROM `%[1]s`.INFORMATION_SCHEMA.TABLES WHERE table_name LIKE '%[2]s'", schema, prefix+"%"), B: "table_name"},
 					}
 				}
-				cmds.TableExists = func(schema, table string) string {
+				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SELECT table_name FROM `%[1]s`.INFORMATION_SCHEMA.TABLES WHERE table_name = '%[2]s'", schema, table)
 				}
-				cmds.ListColumns = func(schema, table string) (string, string, string) {
+				cmds.ListColumns = func(schema, table base.UnquotedIdentifier) (string, string, string) {
 					return fmt.Sprintf("SELECT column_name, data_type FROM `%[1]s`.INFORMATION_SCHEMA.COLUMNS WHERE table_name = '%[2]s'", schema, table), "column_name", "data_type"
 				}
 

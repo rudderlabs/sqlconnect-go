@@ -12,14 +12,14 @@ import (
 
 // CreateTestTable creates a test table
 func (db *DB) CreateTestTable(ctx context.Context, table sqlconnect.RelationRef) error {
-	_, err := db.ExecContext(ctx, db.sqlCommands.CreateTestTable(db.QuoteTable(table)))
+	_, err := db.ExecContext(ctx, db.sqlCommands.CreateTestTable(QuotedIdentifier(db.QuoteTable(table))))
 	return err
 }
 
 // ListTables returns a list of tables in the given schema
 func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef) ([]sqlconnect.RelationRef, error) {
 	var res []sqlconnect.RelationRef
-	for _, tuple := range db.sqlCommands.ListTables(schema.Name) {
+	for _, tuple := range db.sqlCommands.ListTables(UnquotedIdentifier(schema.Name)) {
 		stmt := tuple.A
 		colName := tuple.B
 		rows, err := db.QueryContext(ctx, stmt)
@@ -68,7 +68,7 @@ func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef) ([]sq
 // ListTablesWithPrefix returns a list of tables in the given schema that have the given prefix
 func (db *DB) ListTablesWithPrefix(ctx context.Context, schema sqlconnect.SchemaRef, prefix string) ([]sqlconnect.RelationRef, error) {
 	var res []sqlconnect.RelationRef
-	for _, tuple := range db.sqlCommands.ListTablesWithPrefix(schema.Name, prefix) {
+	for _, tuple := range db.sqlCommands.ListTablesWithPrefix(UnquotedIdentifier(schema.Name), prefix) {
 		stmt := tuple.A
 		colName := tuple.B
 		rows, err := db.QueryContext(ctx, stmt)
@@ -115,7 +115,7 @@ func (db *DB) ListTablesWithPrefix(ctx context.Context, schema sqlconnect.Schema
 
 // TableExists returns true if the table exists
 func (db *DB) TableExists(ctx context.Context, relation sqlconnect.RelationRef) (bool, error) {
-	stmt := db.sqlCommands.TableExists(relation.Schema, relation.Name)
+	stmt := db.sqlCommands.TableExists(UnquotedIdentifier(relation.Schema), UnquotedIdentifier(relation.Name))
 	rows, err := db.QueryContext(ctx, stmt)
 	if err != nil {
 		return false, fmt.Errorf("querying table %s exists: %w", relation, err)
@@ -133,7 +133,7 @@ func (db *DB) TableExists(ctx context.Context, relation sqlconnect.RelationRef) 
 // ListColumns returns a list of columns for the given table
 func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) ([]sqlconnect.ColumnRef, error) {
 	var res []sqlconnect.ColumnRef
-	stmt, nameCol, typeCol := db.sqlCommands.ListColumns(relation.Schema, relation.Name)
+	stmt, nameCol, typeCol := db.sqlCommands.ListColumns(UnquotedIdentifier(relation.Schema), UnquotedIdentifier(relation.Name))
 	columns, err := db.QueryContext(ctx, stmt)
 	if err != nil {
 		return nil, fmt.Errorf("querying list columns for %s: %w", relation.String(), err)
@@ -206,7 +206,7 @@ func (db *DB) ListColumnsForSqlQuery(ctx context.Context, sql string) ([]sqlconn
 // CountTableRows returns the number of rows in the given table
 func (c *DB) CountTableRows(ctx context.Context, relation sqlconnect.RelationRef) (int, error) {
 	var count int
-	if err := c.QueryRowContext(ctx, c.sqlCommands.CountTableRows(c.QuoteTable(relation))).Scan(&count); err != nil {
+	if err := c.QueryRowContext(ctx, c.sqlCommands.CountTableRows(QuotedIdentifier(c.QuoteTable(relation)))).Scan(&count); err != nil {
 		return 0, fmt.Errorf("counting table rows for %s: %w", relation.String(), err)
 	}
 	return count, nil
@@ -214,7 +214,7 @@ func (c *DB) CountTableRows(ctx context.Context, relation sqlconnect.RelationRef
 
 // DropTable drops a table
 func (db *DB) DropTable(ctx context.Context, ref sqlconnect.RelationRef) error {
-	if _, err := db.ExecContext(ctx, db.sqlCommands.DropTable(db.QuoteTable(ref))); err != nil {
+	if _, err := db.ExecContext(ctx, db.sqlCommands.DropTable(QuotedIdentifier(db.QuoteTable(ref)))); err != nil {
 		return fmt.Errorf("dropping table %s: %w", ref.String(), err)
 	}
 	return nil
@@ -222,7 +222,7 @@ func (db *DB) DropTable(ctx context.Context, ref sqlconnect.RelationRef) error {
 
 // TruncateTable truncates a table
 func (db *DB) TruncateTable(ctx context.Context, ref sqlconnect.RelationRef) error {
-	if _, err := db.ExecContext(ctx, db.sqlCommands.TruncateTable(db.QuoteTable(ref))); err != nil {
+	if _, err := db.ExecContext(ctx, db.sqlCommands.TruncateTable(QuotedIdentifier(db.QuoteTable(ref)))); err != nil {
 		return fmt.Errorf("truncating table %s: %w", ref.String(), err)
 	}
 	return nil
@@ -233,7 +233,7 @@ func (db *DB) RenameTable(ctx context.Context, oldRef, newRef sqlconnect.Relatio
 	if oldRef.Schema != newRef.Schema {
 		return fmt.Errorf("moving table to another schema not supported, oldRef: %s newRef: %s", oldRef, newRef)
 	}
-	if _, err := db.ExecContext(ctx, db.sqlCommands.RenameTable(db.QuoteIdentifier(oldRef.Schema), db.QuoteIdentifier(oldRef.Name), db.QuoteIdentifier(newRef.Name))); err != nil {
+	if _, err := db.ExecContext(ctx, db.sqlCommands.RenameTable(QuotedIdentifier(db.QuoteIdentifier(oldRef.Schema)), QuotedIdentifier(db.QuoteIdentifier(oldRef.Name)), QuotedIdentifier(db.QuoteIdentifier(newRef.Name)))); err != nil {
 		return fmt.Errorf("renaming table %s to %s: %w", oldRef.String(), newRef.String(), err)
 	}
 	return nil
@@ -244,7 +244,7 @@ func (db *DB) MoveTable(ctx context.Context, oldRef, newRef sqlconnect.RelationR
 	if oldRef.Schema != newRef.Schema {
 		return fmt.Errorf("moving table to another schema not supported, oldRef: %s newRef: %s", oldRef, newRef)
 	}
-	if _, err := db.ExecContext(ctx, db.sqlCommands.MoveTable(db.QuoteIdentifier(oldRef.Schema), db.QuoteIdentifier(oldRef.Name), db.QuoteIdentifier(newRef.Name))); err != nil {
+	if _, err := db.ExecContext(ctx, db.sqlCommands.MoveTable(QuotedIdentifier(db.QuoteIdentifier(oldRef.Schema)), QuotedIdentifier(db.QuoteIdentifier(oldRef.Name)), QuotedIdentifier(db.QuoteIdentifier(newRef.Name)))); err != nil {
 		return fmt.Errorf("copying table %s contents to %s: %w", oldRef.String(), newRef.String(), err)
 	}
 	if err := db.DropTable(ctx, oldRef); err != nil {

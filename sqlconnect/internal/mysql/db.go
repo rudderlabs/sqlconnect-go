@@ -38,10 +38,10 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
-				cmds.DropSchema = func(schema string) string { // mysql does not support CASCADE
+				cmds.DropSchema = func(schema base.QuotedIdentifier) string { // mysql does not support CASCADE
 					return fmt.Sprintf("DROP SCHEMA %[1]s", schema)
 				}
-				cmds.RenameTable = func(schema, oldName, newName string) string {
+				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {
 					return fmt.Sprintf("RENAME TABLE %[1]s.%[2]s TO %[1]s.%[3]s", schema, oldName, newName)
 				}
 				return cmds
