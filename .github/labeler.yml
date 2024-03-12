@@ -1,0 +1,2 @@
+with tests:
+- any: ['**/*_test.go']

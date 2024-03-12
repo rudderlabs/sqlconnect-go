@@ -1,0 +1,99 @@
+name: test
+on:
+  release:
+    types: [created]
+  push:
+    branches:
+      - main
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write # allows the JWT to be requested from GitHub's OIDC provider
+  contents: read # This is required for actions/checkout
+
+jobs:
+  tests:
+    name: matrix test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: 
+        - .
+        - sqlconnect/internal
+        - sqlconnect/internal/bigquery
+        - sqlconnect/internal/databricks
+        - sqlconnect/internal/mysql
+        - sqlconnect/internal/postgres
+        - sqlconnect/internal/redshift
+        - sqlconnect/internal/snowflake
+        - sqlconnect/internal/trino
+        include:
+          - package: .
+            exclude: sqlconnect-go/sqlconnect/internal
+          - package: sqlconnect/internal
+            exclude: sqlconnect-go/sqlconnect/internal/(bigquery|databricks|mysql|postgres|redshift|snowflake|trino)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+      - run: go version
+      - run: go mod download
+      - name: Run tests
+        run: |
+          make test exclude="${{ matrix.exclude }}" package=${{ matrix.package }}
+        env:
+          REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS }}
+          SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS }}
+          BIGQUERY_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.BIGQUERY_TEST_ENVIRONMENT_CREDENTIALS }}
+          DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS }}
+          TRINO_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.TRINO_TEST_ENVIRONMENT_CREDENTIALS }}
+      - name: Sanitize name for Artifact
+        run: |
+          name=$(echo -n "${{ matrix.package }}" | sed -e 's/[ \t:.\/\\"<>|*?]/_/g' -e 's/--*/-/g')
+          echo "ARTIFACT_NAME=$name" >> $GITHUB_ENV
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}_profile.out
+          path: profile.out
+  coverage:
+    name: coverage
+    runs-on: 'ubuntu-20.04'
+    needs:
+      - tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22.0'
+          check-latest: true
+      - name: Download coverage reports
+        uses: actions/download-artifact@v4
+      - name: Merge Coverage
+        run: |
+          go install github.com/wadey/gocovmerge@latest
+          gocovmerge */profile.out > profile.out
+      - uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          files: ./profile.out
+          token: ${{ secrets.CODECOV_TOKEN }}
+  all-green:
+    name: all-tests
+    if: always()
+    runs-on: ubuntu-latest
+    needs:
+      - tests
+    steps:
+      - uses: re-actors/alls-green@v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
