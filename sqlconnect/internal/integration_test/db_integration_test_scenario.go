@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/rudderlabs/rudder-go-kit/testhelper/rand"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	sqlconnectutil "github.com/rudderlabs/sqlconnect-go/sqlconnect/util"
 )
 
 type Options struct {
@@ -586,7 +586,6 @@ func ExecuteStatements(t *testing.T, c sqlconnect.DB, schema, path string) {
 
 func ReadSQLStatements(t *testing.T, schema, path string) []string {
 	t.Helper()
-	SQLComment := regexp.MustCompile(`(?m)--.*\n`)
 	data, err := os.ReadFile(path)
 	require.NoErrorf(t, err, "it should be able to read the sql script file %q", path)
 	tpl, err := template.New("data").Parse(string(data))
@@ -595,10 +594,5 @@ func ReadSQLStatements(t *testing.T, schema, path string) []string {
 	templateData := map[string]any{"schema": schema}
 	err = tpl.Execute(sql, templateData)
 	require.NoErrorf(t, err, "it should be able to execute the sql script file %q", path)
-	allStmts := sql.String()
-	stmts := lo.FilterMap(strings.Split(allStmts, ";"), func(stmt string, _ int) (string, bool) {
-		stmt = SQLComment.ReplaceAllString(strings.TrimSpace(stmt), "")
-		return stmt, stmt != ""
-	})
-	return stmts
+	return sqlconnectutil.SplitStatements(sql.String())
 }

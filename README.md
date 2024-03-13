@@ -104,3 +104,14 @@ for row := range ch {
     _ = row.Value
 }
 ```
+
+## Utilities
+
+**SplitStatements**: Splits a string of SQL statements separated with semicolons into individual statements
+```go
+import sqlconnectutil "github.com/rudderlabs/sqlconnect-go/sqlconnect/util"
+
+func main() {
+    statements := sqlconnectutil.SplitStatements("SELECT * FROM table; SELECT * FROM table;")
+}
+```
