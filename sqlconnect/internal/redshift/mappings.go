@@ -44,6 +44,10 @@ func jsonRowMapper(databaseTypeName string, value any) any {
 			if n, err := strconv.ParseFloat(string(v), 64); err == nil {
 				return n
 			}
+		case string:
+			if n, err := strconv.ParseFloat(v, 64); err == nil {
+				return n
+			}
 		}
 	default:
 		switch v := value.(type) {

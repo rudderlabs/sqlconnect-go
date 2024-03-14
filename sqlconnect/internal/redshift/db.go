@@ -6,6 +6,9 @@ import (
 	"fmt"
 
 	_ "github.com/lib/pq" // postgres driver
+	"github.com/tidwall/gjson"
+
+	redshiftdriver "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift/driver"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
@@ -18,13 +21,17 @@ const (
 
 // NewDB creates a new redshift db client
 func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
-	var config Config
-	err := config.Parse(credentialsJSON)
-	if err != nil {
-		return nil, err
+	var (
+		db  *sql.DB
+		err error
+	)
+	useLegacyMappings := gjson.GetBytes(credentialsJSON, "useLegacyMappings").Bool()
+	// Use the SDK if the credentials are for the SDK
+	if configType := gjson.GetBytes(credentialsJSON, "type").Str; configType == SDKConfigType {
+		db, err = newSdkDB(credentialsJSON)
+	} else {
+		db, err = newPgDB(credentialsJSON)
 	}
-
-	db, err := sql.Open(postgres.DatabaseType, config.ConnectionString())
 	if err != nil {
 		return nil, err
 	}
@@ -32,8 +39,8 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
-			base.WithColumnTypeMappings(getColumnTypeMappings(config)),
-			base.WithJsonRowMapper(getJonRowMapper(config)),
+			base.WithColumnTypeMappings(getColumnTypeMappings(useLegacyMappings)),
+			base.WithJsonRowMapper(getJonRowMapper(useLegacyMappings)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
 				cmds.CurrentCatalog = func() string {
 					return "SELECT current_database()"
@@ -50,6 +57,41 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 	}, nil
 }
 
+func newPgDB(credentialsJSON json.RawMessage) (*sql.DB, error) {
+	var config Config
+	err := config.Parse(credentialsJSON)
+	if err != nil {
+		return nil, err
+	}
+
+	return sql.Open(postgres.DatabaseType, config.ConnectionString())
+}
+
+func newSdkDB(credentialsJSON json.RawMessage) (*sql.DB, error) {
+	var config SDKConfig
+	err := config.Parse(credentialsJSON)
+	if err != nil {
+		return nil, err
+	}
+	cfg := redshiftdriver.RedshiftConfig{
+		ClusterIdentifier: config.ClusterIdentifier,
+		Database:          config.Database,
+		DbUser:            config.User,
+		WorkgroupName:     config.WorkgroupName,
+		SecretsARN:        config.SecretsARN,
+		Region:            config.Region,
+		AccessKeyID:       config.AccessKeyID,
+		SecretAccessKey:   config.SecretAccessKey,
+		SessionToken:      config.SessionToken,
+		Timeout:           config.Timeout,
+		MinPolling:        config.MinPolling,
+		MaxPolling:        config.MaxPolling,
+	}
+	connector := redshiftdriver.NewRedshiftConnector(cfg)
+
+	return sql.OpenDB(connector), nil
+}
+
 func init() {
 	sqlconnect.RegisterDBFactory(DatabaseType, func(credentialsJSON json.RawMessage) (sqlconnect.DB, error) {
 		return NewDB(credentialsJSON)
@@ -60,15 +102,15 @@ type DB struct {
 	*base.DB
 }
 
-func getColumnTypeMappings(config postgres.Config) map[string]string {
-	if config.UseLegacyMappings {
+func getColumnTypeMappings(useLegacyMappings bool) map[string]string {
+	if useLegacyMappings {
 		return legacyColumnTypeMappings
 	}
 	return columnTypeMappings
 }
 
-func getJonRowMapper(config postgres.Config) func(databaseTypeName string, value any) any {
-	if config.UseLegacyMappings {
+func getJonRowMapper(useLegacyMappings bool) func(databaseTypeName string, value any) any {
+	if useLegacyMappings {
 		return legacyJsonRowMapper
 	}
 	return jsonRowMapper

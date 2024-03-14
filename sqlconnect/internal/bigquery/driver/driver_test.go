@@ -45,6 +45,10 @@ func TestBigqueryDriver(t *testing.T) {
 	})
 
 	schema := GenerateTestSchema()
+	t.Cleanup(func() {
+		_, err := db.Exec(fmt.Sprintf("DROP SCHEMA IF EXISTS `%s` CASCADE", schema))
+		require.NoError(t, err, "it should be able to drop the schema")
+	})
 
 	t.Run("Ping", func(t *testing.T) {
 		require.NoError(t, db.Ping(), "it should be able to ping the database")
@@ -224,5 +228,5 @@ type config struct {
 }
 
 func GenerateTestSchema() string {
-	return strings.ToLower(fmt.Sprintf("tbqdrv_%s_%d", rand.String(12), time.Now().Unix()))
+	return strings.ToLower(fmt.Sprintf("tsqlcon_%s_%d", rand.String(12), time.Now().Unix()))
 }
