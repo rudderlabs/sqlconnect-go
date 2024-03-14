@@ -133,7 +133,7 @@ func (db *DB) TableExists(ctx context.Context, relation sqlconnect.RelationRef) 
 // ListColumns returns a list of columns for the given table
 func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) ([]sqlconnect.ColumnRef, error) {
 	var res []sqlconnect.ColumnRef
-	stmt, nameCol, typeCol := db.sqlCommands.ListColumns(UnquotedIdentifier(relation.Schema), UnquotedIdentifier(relation.Name))
+	stmt, nameCol, typeCol := db.sqlCommands.ListColumns(UnquotedIdentifier(relation.Catalog), UnquotedIdentifier(relation.Schema), UnquotedIdentifier(relation.Name))
 	columns, err := db.QueryContext(ctx, stmt)
 	if err != nil {
 		return nil, fmt.Errorf("querying list columns for %s: %w", relation.String(), err)

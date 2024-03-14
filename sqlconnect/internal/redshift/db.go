@@ -35,6 +35,9 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 			base.WithColumnTypeMappings(getColumnTypeMappings(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
+				cmds.CurrentCatalog = func() string {
+					return "SELECT current_database()"
+				}
 				cmds.ListSchemas = func() (string, string) {
 					return "SELECT schema_name FROM svv_redshift_schemas", "schema_name"
 				}
