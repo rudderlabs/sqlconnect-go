@@ -3,7 +3,9 @@ package postgres
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
 
@@ -15,6 +17,8 @@ type Config struct {
 	User     string `json:"user"`
 	Password string `json:"password"`
 	SSLMode  string `json:"sslmode"`
+
+	TunnelInfo *sshtunnel.Config `json:"tunnel_info,omitempty"`
 
 	// SkipHostValidation is used to skip host validation during tests
 	SkipHostValidation bool `json:"skipHostValidation"`
@@ -29,13 +33,27 @@ func (c Config) ConnectionString() string {
 	if c.SSLMode != "" {
 		sslMode = c.SSLMode
 	}
-	return fmt.Sprintf("host=%s port=%d dbname=%s user=%s password=%s sslmode=%s", c.Host, c.Port, c.DBName, c.User, c.Password, sslMode)
+	dsn := url.URL{
+		Scheme: DatabaseType,
+		User:   url.UserPassword(c.User, c.Password),
+		Host:   fmt.Sprintf("%s:%d", c.Host, c.Port),
+		Path:   c.DBName,
+	}
+	values := dsn.Query()
+	values.Set("sslmode", sslMode)
+	dsn.RawQuery = values.Encode()
+	return dsn.String()
 }
 
 func (c *Config) Parse(input json.RawMessage) error {
 	err := json.Unmarshal(input, c)
 	if err != nil {
 		return err
+	}
+	if c.TunnelInfo == nil { // if tunnel info is not provided as a separate json object, try to parse it from the input
+		if c.TunnelInfo, err = sshtunnel.ParseInlineConfig(input); err != nil {
+			return err
+		}
 	}
 	if !c.SkipHostValidation {
 		return util.ValidateHost(c.Host)

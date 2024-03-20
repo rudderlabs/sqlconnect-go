@@ -35,4 +35,6 @@ func TestMysqlDB(t *testing.T) {
 	require.NoError(t, err, "it should be able to marshal config to json")
 
 	integrationtest.TestDatabaseScenarios(t, mysql.DatabaseType, configJSON, strings.ToLower, integrationtest.Options{LegacySupport: true})
+
+	integrationtest.TestSshTunnelScenarios(t, mysql.DatabaseType, configJSON)
 }

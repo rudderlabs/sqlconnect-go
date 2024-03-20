@@ -32,7 +32,7 @@ type Config struct {
 
 	Timeout    time.Duration `json:"timeout"`    // default: no timeout
 	MinPolling time.Duration `json:"minPolling"` // default: 10ms
-	MaxPolling time.Duration `json:"manPolling"` // default: 5s
+	MaxPolling time.Duration `json:"maxPolling"` // default: 5s
 
 	UseLegacyMappings bool `json:"useLegacyMappings"`
 }

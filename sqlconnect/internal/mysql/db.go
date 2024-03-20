@@ -9,6 +9,7 @@ import (
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 )
 
 const (
@@ -23,6 +24,18 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		return nil, err
 	}
 
+	tunnelCloser := sshtunnel.NoTunnelCloser
+	if config.TunnelInfo != nil {
+		tunnel, err := sshtunnel.NewTcpTunnel(*config.TunnelInfo, config.Host, config.Port)
+		if err != nil {
+			return nil, err
+		}
+		tunnelCloser = tunnel.Close
+		// Update the remote host and port to the tunnel's host and port
+		config.Host = tunnel.Host()
+		config.Port = tunnel.Port()
+	}
+
 	connectionString, err := config.ConnectionString()
 	if err != nil {
 		return nil, err
@@ -35,6 +48,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
+			tunnelCloser,
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {

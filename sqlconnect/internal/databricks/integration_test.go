@@ -23,15 +23,14 @@ func TestDatabricksDB(t *testing.T) {
 		t.Skip("skipping databricks integration test due to lack of a test environment")
 	}
 
-	configJSON, err := sjson.Set(configJSON, "retryAttempts", 4)
-	require.NoError(t, err, "failed to set retryAttempts")
-	configJSON, err = sjson.Set(configJSON, "minRetryWaitTime", time.Second)
-	require.NoError(t, err, "failed to set minRetryWaitTime")
-	configJSON, err = sjson.Set(configJSON, "maxRetryWaitTime", 30*time.Second)
-	require.NoError(t, err, "failed to set maxRetryWaitTime")
-
 	t.Run("with information schema", func(t *testing.T) {
-		configJSON, err := sjson.Set(configJSON, "catalog", "sqlconnect")
+		configJSON, err := sjson.Set(configJSON, "retryAttempts", 4)
+		require.NoError(t, err, "failed to set retryAttempts")
+		configJSON, err = sjson.Set(configJSON, "minRetryWaitTime", time.Second)
+		require.NoError(t, err, "failed to set minRetryWaitTime")
+		configJSON, err = sjson.Set(configJSON, "maxRetryWaitTime", 30*time.Second)
+		require.NoError(t, err, "failed to set maxRetryWaitTime")
+		configJSON, err = sjson.Set(configJSON, "catalog", "sqlconnect")
 		require.NoError(t, err, "failed to set catalog")
 		db, err := sqlconnect.NewDB(databricks.DatabaseType, []byte(configJSON))
 		require.NoError(t, err, "failed to create db")
@@ -51,5 +50,7 @@ func TestDatabricksDB(t *testing.T) {
 		require.ErrorContains(t, err, "TABLE_OR_VIEW_NOT_FOUND", "information schema should not be available")
 
 		integrationtest.TestDatabaseScenarios(t, databricks.DatabaseType, []byte(configJSON), strings.ToLower, integrationtest.Options{LegacySupport: true})
+
+		integrationtest.TestSshTunnelScenarios(t, databricks.DatabaseType, []byte(configJSON))
 	})
 }

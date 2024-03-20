@@ -5,16 +5,20 @@ go 1.22.0
 require (
 	cloud.google.com/go v0.112.1
 	cloud.google.com/go/bigquery v1.59.1
+	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/aws/aws-sdk-go-v2 v1.25.3
 	github.com/aws/aws-sdk-go-v2/config v1.25.3
 	github.com/aws/aws-sdk-go-v2/credentials v1.16.2
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.25.2
 	github.com/databricks/databricks-sql-go v1.5.3
 	github.com/dlclark/regexp2 v1.11.0
+	github.com/gliderlabs/ssh v0.3.7
 	github.com/go-sql-driver/mysql v1.7.1
+	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/rudderlabs/rudder-go-kit v0.23.3
+	github.com/rudderlabs/sql-tunnels v0.1.6
 	github.com/samber/lo v1.39.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/snowflakedb/gosnowflake v1.7.2
@@ -22,6 +26,7 @@ require (
 	github.com/tidwall/gjson v1.17.1
 	github.com/tidwall/sjson v1.2.5
 	github.com/trinodb/trino-go-client v0.313.0
+	golang.org/x/crypto v0.21.0
 	google.golang.org/api v0.171.0
 )
 
@@ -39,6 +44,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.0 // indirect
 	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
 	github.com/andybalholm/brotli v1.0.6 // indirect
+	github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be // indirect
 	github.com/apache/arrow/go/v12 v12.0.1 // indirect
 	github.com/apache/arrow/go/v14 v14.0.2 // indirect
 	github.com/apache/thrift v0.17.0 // indirect
@@ -86,7 +92,6 @@ require (
 	github.com/google/flatbuffers v23.5.26+incompatible // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.3 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
@@ -109,6 +114,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799 // indirect
 	github.com/opencontainers/runc v1.1.12 // indirect
+	github.com/phayes/freeport v0.0.0-20220201140144-74d24b5ae9f5 // indirect
 	github.com/pierrec/lz4/v4 v4.1.18 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -126,7 +132,6 @@ require (
 	go.opentelemetry.io/otel v1.24.0 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.22.0 // indirect

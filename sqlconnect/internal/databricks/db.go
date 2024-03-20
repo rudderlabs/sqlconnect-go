@@ -11,6 +11,7 @@ import (
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 )
 
 const (
@@ -25,7 +26,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 		return nil, err
 	}
 
-	connector, err := databricks.NewConnector(
+	opts := newOpts(
 		databricks.WithAccessToken(config.Token),
 		databricks.WithServerHostname(config.Host),
 		databricks.WithPort(config.Port),
@@ -38,6 +39,18 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 		),
 		databricks.WithUserAgentEntry("Rudderstack"),
 	)
+	tunnelCloser := sshtunnel.NoTunnelCloser
+	if config.TunnelInfo != nil {
+		tunnel, err := sshtunnel.NewSocks5Tunnel(*config.TunnelInfo)
+		if err != nil {
+			return nil, err
+		}
+		tunnelCloser = tunnel.Close
+		// Use a custom http transport in the client to route the connection through the tunnel's socks5 proxy
+		opts = append(opts, databricks.WithTransport(sshtunnel.Socks5HTTPTransport(tunnel.Host(), tunnel.Port())))
+	}
+
+	connector, err := databricks.NewConnector(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +66,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
+			tunnelCloser,
 			base.WithDialect(dialect{}),
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
@@ -129,4 +143,11 @@ func getJonRowMapper(config Config) func(databaseTypeName string, value any) any
 		return legacyJsonRowMapper
 	}
 	return jsonRowMapper
+}
+
+// This is required because databricks connection option types are unexported...
+func newOpts[T any](args ...T) []T {
+	var slice []T
+	slice = append(slice, args...)
+	return slice
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/bigquery/driver"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 )
 
 const (
@@ -32,6 +33,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
+			sshtunnel.NoTunnelCloser,
 			base.WithDialect(dialect{}),
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),

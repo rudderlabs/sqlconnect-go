@@ -20,6 +20,8 @@ func TestRedshiftDB(t *testing.T) {
 		}
 
 		integrationtest.TestDatabaseScenarios(t, redshift.DatabaseType, []byte(configJSON), strings.ToLower, integrationtest.Options{LegacySupport: true})
+
+		integrationtest.TestSshTunnelScenarios(t, redshift.DatabaseType, []byte(configJSON))
 	})
 
 	t.Run("redshift data driver", func(t *testing.T) {

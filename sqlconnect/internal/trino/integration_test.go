@@ -20,4 +20,6 @@ func TestTrinoDB(t *testing.T) {
 	}
 
 	integrationtest.TestDatabaseScenarios(t, trino.DatabaseType, []byte(configJSON), strings.ToLower, integrationtest.Options{})
+
+	integrationtest.TestSshTunnelScenarios(t, trino.DatabaseType, []byte(configJSON))
 }
