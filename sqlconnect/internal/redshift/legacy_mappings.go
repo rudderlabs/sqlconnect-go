@@ -1,7 +1,5 @@
 package redshift
 
-import "encoding/json"
-
 var legacyColumnTypeMappings = map[string]string{
 	"int":                         "int",
 	"int2":                        "int",
@@ -33,22 +31,9 @@ var legacyColumnTypeMappings = map[string]string{
 
 // legacyJsonRowMapper maps a row's scanned column to a json object's field
 func legacyJsonRowMapper(databaseTypeName string, value any) any {
-	switch databaseTypeName {
-	case "JSON":
-		fallthrough
-	case "JSONB":
-		switch v := value.(type) {
-		case []byte:
-			return json.RawMessage(v)
-
-		case string:
-			return json.RawMessage(v)
-		}
-	default:
-		switch v := value.(type) {
-		case []byte:
-			return string(v)
-		}
+	switch v := value.(type) {
+	case []byte:
+		return string(v)
 	}
 	return value
 }

@@ -6,7 +6,8 @@ Sqlconnect provides a uniform client interface for accessing multiple warehouses
 - databricks ([configuration](sqlconnect/internal/databricks/config.go))
 - mysql ([configuration](sqlconnect/internal/mysql/config.go))
 - postgres ([configuration](sqlconnect/internal/postgres/config.go))
-- redshift ([configuration](sqlconnect/internal/postgres/config.go))
+- redshift using data API driver ([configuration](sqlconnect/internal/redshift/config.go))
+- redshift using postgres driver ([configuration](sqlconnect/internal/postgres/config.go))
 - snowflake ([configuration](sqlconnect/internal/snowflake/config.go))
 - trino ([configuration](sqlconnect/internal/trino/config.go))
 
