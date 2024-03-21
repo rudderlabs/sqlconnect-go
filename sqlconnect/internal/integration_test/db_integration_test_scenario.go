@@ -58,6 +58,23 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 	})
 
+	var currentCatalog string
+	t.Run("catalog admin", func(t *testing.T) {
+		t.Run("current catalog", func(t *testing.T) {
+			t.Run("with context cancelled", func(t *testing.T) {
+				_, err := db.CurrentCatalog(cancelledCtx)
+				require.Error(t, err, "it should not be able to get the current catalog with a cancelled context")
+			})
+
+			currentCatalog, err = db.CurrentCatalog(ctx)
+			if errors.Is(err, sqlconnect.ErrNotSupported) {
+				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
+			}
+			require.NoError(t, err, "it should be able to get the current catalog")
+			require.NotEmpty(t, currentCatalog, "it should return a non-empty current catalog")
+		})
+	})
+
 	t.Run("schema admin", func(t *testing.T) {
 		t.Run("schema doesn't exist", func(t *testing.T) {
 			exists, err := db.SchemaExists(ctx, schema)
@@ -178,18 +195,44 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				require.Error(t, err, "it should not be able to list columns with a cancelled context")
 			})
 
-			columns, err := db.ListColumns(ctx, table)
-			columns = lo.Map(columns, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
-				require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
-				col.RawType = ""
-				return col
+			t.Run("without catalog", func(t *testing.T) {
+				columns, err := db.ListColumns(ctx, table)
+				columns = lo.Map(columns, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+					require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
+					col.RawType = ""
+					return col
+				})
+				require.NoError(t, err, "it should be able to list columns")
+				require.Len(t, columns, 2, "it should return the correct number of columns")
+				require.ElementsMatch(t, columns, []sqlconnect.ColumnRef{
+					{Name: formatfn("c1"), Type: "int"},
+					{Name: formatfn("c2"), Type: "string"},
+				}, "it should return the correct columns")
 			})
-			require.NoError(t, err, "it should be able to list columns")
-			require.Len(t, columns, 2, "it should return the correct number of columns")
-			require.ElementsMatch(t, columns, []sqlconnect.ColumnRef{
-				{Name: formatfn("c1"), Type: "int"},
-				{Name: formatfn("c2"), Type: "string"},
-			}, "it should return the correct columns")
+
+			t.Run("with catalog", func(t *testing.T) {
+				tableWithCatalog := table
+				tableWithCatalog.Catalog = currentCatalog
+				columns, err := db.ListColumns(ctx, tableWithCatalog)
+				columns = lo.Map(columns, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+					require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
+					col.RawType = ""
+					return col
+				})
+				require.NoError(t, err, "it should be able to list columns")
+				require.Len(t, columns, 2, "it should return the correct number of columns")
+				require.ElementsMatch(t, columns, []sqlconnect.ColumnRef{
+					{Name: formatfn("c1"), Type: "int"},
+					{Name: formatfn("c2"), Type: "string"},
+				}, "it should return the correct columns")
+			})
+
+			t.Run("with invalid catalog", func(t *testing.T) {
+				tableWithInvalidCatalog := table
+				tableWithInvalidCatalog.Catalog = "invalid"
+				cols, _ := db.ListColumns(ctx, tableWithInvalidCatalog)
+				require.Empty(t, cols, "it should return an empty list of columns for an invalid catalog")
+			})
 		})
 
 		t.Run("list columns for sql query", func(t *testing.T) {

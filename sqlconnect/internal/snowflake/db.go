@@ -40,6 +40,9 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
+				cmds.CurrentCatalog = func() string {
+					return "SELECT current_database()"
+				}
 				cmds.ListSchemas = func() (string, string) { return "SHOW TERSE SCHEMAS", "name" }
 				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SHOW TERSE SCHEMAS LIKE '%[1]s'", schema)
@@ -57,7 +60,10 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%[1]s' AND TABLE_NAME = '%[2]s'", schema, table)
 				}
-				cmds.ListColumns = func(schema, table base.UnquotedIdentifier) (string, string, string) {
+				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
+					if catalog != "" {
+						return fmt.Sprintf(`DESCRIBE TABLE "%[1]s"."%[2]s"."%[3]s"`, catalog, schema, table), "name", "type"
+					}
 					return fmt.Sprintf(`DESCRIBE TABLE "%[1]s"."%[2]s"`, schema, table), "name", "type"
 				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {

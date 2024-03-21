@@ -20,6 +20,9 @@ func NewDB(db *sql.DB, opts ...Option) *DB {
 			return value
 		},
 		sqlCommands: SQLCommands{
+			CurrentCatalog: func() string {
+				return "SELECT current_catalog"
+			},
 			CreateSchema: func(schema QuotedIdentifier) string {
 				return fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %[1]s", schema)
 			},
@@ -46,8 +49,12 @@ func NewDB(db *sql.DB, opts ...Option) *DB {
 			TableExists: func(schema, table UnquotedIdentifier) string {
 				return fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='%[1]s' and table_name = '%[2]s'", schema, table)
 			},
-			ListColumns: func(schema, table UnquotedIdentifier) (string, string, string) {
-				return fmt.Sprintf("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '%[1]s' AND table_name = '%[2]s'", schema, table), "column_name", "data_type"
+			ListColumns: func(catalog, schema, table UnquotedIdentifier) (string, string, string) {
+				stmt := fmt.Sprintf("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '%[1]s' AND table_name = '%[2]s'", schema, table)
+				if catalog != "" {
+					stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", catalog)
+				}
+				return stmt + " ORDER BY ordinal_position ASC", "column_name", "data_type"
 			},
 			CountTableRows: func(table QuotedIdentifier) string { return fmt.Sprintf("SELECT COUNT(*) FROM %[1]s", table) },
 			DropTable:      func(table QuotedIdentifier) string { return fmt.Sprintf("DROP TABLE IF EXISTS %[1]s", table) },
@@ -101,6 +108,8 @@ type (
 	QuotedIdentifier   string // A quoted identifier is a string that is quoted, e.g. "my_table"
 	UnquotedIdentifier string // An unquoted identifier is a string that is not quoted, e.g. my_table
 	SQLCommands        struct {
+		// Provides the SQL command to get the current catalog
+		CurrentCatalog func() string
 		// Provides the SQL command to create a schema
 		CreateSchema func(schema QuotedIdentifier) string
 		// Provides the SQL command to list all schemas
@@ -118,7 +127,7 @@ type (
 		// Provides the SQL command to check if a table exists
 		TableExists func(schema, table UnquotedIdentifier) string
 		// Provides the SQL command to list all columns in a table along with the column names in the result set that point to the name and type
-		ListColumns func(schema, table UnquotedIdentifier) (sql, nameCol, typeCol string)
+		ListColumns func(catalog, schema, table UnquotedIdentifier) (sql, nameCol, typeCol string)
 		// Provides the SQL command to count the rows in a table
 		CountTableRows func(table QuotedIdentifier) string
 		// Provides the SQL command to drop a table

@@ -38,6 +38,9 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
+				cmds.CurrentCatalog = func() string {
+					return "SELECT DATABASE()"
+				}
 				cmds.DropSchema = func(schema base.QuotedIdentifier) string { // mysql does not support CASCADE
 					return fmt.Sprintf("DROP SCHEMA %[1]s", schema)
 				}

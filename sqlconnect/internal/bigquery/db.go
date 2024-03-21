@@ -52,8 +52,12 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SELECT table_name FROM `%[1]s`.INFORMATION_SCHEMA.TABLES WHERE table_name = '%[2]s'", schema, table)
 				}
-				cmds.ListColumns = func(schema, table base.UnquotedIdentifier) (string, string, string) {
-					return fmt.Sprintf("SELECT column_name, data_type FROM `%[1]s`.INFORMATION_SCHEMA.COLUMNS WHERE table_name = '%[2]s'", schema, table), "column_name", "data_type"
+				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
+					stmt := fmt.Sprintf("SELECT column_name, data_type FROM `%[1]s`.INFORMATION_SCHEMA.COLUMNS WHERE table_name = '%[2]s'", schema, table)
+					if catalog != "" {
+						stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", catalog)
+					}
+					return stmt, "column_name", "data_type"
 				}
 
 				return cmds

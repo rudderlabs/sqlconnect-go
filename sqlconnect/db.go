@@ -8,12 +8,16 @@ import (
 	"time"
 )
 
-var ErrDropOldTablePostCopy = errors.New("move table: dropping old table after copying its contents to the new table")
+var (
+	ErrNotSupported         = errors.New("sqconnect: feature not supported")
+	ErrDropOldTablePostCopy = errors.New("sqlconnect move table: dropping old table after copying its contents to the new table")
+)
 
 type DB interface {
 	sqlDB
 	// SqlDB returns the underlying *sql.DB
 	SqlDB() *sql.DB
+	CatalogAdmin
 	SchemaAdmin
 	TableAdmin
 	JsonRowMapper
@@ -41,6 +45,12 @@ type sqlDB interface {
 	SetMaxIdleConns(n int)
 	SetMaxOpenConns(n int)
 	Stats() sql.DBStats
+}
+
+type CatalogAdmin interface {
+	// CurrentCatalog returns the current catalog.
+	// If this operation is not supported by the warehouse [ErrNotSupported] will be returned.
+	CurrentCatalog(ctx context.Context) (string, error)
 }
 
 type SchemaAdmin interface {
