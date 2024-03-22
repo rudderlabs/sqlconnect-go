@@ -11,11 +11,12 @@ import (
 )
 
 type (
-	BigQuery   = bigquery.Config
-	Databricks = databricks.Config
-	Mysql      = mysql.Config
-	Postgres   = postgres.Config
-	Redshift   = redshift.Config
-	Snowflake  = snowflake.Config
-	Trino      = trino.Config
+	BigQuery     = bigquery.Config
+	Databricks   = databricks.Config
+	Mysql        = mysql.Config
+	Postgres     = postgres.Config
+	Redshift     = redshift.PostgresConfig
+	RedshiftData = redshift.Config
+	Snowflake    = snowflake.Config
+	Trino        = trino.Config
 )

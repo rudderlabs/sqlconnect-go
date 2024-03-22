@@ -9,13 +9,13 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/postgres"
 )
 
-const SDKConfigType = "sdk"
+const RedshiftDataConfigType = "redshift-data"
 
-// Config is the configuration for a redshift database when using postgres driver
-type Config = postgres.Config
+// PostgresConfig is the configuration for a redshift database when using the postgres driver
+type PostgresConfig = postgres.Config
 
-// SDKConfig is the configuration for a redshift database when using the AWS SDK
-type SDKConfig struct {
+// Config is the configuration for a redshift database when using the redshift data api driver
+type Config struct {
 	ClusterIdentifier string `json:"clusterIdentifier"`
 	Database          string `json:"database"`
 	User              string `json:"user"`
@@ -37,15 +37,15 @@ type SDKConfig struct {
 	UseLegacyMappings bool `json:"useLegacyMappings"`
 }
 
-func (c *SDKConfig) MarshalJSON() ([]byte, error) {
+func (c *Config) MarshalJSON() ([]byte, error) {
 	bytes, err := json.Marshal(*c)
 	if err != nil {
 		return nil, err
 	}
-	return sjson.SetBytes(bytes, "type", SDKConfigType)
+	return sjson.SetBytes(bytes, "type", RedshiftDataConfigType)
 }
 
-func (c *SDKConfig) Parse(input json.RawMessage) error {
+func (c *Config) Parse(input json.RawMessage) error {
 	err := json.Unmarshal(input, c)
 	if err != nil {
 		return err

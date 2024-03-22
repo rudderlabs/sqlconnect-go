@@ -27,10 +27,10 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 	)
 	useLegacyMappings := gjson.GetBytes(credentialsJSON, "useLegacyMappings").Bool()
 	// Use the SDK if the credentials are for the SDK
-	if configType := gjson.GetBytes(credentialsJSON, "type").Str; configType == SDKConfigType {
-		db, err = newSdkDB(credentialsJSON)
+	if configType := gjson.GetBytes(credentialsJSON, "type").Str; configType == RedshiftDataConfigType {
+		db, err = newRedshiftDataDB(credentialsJSON)
 	} else {
-		db, err = newPgDB(credentialsJSON)
+		db, err = newPostgresDB(credentialsJSON)
 	}
 	if err != nil {
 		return nil, err
@@ -57,8 +57,8 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 	}, nil
 }
 
-func newPgDB(credentialsJSON json.RawMessage) (*sql.DB, error) {
-	var config Config
+func newPostgresDB(credentialsJSON json.RawMessage) (*sql.DB, error) {
+	var config PostgresConfig
 	err := config.Parse(credentialsJSON)
 	if err != nil {
 		return nil, err
@@ -67,8 +67,8 @@ func newPgDB(credentialsJSON json.RawMessage) (*sql.DB, error) {
 	return sql.Open(postgres.DatabaseType, config.ConnectionString())
 }
 
-func newSdkDB(credentialsJSON json.RawMessage) (*sql.DB, error) {
-	var config SDKConfig
+func newRedshiftDataDB(credentialsJSON json.RawMessage) (*sql.DB, error) {
+	var config Config
 	err := config.Parse(credentialsJSON)
 	if err != nil {
 		return nil, err

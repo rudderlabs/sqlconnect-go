@@ -12,6 +12,9 @@ import (
 func TestSnowflakeDB(t *testing.T) {
 	configJSON, ok := os.LookupEnv("SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS")
 	if !ok {
+		if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
+			t.Fatal("SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS environment variable not set")
+		}
 		t.Skip("skipping snowflake integration test due to lack of a test environment")
 	}
 

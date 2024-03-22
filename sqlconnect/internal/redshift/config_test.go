@@ -10,9 +10,9 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift"
 )
 
-func TestRedshiftSDKConfig(t *testing.T) {
-	// Create a new SDKConfig
-	config := redshift.SDKConfig{
+func TestRedshiftConfig(t *testing.T) {
+	// Create a new redshift config
+	config := redshift.Config{
 		ClusterIdentifier: "cluster-identifier",
 		Database:          "database",
 		User:              "user",
@@ -23,10 +23,10 @@ func TestRedshiftSDKConfig(t *testing.T) {
 	}
 	configJSON, err := json.Marshal(&config)
 	require.NoError(t, err)
-	require.Equal(t, "sdk", gjson.GetBytes(configJSON, "type").String())
+	require.Equal(t, redshift.RedshiftDataConfigType, gjson.GetBytes(configJSON, "type").String())
 
 	// Unmarshal the JSON back into a new SDKConfig
-	var newConfig redshift.SDKConfig
+	var newConfig redshift.Config
 	err = newConfig.Parse(configJSON)
 	require.NoError(t, err)
 	require.Equal(t, config, newConfig)

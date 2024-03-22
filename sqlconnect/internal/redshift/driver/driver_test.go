@@ -17,8 +17,11 @@ import (
 )
 
 func TestRedshiftDriver(t *testing.T) {
-	configJSON, ok := os.LookupEnv("REDSHIFT_SDK_TEST_ENVIRONMENT_CREDENTIALS")
+	configJSON, ok := os.LookupEnv("REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS")
 	if !ok {
+		if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
+			t.Fatal("REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS environment variable not set")
+		}
 		t.Skip("skipping redshift sdk driver integration test due to lack of a test environment")
 	}
 	var cfg driver.RedshiftConfig

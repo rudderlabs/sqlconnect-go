@@ -13,16 +13,22 @@ func TestRedshiftDB(t *testing.T) {
 	t.Run("postgres driver", func(t *testing.T) {
 		configJSON, ok := os.LookupEnv("REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS")
 		if !ok {
-			t.Skip("skipping redshift pg integration test due to lack of a test environment")
+			if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
+				t.Fatal("REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS environment variable not set")
+			}
+			t.Skip("skipping redshift postgres driver integration test due to lack of a test environment")
 		}
 
 		integrationtest.TestDatabaseScenarios(t, redshift.DatabaseType, []byte(configJSON), strings.ToLower, integrationtest.Options{LegacySupport: true})
 	})
 
-	t.Run("sdk driver", func(t *testing.T) {
-		configJSON, ok := os.LookupEnv("REDSHIFT_SDK_TEST_ENVIRONMENT_CREDENTIALS")
+	t.Run("redshift data driver", func(t *testing.T) {
+		configJSON, ok := os.LookupEnv("REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS")
 		if !ok {
-			t.Skip("skipping redshift sdk integration test due to lack of a test environment")
+			if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
+				t.Fatal("REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS environment variable not set")
+			}
+			t.Skip("skipping redshift data driver integration test due to lack of a test environment")
 		}
 		integrationtest.TestDatabaseScenarios(t, redshift.DatabaseType, []byte(configJSON), strings.ToLower, integrationtest.Options{LegacySupport: true})
 	})
