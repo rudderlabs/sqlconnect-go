@@ -3,6 +3,7 @@ package mysql
 import (
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -70,6 +71,12 @@ func jsonRowMapper(databaseTypeName string, value interface{}) interface{} {
 		stringValue = v.String()
 	case string:
 		stringValue = v
+	case int, int32, int64, uint32, uint64:
+		stringValue = fmt.Sprintf("%d", v)
+	case float32, float64:
+		stringValue = fmt.Sprintf("%f", v)
+	default:
+		return value
 	}
 
 	switch databaseTypeName {
@@ -100,12 +107,18 @@ func jsonRowMapper(databaseTypeName string, value interface{}) interface{} {
 	case "JSON":
 		return json.RawMessage(stringValue)
 	case "FLOAT", "DOUBLE", "DECIMAL":
+		if stringValue == "" {
+			return nil
+		}
 		n, err := strconv.ParseFloat(stringValue, 64)
 		if err != nil {
 			panic(err)
 		}
 		return n
 	case "INT", "TINYINT", "SMALLINT", "MEDIUMINT", "BIGINT":
+		if stringValue == "" {
+			return nil
+		}
 		n, err := strconv.ParseInt(stringValue, 10, 64)
 		if err != nil {
 			panic(err)
