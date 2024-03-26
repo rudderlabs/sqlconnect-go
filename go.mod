@@ -14,7 +14,7 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/lib/pq v1.10.9
 	github.com/ory/dockertest/v3 v3.10.0
-	github.com/rudderlabs/rudder-go-kit v0.23.2
+	github.com/rudderlabs/rudder-go-kit v0.23.3
 	github.com/samber/lo v1.39.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/snowflakedb/gosnowflake v1.7.2
