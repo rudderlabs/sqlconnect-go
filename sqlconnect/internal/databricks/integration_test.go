@@ -17,6 +17,9 @@ import (
 func TestDatabricksDB(t *testing.T) {
 	configJSON, ok := os.LookupEnv("DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS")
 	if !ok {
+		if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
+			t.Fatal("DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS environment variable not set")
+		}
 		t.Skip("skipping databricks integration test due to lack of a test environment")
 	}
 

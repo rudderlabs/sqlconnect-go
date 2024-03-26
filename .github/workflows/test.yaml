@@ -47,9 +47,10 @@ jobs:
       - run: go mod download
       - name: Run tests
         run: |
-          make test exclude="${{ matrix.exclude }}" package=${{ matrix.package }}
+          FORCE_RUN_INTEGRATION_TESTS=true make test exclude="${{ matrix.exclude }}" package=${{ matrix.package }}
         env:
           REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS }}
+          REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS }}
           SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS }}
           BIGQUERY_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.BIGQUERY_TEST_ENVIRONMENT_CREDENTIALS }}
           DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS }}
