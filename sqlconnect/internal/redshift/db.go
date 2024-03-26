@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/postgres"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 )
 
 const (
@@ -26,11 +27,12 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 		err error
 	)
 	useLegacyMappings := gjson.GetBytes(credentialsJSON, "useLegacyMappings").Bool()
+	tunnelCloser := sshtunnel.NoTunnelCloser
 	// Use the SDK if the credentials are for the SDK
 	if configType := gjson.GetBytes(credentialsJSON, "type").Str; configType == RedshiftDataConfigType {
 		db, err = newRedshiftDataDB(credentialsJSON)
 	} else {
-		db, err = newPostgresDB(credentialsJSON)
+		db, tunnelCloser, err = newPostgresDB(credentialsJSON)
 	}
 	if err != nil {
 		return nil, err
@@ -39,6 +41,7 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
+			tunnelCloser,
 			base.WithColumnTypeMappings(getColumnTypeMappings(useLegacyMappings)),
 			base.WithJsonRowMapper(getJonRowMapper(useLegacyMappings)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
@@ -57,14 +60,29 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 	}, nil
 }
 
-func newPostgresDB(credentialsJSON json.RawMessage) (*sql.DB, error) {
+func newPostgresDB(credentialsJSON json.RawMessage) (*sql.DB, func() error, error) {
 	var config PostgresConfig
 	err := config.Parse(credentialsJSON)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	tunnelCloser := sshtunnel.NoTunnelCloser
+	if config.TunnelInfo != nil {
+		tunnel, err := sshtunnel.NewTcpTunnel(*config.TunnelInfo, config.Host, config.Port)
+		if err != nil {
+			return nil, nil, err
+		}
+		tunnelCloser = tunnel.Close
+		// Update the remote host and port to the tunnel's host and port
+		config.Host = tunnel.Host()
+		config.Port = tunnel.Port()
 	}
 
-	return sql.Open(postgres.DatabaseType, config.ConnectionString())
+	db, err := sql.Open(postgres.DatabaseType, config.ConnectionString())
+	if err != nil {
+		return nil, nil, err
+	}
+	return db, tunnelCloser, nil
 }
 
 func newRedshiftDataDB(credentialsJSON json.RawMessage) (*sql.DB, error) {

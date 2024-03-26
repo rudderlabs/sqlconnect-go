@@ -7,6 +7,7 @@ import (
 
 	"github.com/trinodb/trino-go-client/trino"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
 
@@ -16,6 +17,9 @@ type Config struct {
 	Catalog  string `json:"catalog"`
 	User     string `json:"user"`
 	Password string `json:"password"`
+
+	TunnelInfo       *sshtunnel.Config `json:"tunnel_info,omitempty"`
+	customClientName string            `json:"-"`
 }
 
 func (c Config) ConnectionString() (string, error) {
@@ -35,6 +39,9 @@ func (c Config) ConnectionString() (string, error) {
 		ServerURI: uri,
 		Catalog:   c.Catalog,
 	}
+	if c.TunnelInfo != nil {
+		config.CustomClientName = c.customClientName
+	}
 	dsn, err := config.FormatDSN()
 	if err != nil {
 		return "", fmt.Errorf("formatting dsn: %w", err)
@@ -46,6 +53,11 @@ func (c *Config) Parse(input json.RawMessage) error {
 	err := json.Unmarshal(input, c)
 	if err != nil {
 		return err
+	}
+	if c.TunnelInfo == nil { // if tunnel info is not provided as a separate json object, try to parse it from the input
+		if c.TunnelInfo, err = sshtunnel.ParseInlineConfig(input); err != nil {
+			return err
+		}
 	}
 	return util.ValidateHost(c.Host)
 }

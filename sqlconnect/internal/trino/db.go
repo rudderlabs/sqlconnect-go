@@ -5,12 +5,16 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/samber/lo"
+	"github.com/trinodb/trino-go-client/trino"
 	_ "github.com/trinodb/trino-go-client/trino" // trino driver
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 )
 
 const (
@@ -24,7 +28,10 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	tunnelCloser, err := sshTunnelling(&config)
+	if err != nil {
+		return nil, fmt.Errorf("configuring ssh tunnel: %w", err)
+	}
 	dsn, err := config.ConnectionString()
 	if err != nil {
 		return nil, err
@@ -37,6 +44,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB: base.NewDB(
 			db,
+			tunnelCloser,
 			base.WithColumnTypeMapper(columnTypeMapper),
 			base.WithJsonRowMapper(jsonRowMapper),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
@@ -60,6 +68,27 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 			}),
 		),
 	}, nil
+}
+
+// passing config as a pointer since we might need to modify [customClientName]
+func sshTunnelling(config *Config) (tunnelCloser func() error, err error) {
+	tunnelCloser = func() error { return nil }
+	if config.TunnelInfo != nil {
+		tunnel, err := sshtunnel.NewSocks5Tunnel(*config.TunnelInfo)
+		if err != nil {
+			return nil, err
+		}
+		customClientKey := uuid.New().String()
+		config.customClientName = customClientKey
+		_ = trino.RegisterCustomClient(customClientKey, &http.Client{
+			Transport: sshtunnel.Socks5HTTPTransport(tunnel.Host(), tunnel.Port()),
+		})
+		tunnelCloser = func() error {
+			trino.DeregisterCustomClient(customClientKey)
+			return tunnel.Close()
+		}
+	}
+	return tunnelCloser, nil
 }
 
 func init() {

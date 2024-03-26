@@ -35,4 +35,6 @@ func TestPostgresDB(t *testing.T) {
 	require.NoError(t, err, "it should be able to marshal config to json")
 
 	integrationtest.TestDatabaseScenarios(t, postgres.DatabaseType, configJSON, strings.ToLower, integrationtest.Options{LegacySupport: true})
+
+	integrationtest.TestSshTunnelScenarios(t, postgres.DatabaseType, configJSON)
 }

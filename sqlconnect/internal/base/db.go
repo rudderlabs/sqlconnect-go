@@ -2,6 +2,7 @@ package base
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/samber/lo"
@@ -9,10 +10,11 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
-func NewDB(db *sql.DB, opts ...Option) *DB {
+func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 	d := &DB{
-		DB:      db,
-		Dialect: dialect{},
+		DB:           db,
+		Dialect:      dialect{},
+		tunnelCloser: tunnelCloser,
 		columnTypeMapper: func(c ColumnType) string {
 			return c.DatabaseTypeName()
 		},
@@ -76,10 +78,19 @@ func NewDB(db *sql.DB, opts ...Option) *DB {
 type DB struct {
 	*sql.DB
 	sqlconnect.Dialect
+	tunnelCloser func() error // closer for the ssh tunnel to be called on close
 
 	columnTypeMapper func(ColumnType) string // map from database type to rudder type
 	jsonRowMapper    func(databaseTypeName string, value any) any
 	sqlCommands      SQLCommands
+}
+
+// Close closes the db and the tunnel
+func (d *DB) Close() error {
+	return errors.Join(
+		d.DB.Close(),     // first close the db
+		d.tunnelCloser(), // then close the tunnel
+	)
 }
 
 type ColumnType interface {
