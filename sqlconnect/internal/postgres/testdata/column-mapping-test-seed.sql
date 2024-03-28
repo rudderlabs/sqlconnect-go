@@ -19,6 +19,9 @@ CREATE TABLE "{{.schema}}"."column_mappings_test" (
     _nchar NCHAR(10),
     _bpchar BPCHAR,
     _character CHARACTER(10),
+    _date DATE,
+    _time TIME,
+    _timetz TIME WITH TIME ZONE,
     _timestamptz TIMESTAMPTZ,
     _timestampntz TIMESTAMP WITHOUT TIME ZONE,
     _timestampwtz TIMESTAMP WITH TIME ZONE, 
@@ -30,8 +33,8 @@ CREATE TABLE "{{.schema}}"."column_mappings_test" (
 );
 
 INSERT INTO "{{.schema}}"."column_mappings_test"
-    (_order, _int, _int2, _int4, _int8, _integer, _smallint, _bigint, _real, _float, _float4, _float8, _numeric, _double, _text, _varchar, _charvar, _nchar, _bpchar, _character, _timestamptz, _timestampntz, _timestampwtz, _timestamp, _boolean, _bool, _json, _jsonb)
+    (_order, _int, _int2, _int4, _int8, _integer, _smallint, _bigint, _real, _float, _float4, _float8, _numeric, _double, _text, _varchar, _charvar, _nchar, _bpchar, _character, _date, _time, _timetz, _timestamptz, _timestampntz, _timestampwtz, _timestamp, _boolean, _bool, _json, _jsonb)
 VALUES
-    (1, 1,    1,    1,    1,    1,    1,    1,    1.1,  1.1,  1.1,  1.1,  1.1,  1.1,  'abc', 'abc', 'abc', 'abc', 'abc', 'abc', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54+02', true,  true,  '{"a": 1}', '{"a": 1}'),
-    (2, 0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    '',    '',    '',    '',    '',    '',    '2004-10-19 10:23:54+02', '2004-10-19 10:23:54', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54+02', false, false, '{}',       '{}'      ), 
-    (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,                     NULL,                  NULL,                     NULL,                     NULL,  NULL,  NULL,       NULL      );
+    (1, 1,    1,    1,    1,    1,    1,    1,    1.1,  1.1,  1.1,  1.1,  1.1,  1.1,  'abc', 'abc', 'abc', 'abc', 'abc', 'abc', '2004-10-19', '10:23:54', '10:23:54+02', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54+02', true,  true,  '{"a": 1}', '{"a": 1}'),
+    (2, 0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    '',    '',    '',    '',    '',    '',    '2004-10-19', '10:23:54', '10:23:54+02', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54+02', false, false, '{}',       '{}'      ), 
+    (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,         NULL,       NULL,          NULL,                     NULL,                  NULL,                     NULL,                     NULL,  NULL,  NULL,       NULL      );
