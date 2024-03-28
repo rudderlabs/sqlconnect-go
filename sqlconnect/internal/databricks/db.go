@@ -99,7 +99,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 					}
 					stmt := fmt.Sprintf(`SELECT 
 											column_name, 
-											data_type 
+											full_data_type 
 										FROM information_schema.columns 
 										WHERE table_schema = '%[1]s' 
 										AND table_name = '%[2]s'
@@ -108,7 +108,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 						schema,
 						table,
 						catalog)
-					return stmt, "column_name", "data_type"
+					return stmt, "column_name", "full_data_type"
 				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {
 					return fmt.Sprintf("ALTER TABLE %[1]s.%[2]s RENAME TO %[1]s.%[3]s", schema, oldName, newName)

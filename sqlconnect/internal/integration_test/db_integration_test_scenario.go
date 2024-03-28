@@ -523,15 +523,28 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				expectedCols := lo.MapToSlice(expectedColsMap, func(k, v string) sqlconnect.ColumnRef {
 					return sqlconnect.ColumnRef{Name: k, Type: v}
 				})
-
-				actualCols, err := legacyDB.ListColumns(ctx, table)
-				require.NoError(t, err, "it should be able to list columns")
-				actualCols = lo.Map(actualCols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
-					require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
-					col.RawType = ""
-					return col
+				t.Run("without catalog", func(t *testing.T) {
+					actualCols, err := legacyDB.ListColumns(ctx, table)
+					require.NoError(t, err, "it should be able to list columns")
+					actualCols = lo.Map(actualCols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+						require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
+						col.RawType = ""
+						return col
+					})
+					require.ElementsMatch(t, actualCols, expectedCols, "it should return the correct columns")
 				})
-				require.ElementsMatch(t, actualCols, expectedCols, "it should return the correct columns")
+				t.Run("with catalog", func(t *testing.T) {
+					table := table
+					table.Catalog = currentCatalog
+					actualCols, err := legacyDB.ListColumns(ctx, table)
+					require.NoError(t, err, "it should be able to list columns")
+					actualCols = lo.Map(actualCols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+						require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
+						col.RawType = ""
+						return col
+					})
+					require.ElementsMatch(t, actualCols, expectedCols, "it should return the correct columns")
+				})
 			})
 
 			t.Run("list columns for sql query", func(t *testing.T) {
