@@ -55,7 +55,7 @@ func (statement *bigQueryStatement) QueryContext(ctx context.Context, args []dri
 		return nil, err
 	}
 
-	rowIterator, err := query.Read(context.Background())
+	rowIterator, err := query.Read(ctx)
 	if err != nil {
 		return nil, err
 	}
