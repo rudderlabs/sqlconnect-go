@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.0...v1.1.1) (2024-04-01)
+
+
+### Bug Fixes
+
+* bigquery driver not honouring context while querying ([#34](https://github.com/rudderlabs/sqlconnect-go/issues/34)) ([653a194](https://github.com/rudderlabs/sqlconnect-go/commit/653a194ab0b5d1084ae80975b088c5ad73fb609e))
+
+
+### Miscellaneous
+
+* **databricks:** use full_data_type instead of data_type when listing columns ([#30](https://github.com/rudderlabs/sqlconnect-go/issues/30)) ([84b40fb](https://github.com/rudderlabs/sqlconnect-go/commit/84b40fbca57bd09a881d976b30381cfda3ad9f96))
+* handle date and time data type mappings for postgres and redshift ([#32](https://github.com/rudderlabs/sqlconnect-go/issues/32)) ([3bab2e1](https://github.com/rudderlabs/sqlconnect-go/commit/3bab2e1031234ea342d73b940e33dac548031f01))
+
 ## [1.1.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.0.1...v1.1.0) (2024-03-26)
 
 
