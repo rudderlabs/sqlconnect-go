@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go v0.112.1
 	cloud.google.com/go/bigquery v1.59.1
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
-	github.com/aws/aws-sdk-go-v2 v1.25.3
+	github.com/aws/aws-sdk-go-v2 v1.26.1
 	github.com/aws/aws-sdk-go-v2/config v1.25.3
 	github.com/aws/aws-sdk-go-v2/credentials v1.16.2
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.25.2
@@ -63,7 +63,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.17.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.20.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.25.3 // indirect
-	github.com/aws/smithy-go v1.20.1 // indirect
+	github.com/aws/smithy-go v1.20.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/coreos/go-oidc/v3 v3.5.0 // indirect
