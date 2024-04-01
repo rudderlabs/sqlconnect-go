@@ -81,21 +81,44 @@ func (rows *redshiftRows) Next(dest []driver.Value) error {
 			case *types.FieldMemberIsNull:
 				dest[i] = nil
 			case *types.FieldMemberStringValue:
-				switch {
-				case strings.EqualFold(*rows.page.ColumnMetadata[i].TypeName, "timestamp"):
+				dataType := strings.ToLower(*rows.page.ColumnMetadata[i].TypeName)
+				switch dataType {
+				case "timestamp":
 					t, err := time.Parse("2006-01-02 15:04:05", field.Value)
 					if err != nil {
 						dest[i] = field.Value
 					} else {
 						dest[i] = t.UTC().Format(time.RFC3339)
 					}
-				case strings.EqualFold(*rows.page.ColumnMetadata[i].TypeName, "timestamptz"):
+				case "timestamptz":
 					t, err := time.Parse("2006-01-02 15:04:05-07", field.Value)
 					if err != nil {
 						dest[i] = field.Value
 					} else {
 						dest[i] = t.UTC().Format(time.RFC3339)
 					}
+				case "date":
+					t, err := time.Parse("2006-01-02", field.Value)
+					if err != nil {
+						dest[i] = field.Value
+					} else {
+						dest[i] = t.UTC().Format(time.RFC3339)
+					}
+				case "time", "time without time zone":
+					t, err := time.Parse("15:04:05", field.Value)
+					if err != nil {
+						dest[i] = field.Value
+					} else {
+						dest[i] = t.UTC().Format(time.RFC3339)
+					}
+				case "timetz", "time with time zone":
+					t, err := time.Parse("15:04:05-07", field.Value)
+					if err != nil {
+						dest[i] = field.Value
+					} else {
+						dest[i] = t.UTC().Format(time.RFC3339)
+					}
+
 				default:
 					dest[i] = field.Value
 				}
