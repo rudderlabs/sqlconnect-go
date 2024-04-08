@@ -5,12 +5,16 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/cenkalti/backoff/v4"
 	"google.golang.org/api/iterator"
 )
 
 type bigQueryConnection struct {
+	config Config
 	ctx    context.Context
 	client *bigquery.Client
 	closed bool
@@ -75,4 +79,29 @@ func (bigQueryConnection) CheckNamedValue(*driver.NamedValue) error {
 // BigqueryClient returns the underlying bigquery.Client (for those hard to reach places...)
 func (connection *bigQueryConnection) BigqueryClient() *bigquery.Client {
 	return connection.client
+}
+
+// readWithBackoff will retry the read operation if the error is [jobRateLimitExceeded] and the config is set to retry rate limit errors
+//
+// TODO: this should no longer be needed once this fix is released:
+// https://github.com/googleapis/google-cloud-go/pull/9726
+func (connection *bigQueryConnection) readWithBackoff(ctx context.Context, query *bigquery.Query) (it *bigquery.RowIterator, err error) {
+	if !connection.config.JobRateLimitExceededRetryEnabled {
+		return query.Read(ctx)
+	}
+	// mimicking google's own retry backoff settings
+	// https://github.com/googleapis/google-cloud-go/blob/b2e704d9d287445304d2b6030b6e35a4eb8be80a/bigquery/bigquery.go#L236
+	retry := backoff.WithContext(backoff.NewExponentialBackOff(
+		backoff.WithInitialInterval(1*time.Second),
+		backoff.WithMaxInterval(32*time.Second),
+		backoff.WithMultiplier(2),
+	), ctx)
+	_ = backoff.Retry(func() error {
+		it, err = query.Read(ctx)
+		if err != nil && (strings.Contains(err.Error(), "jobRateLimitExceeded")) {
+			return err
+		}
+		return nil
+	}, retry)
+	return it, err
 }

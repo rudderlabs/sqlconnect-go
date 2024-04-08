@@ -28,7 +28,13 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		return nil, err
 	}
 
-	db := sql.OpenDB(driver.NewConnector(config.ProjectID, option.WithCredentialsJSON([]byte(config.CredentialsJSON))))
+	db := sql.OpenDB(driver.NewConnector(
+		config.ProjectID,
+		driver.Config{
+			JobRateLimitExceededRetryEnabled: true,
+		},
+		option.WithCredentialsJSON([]byte(config.CredentialsJSON))),
+	)
 
 	return &DB{
 		DB: base.NewDB(
