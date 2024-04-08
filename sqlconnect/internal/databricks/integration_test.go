@@ -37,7 +37,15 @@ func TestDatabricksDB(t *testing.T) {
 		_, err = db.Exec("SELECT * FROM INFORMATION_SCHEMA.COLUMNS LIMIT 1")
 		require.NoError(t, err, "information schema should be available")
 
-		integrationtest.TestDatabaseScenarios(t, databricks.DatabaseType, []byte(configJSON), strings.ToLower, integrationtest.Options{LegacySupport: true})
+		integrationtest.TestDatabaseScenarios(
+			t,
+			databricks.DatabaseType,
+			[]byte(configJSON),
+			strings.ToLower,
+			integrationtest.Options{
+				LegacySupport: true,
+			},
+		)
 	})
 
 	t.Run("without information schema", func(t *testing.T) {
@@ -49,7 +57,15 @@ func TestDatabricksDB(t *testing.T) {
 		require.Error(t, err, "information schema should not be available")
 		require.ErrorContains(t, err, "TABLE_OR_VIEW_NOT_FOUND", "information schema should not be available")
 
-		integrationtest.TestDatabaseScenarios(t, databricks.DatabaseType, []byte(configJSON), strings.ToLower, integrationtest.Options{LegacySupport: true})
+		integrationtest.TestDatabaseScenarios(
+			t,
+			databricks.DatabaseType,
+			[]byte(configJSON),
+			strings.ToLower,
+			integrationtest.Options{
+				LegacySupport: true,
+			},
+		)
 
 		integrationtest.TestSshTunnelScenarios(t, databricks.DatabaseType, []byte(configJSON))
 	})

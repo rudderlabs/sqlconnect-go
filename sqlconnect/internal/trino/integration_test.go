@@ -19,7 +19,13 @@ func TestTrinoDB(t *testing.T) {
 		t.Skip("skipping trino integration test due to lack of a test environment")
 	}
 
-	integrationtest.TestDatabaseScenarios(t, trino.DatabaseType, []byte(configJSON), strings.ToLower, integrationtest.Options{})
+	integrationtest.TestDatabaseScenarios(
+		t,
+		trino.DatabaseType,
+		[]byte(configJSON),
+		strings.ToLower,
+		integrationtest.Options{},
+	)
 
 	integrationtest.TestSshTunnelScenarios(t, trino.DatabaseType, []byte(configJSON))
 }

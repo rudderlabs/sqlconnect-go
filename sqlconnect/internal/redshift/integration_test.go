@@ -19,7 +19,15 @@ func TestRedshiftDB(t *testing.T) {
 			t.Skip("skipping redshift postgres driver integration test due to lack of a test environment")
 		}
 
-		integrationtest.TestDatabaseScenarios(t, redshift.DatabaseType, []byte(configJSON), strings.ToLower, integrationtest.Options{LegacySupport: true})
+		integrationtest.TestDatabaseScenarios(
+			t,
+			redshift.DatabaseType,
+			[]byte(configJSON),
+			strings.ToLower,
+			integrationtest.Options{
+				LegacySupport: true,
+			},
+		)
 
 		integrationtest.TestSshTunnelScenarios(t, redshift.DatabaseType, []byte(configJSON))
 	})
@@ -32,6 +40,14 @@ func TestRedshiftDB(t *testing.T) {
 			}
 			t.Skip("skipping redshift data driver integration test due to lack of a test environment")
 		}
-		integrationtest.TestDatabaseScenarios(t, redshift.DatabaseType, []byte(configJSON), strings.ToLower, integrationtest.Options{LegacySupport: true})
+		integrationtest.TestDatabaseScenarios(
+			t,
+			redshift.DatabaseType,
+			[]byte(configJSON),
+			strings.ToLower,
+			integrationtest.Options{
+				LegacySupport: true,
+			},
+		)
 	})
 }

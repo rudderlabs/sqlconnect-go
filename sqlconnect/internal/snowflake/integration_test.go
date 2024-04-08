@@ -18,5 +18,14 @@ func TestSnowflakeDB(t *testing.T) {
 		t.Skip("skipping snowflake integration test due to lack of a test environment")
 	}
 
-	integrationtest.TestDatabaseScenarios(t, snowflake.DatabaseType, []byte(configJSON), strings.ToUpper, integrationtest.Options{LegacySupport: true})
+	integrationtest.TestDatabaseScenarios(
+		t,
+		snowflake.DatabaseType,
+		[]byte(configJSON),
+		strings.ToUpper,
+		integrationtest.Options{
+			LegacySupport:             true,
+			IncludesViewsInListTables: true,
+		},
+	)
 }
