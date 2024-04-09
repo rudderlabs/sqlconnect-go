@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.1...v1.1.2) (2024-04-09)
+
+
+### Bug Fixes
+
+* **snowflake:** audiences stopped supporting views ([#43](https://github.com/rudderlabs/sqlconnect-go/issues/43)) ([3c5b7e5](https://github.com/rudderlabs/sqlconnect-go/commit/3c5b7e56d87d4ed1c5c70d5d0b27cc29028cc413))
+
+
+### Miscellaneous
+
+* **deps:** bump github.com/aws/aws-sdk-go-v2/credentials from 1.16.2 to 1.17.10 ([#37](https://github.com/rudderlabs/sqlconnect-go/issues/37)) ([19f7873](https://github.com/rudderlabs/sqlconnect-go/commit/19f78739bb1d8f4d866774280bfa02fbbfd36c3a))
+* **deps:** bump github.com/aws/aws-sdk-go-v2/credentials from 1.17.10 to 1.17.11 ([#42](https://github.com/rudderlabs/sqlconnect-go/issues/42)) ([f84cb71](https://github.com/rudderlabs/sqlconnect-go/commit/f84cb7196d5f7109eb2520ba62fe0c6751baf40f))
+* **deps:** bump github.com/aws/aws-sdk-go-v2/service/redshiftdata from 1.25.2 to 1.25.4 ([#36](https://github.com/rudderlabs/sqlconnect-go/issues/36)) ([2fe4a4d](https://github.com/rudderlabs/sqlconnect-go/commit/2fe4a4d86a1d8208bde38539ae584e6481d75592))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.23.3 to 0.24.0 ([#40](https://github.com/rudderlabs/sqlconnect-go/issues/40)) ([cc02180](https://github.com/rudderlabs/sqlconnect-go/commit/cc02180ad1a8f9da3edb00311d6f74bcb0e0bc20))
+
 ## [1.1.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.0...v1.1.1) (2024-04-01)
 
 
