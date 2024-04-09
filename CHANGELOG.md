@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.2...v1.1.3) (2024-04-09)
+
+
+### Miscellaneous
+
+* **bigquery:** add support for retrying jobRateLimitExceeded errors ([#39](https://github.com/rudderlabs/sqlconnect-go/issues/39)) ([314f5eb](https://github.com/rudderlabs/sqlconnect-go/commit/314f5eb31cd6128e012901eac193ff05f992a186))
+
 ## [1.1.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.1...v1.1.2) (2024-04-09)
 
 
