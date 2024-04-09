@@ -8,15 +8,21 @@ import (
 	"google.golang.org/api/option"
 )
 
-func NewConnector(projectID string, opts ...option.ClientOption) driver.Connector {
+type Config struct {
+	JobRateLimitExceededRetryEnabled bool // Enable jobRateLimitExceeded retries: default false
+}
+
+func NewConnector(projectID string, config Config, opts ...option.ClientOption) driver.Connector {
 	return &bigQueryConnector{
 		projectID: projectID,
+		config:    config,
 		opts:      opts,
 	}
 }
 
 type bigQueryConnector struct {
 	projectID string
+	config    Config
 	opts      []option.ClientOption
 }
 
@@ -27,6 +33,7 @@ func (c *bigQueryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	}
 
 	return &bigQueryConnection{
+		config: c.config,
 		ctx:    ctx,
 		client: client,
 	}, nil
