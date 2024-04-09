@@ -24,6 +24,8 @@ import (
 type Options struct {
 	// LegacySupport enables the use of legacy column mappings
 	LegacySupport bool
+
+	IncludesViewsInListTables bool
 }
 
 func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMessage, formatfn func(string) string, opts Options) {
@@ -177,6 +179,19 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			require.NoError(t, err, "it should be able to list tables")
 			require.Contains(t, tables, table, "it should contain the created table")
 		})
+
+		if opts.IncludesViewsInListTables {
+			t.Run("list tables with views", func(t *testing.T) {
+				view := table
+				view.Name = formatfn(table.Name + "_view")
+				_, err := db.Exec(fmt.Sprintf("CREATE VIEW %s AS SELECT * FROM %s", db.QuoteTable(view), db.QuoteTable(table)))
+				require.NoError(t, err, "it should be able to create a view")
+				tables, err := db.ListTables(ctx, schema)
+				require.NoError(t, err, "it should be able to list tables")
+				require.Contains(t, tables, view, "it should contain the created view")
+				require.Contains(t, tables, view, "it should contain the table as well")
+			})
+		}
 
 		t.Run("list tables with prefix", func(t *testing.T) {
 			t.Run("with context cancelled", func(t *testing.T) {

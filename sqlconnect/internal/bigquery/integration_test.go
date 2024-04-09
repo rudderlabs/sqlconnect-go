@@ -18,5 +18,13 @@ func TestBigqueryDB(t *testing.T) {
 		}
 		t.Skip("skipping bigquery integration test due to lack of a test environment")
 	}
-	integrationtest.TestDatabaseScenarios(t, bigquery.DatabaseType, []byte(configJSON), strings.ToLower, integrationtest.Options{LegacySupport: true})
+	integrationtest.TestDatabaseScenarios(
+		t,
+		bigquery.DatabaseType,
+		[]byte(configJSON),
+		strings.ToLower,
+		integrationtest.Options{
+			LegacySupport: true,
+		},
+	)
 }

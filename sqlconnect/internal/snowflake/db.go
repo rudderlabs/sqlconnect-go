@@ -52,6 +52,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
 						{A: fmt.Sprintf(`SHOW TERSE TABLES IN SCHEMA "%[1]s"`, schema), B: "name"},
+						{A: fmt.Sprintf(`SHOW TERSE VIEWS IN SCHEMA "%[1]s"`, schema), B: "name"},
 					}
 				}
 				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
