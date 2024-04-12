@@ -32,6 +32,15 @@ type RedshiftConfig struct {
 	Params url.Values
 }
 
+func (cfg *RedshiftConfig) Sanitize() {
+	if cfg.ClusterIdentifier != "" {
+		cfg.WorkgroupName = ""
+	}
+	if cfg.WorkgroupName != "" {
+		cfg.DbUser = ""
+	}
+}
+
 func (cfg *RedshiftConfig) LoadOpts() []func(*config.LoadOptions) error {
 	var opts []func(*config.LoadOptions) error
 	if cfg.SharedConfigProfile != "" {

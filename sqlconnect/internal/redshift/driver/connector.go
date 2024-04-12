@@ -6,6 +6,7 @@ import (
 )
 
 func NewRedshiftConnector(cfg RedshiftConfig) driver.Connector {
+	cfg.Sanitize()
 	return &redshiftDataConnector{
 		d:   &redshiftDataDriver{},
 		cfg: &cfg,
