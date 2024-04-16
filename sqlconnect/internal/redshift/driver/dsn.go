@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,9 +24,10 @@ type RedshiftConfig struct {
 	AccessKeyID         string        `json:"accessKeyId"`
 	SecretAccessKey     string        `json:"secretAccessKey"`
 	SessionToken        string        `json:"sessionToken"`
-	Timeout             time.Duration `json:"timeout"`    // default: no timeout
-	MinPolling          time.Duration `json:"polling"`    // default: 10ms
-	MaxPolling          time.Duration `json:"maxPolling"` // default: 5s
+	Timeout             time.Duration `json:"timeout"`          // default: no timeout
+	MinPolling          time.Duration `json:"polling"`          // default: 10ms
+	MaxPolling          time.Duration `json:"maxPolling"`       // default: 5s
+	RetryMaxAttempts    int           `json:"retryMaxAttempts"` // default: 20
 
 	Params url.Values
 }
@@ -42,6 +44,7 @@ func (cfg *RedshiftConfig) LoadOpts() []func(*config.LoadOptions) error {
 			cfg.SessionToken,
 		)))
 	}
+	opts = append(opts, config.WithRetryMaxAttempts(cfg.GetRetryMaxAttempts()))
 	return opts
 }
 
@@ -78,6 +81,11 @@ func (cfg *RedshiftConfig) String() string {
 		params.Add("maxPolling", cfg.MaxPolling.String())
 	} else {
 		params.Del("maxPolling")
+	}
+	if cfg.RetryMaxAttempts > 0 {
+		params.Add("retryMaxAttempts", strconv.Itoa(cfg.RetryMaxAttempts))
+	} else {
+		params.Del("retryMaxAttempts")
 	}
 	if cfg.Region != "" {
 		params.Add("region", cfg.Region)
@@ -134,6 +142,13 @@ func (cfg *RedshiftConfig) setParams(params url.Values) error {
 			return fmt.Errorf("parse max polling as duration: %w", err)
 		}
 		cfg.Params.Del("maxPolling")
+	}
+	if params.Has("retryMaxAttempts") {
+		cfg.RetryMaxAttempts, err = strconv.Atoi(params.Get("retryMaxAttempts"))
+		if err != nil {
+			return fmt.Errorf("parse retry max attempts as int: %w", err)
+		}
+		cfg.Params.Del("retryMaxAttempts")
 	}
 	if params.Has("region") {
 		cfg.Region = params.Get("region")
@@ -192,6 +207,13 @@ func (cfg *RedshiftConfig) GetMaxPolling() time.Duration {
 		return 5 * time.Second
 	}
 	return cfg.MaxPolling
+}
+
+func (cfg *RedshiftConfig) GetRetryMaxAttempts() int {
+	if cfg.RetryMaxAttempts <= 0 {
+		return 20
+	}
+	return cfg.RetryMaxAttempts
 }
 
 func ParseDSN(dsn string) (*RedshiftConfig, error) {

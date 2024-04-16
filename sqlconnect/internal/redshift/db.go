@@ -104,6 +104,7 @@ func newRedshiftDataDB(credentialsJSON json.RawMessage) (*sql.DB, error) {
 		Timeout:           config.Timeout,
 		MinPolling:        config.MinPolling,
 		MaxPolling:        config.MaxPolling,
+		RetryMaxAttempts:  config.RetryMaxAttempts,
 	}
 	connector := redshiftdriver.NewRedshiftConnector(cfg)
 

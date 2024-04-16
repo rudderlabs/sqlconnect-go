@@ -42,8 +42,9 @@ func TestRedshiftDataConfig__String(t *testing.T) {
 				Database:          "dev",
 				MinPolling:        5 * time.Millisecond,
 				MaxPolling:        2 * time.Second,
+				RetryMaxAttempts:  3,
 			},
-			expected: "admin@cluster(default)/dev?maxPolling=2s&minPolling=5ms",
+			expected: "admin@cluster(default)/dev?maxPolling=2s&minPolling=5ms&retryMaxAttempts=3",
 		},
 		{
 			dsn: &RedshiftConfig{
