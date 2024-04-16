@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.4](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.3...v1.1.4) (2024-04-16)
+
+
+### Bug Fixes
+
+* redshift-data driver inconsistencies ([#45](https://github.com/rudderlabs/sqlconnect-go/issues/45)) ([9df88a6](https://github.com/rudderlabs/sqlconnect-go/commit/9df88a6707dff19d9a72b7e37053ac44ea246e70))
+
+
+### Miscellaneous
+
+* add CODEOWNERS file ([#46](https://github.com/rudderlabs/sqlconnect-go/issues/46)) ([55f395f](https://github.com/rudderlabs/sqlconnect-go/commit/55f395fe7f873af47e3635b6d06d0ad200790f42))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.24.0 to 0.27.0 ([#48](https://github.com/rudderlabs/sqlconnect-go/issues/48)) ([b0bd18e](https://github.com/rudderlabs/sqlconnect-go/commit/b0bd18e8741151b8b5ed131dc9dca5bc98e3bd70))
+* **redshift-data:** add support for RetryMaxAttempts with default value set to 20 ([#50](https://github.com/rudderlabs/sqlconnect-go/issues/50)) ([15e0220](https://github.com/rudderlabs/sqlconnect-go/commit/15e0220d34a4850edeb83639de76bfc1bb5df2a9))
+
 ## [1.1.3](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.2...v1.1.3) (2024-04-09)
 
 
