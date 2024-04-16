@@ -92,19 +92,20 @@ func newRedshiftDataDB(credentialsJSON json.RawMessage) (*sql.DB, error) {
 		return nil, err
 	}
 	cfg := redshiftdriver.RedshiftConfig{
-		ClusterIdentifier: config.ClusterIdentifier,
-		Database:          config.Database,
-		DbUser:            config.User,
-		WorkgroupName:     config.WorkgroupName,
-		SecretsARN:        config.SecretsARN,
-		Region:            config.Region,
-		AccessKeyID:       config.AccessKeyID,
-		SecretAccessKey:   config.SecretAccessKey,
-		SessionToken:      config.SessionToken,
-		Timeout:           config.Timeout,
-		MinPolling:        config.MinPolling,
-		MaxPolling:        config.MaxPolling,
-		RetryMaxAttempts:  config.RetryMaxAttempts,
+		ClusterIdentifier:   config.ClusterIdentifier,
+		Database:            config.Database,
+		DbUser:              config.User,
+		WorkgroupName:       config.WorkgroupName,
+		SecretsARN:          config.SecretsARN,
+		Region:              config.Region,
+		AccessKeyID:         config.AccessKeyID,
+		SharedConfigProfile: config.SharedConfigProfile,
+		SecretAccessKey:     config.SecretAccessKey,
+		SessionToken:        config.SessionToken,
+		Timeout:             config.Timeout,
+		MinPolling:          config.MinPolling,
+		MaxPolling:          config.MaxPolling,
+		RetryMaxAttempts:    config.RetryMaxAttempts,
 	}
 	connector := redshiftdriver.NewRedshiftConnector(cfg)
 

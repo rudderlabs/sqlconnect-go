@@ -84,39 +84,39 @@ func (rows *redshiftRows) Next(dest []driver.Value) error {
 				dataType := strings.ToLower(*rows.page.ColumnMetadata[i].TypeName)
 				switch dataType {
 				case "timestamp":
-					t, err := time.Parse("2006-01-02 15:04:05", field.Value)
+					t, err := time.Parse("2006-01-02 15:04:05.999999", field.Value)
 					if err != nil {
 						dest[i] = field.Value
 					} else {
-						dest[i] = t.UTC().Format(time.RFC3339)
+						dest[i] = t.UTC().Format(time.RFC3339Nano)
 					}
 				case "timestamptz":
-					t, err := time.Parse("2006-01-02 15:04:05-07", field.Value)
+					t, err := time.Parse("2006-01-02 15:04:05.999999-07", field.Value)
 					if err != nil {
 						dest[i] = field.Value
 					} else {
-						dest[i] = t.UTC().Format(time.RFC3339)
+						dest[i] = t.UTC().Format(time.RFC3339Nano)
 					}
 				case "date":
 					t, err := time.Parse("2006-01-02", field.Value)
 					if err != nil {
 						dest[i] = field.Value
 					} else {
-						dest[i] = t.UTC().Format(time.RFC3339)
+						dest[i] = t.UTC().Format(time.RFC3339Nano)
 					}
 				case "time", "time without time zone":
-					t, err := time.Parse("15:04:05", field.Value)
+					t, err := time.Parse("15:04:05.999999", field.Value)
 					if err != nil {
 						dest[i] = field.Value
 					} else {
-						dest[i] = t.UTC().Format(time.RFC3339)
+						dest[i] = t.UTC().Format(time.RFC3339Nano)
 					}
 				case "timetz", "time with time zone":
-					t, err := time.Parse("15:04:05-07", field.Value)
+					t, err := time.Parse("15:04:05.999999-07", field.Value)
 					if err != nil {
 						dest[i] = field.Value
 					} else {
-						dest[i] = t.UTC().Format(time.RFC3339)
+						dest[i] = t.UTC().Format(time.RFC3339Nano)
 					}
 
 				default:

@@ -116,3 +116,29 @@ func TestRedshiftDataConfig__String(t *testing.T) {
 		})
 	}
 }
+
+func TestRedshiftConfigSanitize(t *testing.T) {
+	t.Run("cluster config", func(t *testing.T) {
+		c := RedshiftConfig{
+			ClusterIdentifier: "default",
+			WorkgroupName:     "default",
+			DbUser:            "admin",
+		}
+
+		c.Sanitize()
+		require.NotEmpty(t, c.ClusterIdentifier)
+		require.Empty(t, c.WorkgroupName)
+		require.NotEmpty(t, c.DbUser)
+	})
+
+	t.Run("workgroup config", func(t *testing.T) {
+		c := RedshiftConfig{
+			WorkgroupName: "default",
+			DbUser:        "admin",
+		}
+
+		c.Sanitize()
+		require.NotEmpty(t, c.WorkgroupName)
+		require.Empty(t, c.DbUser)
+	})
+}
