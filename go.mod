@@ -4,7 +4,7 @@ go 1.22.0
 
 require (
 	cloud.google.com/go v0.112.2
-	cloud.google.com/go/bigquery v1.59.1
+	cloud.google.com/go/bigquery v1.60.0
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/aws/aws-sdk-go-v2 v1.26.1
 	github.com/aws/aws-sdk-go-v2/config v1.25.3
