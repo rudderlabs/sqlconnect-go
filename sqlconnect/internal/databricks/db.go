@@ -31,7 +31,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 		databricks.WithServerHostname(config.Host),
 		databricks.WithPort(config.Port),
 		databricks.WithHTTPPath(config.Path),
-		databricks.WithInitialNamespace(config.Catalog, ""),
+		databricks.WithInitialNamespace(config.Catalog, config.Schema),
 		databricks.WithRetries(
 			config.RetryAttempts,
 			config.MinRetryWaitTime,
