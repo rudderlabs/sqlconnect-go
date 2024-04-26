@@ -13,6 +13,7 @@ type Config struct {
 	Path    string `json:"path"`
 	Token   string `json:"token"`
 	Catalog string `json:"catalog"`
+	Schema  string `json:"schema"`
 
 	TunnelInfo *sshtunnel.Config `json:"tunnel_info,omitempty"`
 
