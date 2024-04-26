@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.6](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.5...v1.1.6) (2024-04-26)
+
+
+### Miscellaneous
+
+* use go 1.22 with toolchain ([#57](https://github.com/rudderlabs/sqlconnect-go/issues/57)) ([abbeb68](https://github.com/rudderlabs/sqlconnect-go/commit/abbeb68ebc242dccf35e1016e28d0718fb32bff5))
+
 ## [1.1.5](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.4...v1.1.5) (2024-04-26)
 
 
