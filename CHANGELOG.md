@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.5](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.4...v1.1.5) (2024-04-26)
+
+
+### Miscellaneous
+
+* **databricks:** add configuration option for setting the default schema ([#54](https://github.com/rudderlabs/sqlconnect-go/issues/54)) ([17cdafc](https://github.com/rudderlabs/sqlconnect-go/commit/17cdafc80f53ecbe96be38ad171fbe0cb04464c5))
+* **deps:** bump cloud.google.com/go from 0.112.1 to 0.112.2 ([#51](https://github.com/rudderlabs/sqlconnect-go/issues/51)) ([f19c0be](https://github.com/rudderlabs/sqlconnect-go/commit/f19c0be123b7f76c360a3f76ac5fb982cea820a9))
+* **deps:** bump google.golang.org/api from 0.172.0 to 0.175.0 ([#52](https://github.com/rudderlabs/sqlconnect-go/issues/52)) ([8eeea74](https://github.com/rudderlabs/sqlconnect-go/commit/8eeea74b3b7a3f78d5a490de80321d83bd7b45d4))
+* **deps:** bump rudder-go-kit to v0.29.0 ([#55](https://github.com/rudderlabs/sqlconnect-go/issues/55)) ([62df998](https://github.com/rudderlabs/sqlconnect-go/commit/62df998df6186ffa8f5bcfb84025f4b8fe3d8107))
+
 ## [1.1.4](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.3...v1.1.4) (2024-04-16)
 
 
