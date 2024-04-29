@@ -34,7 +34,7 @@ func TestBigqueryDriver(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(configJSON), &c))
 
 	t.Run("OpenDB", func(t *testing.T) {
-		db := sql.OpenDB(driver.NewConnector(c.ProjectID, driver.Config{}, option.WithCredentialsJSON([]byte(c.CredentialsJSON))))
+		db := sql.OpenDB(driver.NewConnector(c.ProjectID, option.WithCredentialsJSON([]byte(c.CredentialsJSON))))
 		t.Cleanup(func() {
 			require.NoError(t, db.Close(), "it should be able to close the database connection")
 		})
@@ -225,32 +225,9 @@ func TestBigqueryDriver(t *testing.T) {
 		})
 	})
 
-	// TODO: this test should start failing once this fix is released:
-	// https://github.com/googleapis/google-cloud-go/pull/9726
 	t.Run("jobRateLimitExceeded", func(t *testing.T) {
-		t.Run("selecting from information schema from multiple go-routines should lead to a jobRateLimitExceeded error", func(t *testing.T) {
-			db := sql.OpenDB(driver.NewConnector(c.ProjectID, driver.Config{}, option.WithCredentialsJSON([]byte(c.CredentialsJSON))))
-			t.Cleanup(func() {
-				require.NoError(t, db.Close(), "it should be able to close the database connection")
-			})
-			ctx, cancel := context.WithCancel(context.Background())
-			t.Cleanup(cancel)
-
-			g, ctx := errgroup.WithContext(ctx)
-			g.SetLimit(10)
-			for i := 0; i < 200; i++ {
-				g.Go(func() error {
-					_, err := db.ExecContext(ctx, "SELECT * FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'invalid'")
-					return err
-				})
-			}
-			err := g.Wait()
-			require.Error(t, err, "it should return an error")
-			require.Contains(t, err.Error(), "jobRateLimitExceeded", "it should return a jobRateLimitExceeded error")
-		})
-
 		t.Run("selecting from information schema from multiple go-routines and having rate limit retries enabled, shoudln't lead to a jobRateLimitExceeded error", func(t *testing.T) {
-			db := sql.OpenDB(driver.NewConnector(c.ProjectID, driver.Config{JobRateLimitExceededRetryEnabled: true}, option.WithCredentialsJSON([]byte(c.CredentialsJSON))))
+			db := sql.OpenDB(driver.NewConnector(c.ProjectID, option.WithCredentialsJSON([]byte(c.CredentialsJSON))))
 			t.Cleanup(func() {
 				require.NoError(t, db.Close(), "it should be able to close the database connection")
 			})
