@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.7](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.6...v1.1.7) (2024-04-29)
+
+
+### Miscellaneous
+
+* **deps:** bump github.com/aws/aws-sdk-go-v2/config from 1.25.3 to 1.27.11 ([#60](https://github.com/rudderlabs/sqlconnect-go/issues/60)) ([e30bf0c](https://github.com/rudderlabs/sqlconnect-go/commit/e30bf0c7b398e3c2a089595e3cdc5e6aa4a335e1))
+* **deps:** bump golangci/golangci-lint-action from 4 to 5 ([#59](https://github.com/rudderlabs/sqlconnect-go/issues/59)) ([22be313](https://github.com/rudderlabs/sqlconnect-go/commit/22be313b48f3e7fe2a36e68ef92ab4a5df4eef88))
+
 ## [1.1.6](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.5...v1.1.6) (2024-04-26)
 
 
