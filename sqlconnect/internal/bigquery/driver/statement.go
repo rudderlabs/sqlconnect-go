@@ -41,7 +41,7 @@ func (statement *bigQueryStatement) ExecContext(ctx context.Context, args []driv
 		return nil, err
 	}
 
-	rowIterator, err := query.Read(ctx)
+	rowIterator, err := statement.connection.readWithBackoff(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (statement *bigQueryStatement) QueryContext(ctx context.Context, args []dri
 		return nil, err
 	}
 
-	rowIterator, err := query.Read(ctx)
+	rowIterator, err := statement.connection.readWithBackoff(ctx, query)
 	if err != nil {
 		return nil, err
 	}
