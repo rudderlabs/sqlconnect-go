@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.7...v1.2.0) (2024-05-20)
+
+
+### Features
+
+* **bigquery:** bump cloud.google.com/go/bigquery from 1.59.1 to 1.61.0 ([#56](https://github.com/rudderlabs/sqlconnect-go/issues/56)) ([30e3030](https://github.com/rudderlabs/sqlconnect-go/commit/30e303055c64a65179a295caa0d8d510e16a9466))
+* **databricks:** bump github.com/databricks/databricks-sql-go from 1.5.3 to 1.5.4 ([#61](https://github.com/rudderlabs/sqlconnect-go/issues/61)) ([ec3fb29](https://github.com/rudderlabs/sqlconnect-go/commit/ec3fb29625866dc9c1f82e077b659af32795d824))
+* **databricks:** bump github.com/databricks/databricks-sql-go from 1.5.4 to 1.5.5 ([#66](https://github.com/rudderlabs/sqlconnect-go/issues/66)) ([000e3b4](https://github.com/rudderlabs/sqlconnect-go/commit/000e3b4b926ff62c7c3527261fdf395c734fc560))
+* **mysql:** bump github.com/go-sql-driver/mysql from 1.7.1 to 1.8.1 ([#11](https://github.com/rudderlabs/sqlconnect-go/issues/11)) ([de51b3a](https://github.com/rudderlabs/sqlconnect-go/commit/de51b3a3445fa06e942eb70cff5f74e9adbaa931))
+* **redshift:** bump github.com/aws/aws-sdk-go-v2/service/redshiftdata from 1.25.4 to 1.25.7 ([#75](https://github.com/rudderlabs/sqlconnect-go/issues/75)) ([3036555](https://github.com/rudderlabs/sqlconnect-go/commit/3036555591b3273403a47ceb0d467f5275f86656))
+* **snowflake:** bump github.com/snowflakedb/gosnowflake from 1.7.2 to 1.9.0 ([#33](https://github.com/rudderlabs/sqlconnect-go/issues/33)) ([5b926c8](https://github.com/rudderlabs/sqlconnect-go/commit/5b926c83908c7d99992ee2d892edbd1a526ec8e3))
+* **snowflake:** bump snowflake to v1.10.0 ([#79](https://github.com/rudderlabs/sqlconnect-go/issues/79)) ([b205e59](https://github.com/rudderlabs/sqlconnect-go/commit/b205e59b30ab3b2505983b00559b58e5c71daa4f))
+* **trino:** bump github.com/trinodb/trino-go-client from 0.313.0 to 0.315.0 ([#64](https://github.com/rudderlabs/sqlconnect-go/issues/64)) ([b15133b](https://github.com/rudderlabs/sqlconnect-go/commit/b15133b0429905024d5603abf6a41ead35f906ee))
+
+
+### Miscellaneous
+
+* **bigquery:** downgrade bigquery from 1.61.0 to 1.60.0 ([#77](https://github.com/rudderlabs/sqlconnect-go/issues/77)) ([eda4cf6](https://github.com/rudderlabs/sqlconnect-go/commit/eda4cf6de926667256969ed8d51d48abceb2ffea))
+* bump bigquery to v1.61.0 ([#78](https://github.com/rudderlabs/sqlconnect-go/issues/78)) ([3ad5159](https://github.com/rudderlabs/sqlconnect-go/commit/3ad5159212b26e09753388504041157b952c1ed3))
+
 ## [1.1.7](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.6...v1.1.7) (2024-04-29)
 
 
