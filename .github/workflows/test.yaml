@@ -45,6 +45,10 @@ jobs:
           check-latest: true
       - run: go version
       - run: go mod download
+      - name: disable ipv6
+        run: |
+          sudo sysctl -w net.ipv6.conf.all.disable_ipv6=1
+          sudo sysctl -w net.ipv6.conf.default.disable_ipv6=1
       - name: Run tests
         run: |
           FORCE_RUN_INTEGRATION_TESTS=true make test exclude="${{ matrix.exclude }}" package=${{ matrix.package }}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/rudderlabs/sql-tunnels/tunnel"
 )
@@ -24,10 +25,30 @@ func NewTcpTunnel(c Config, remoteHost string, remotePort int) (Tunnel, error) {
 		RemoteHost: remoteHost,
 		RemotePort: remotePort,
 	}
+
 	t, err := tunnel.ListenAndForward(&tunnelConfig)
 	if err != nil {
 		return nil, fmt.Errorf("creating ssh tunnel: %w", err)
 	}
+
+	// Wait for the tunnel to be ready (go routine)
+	var (
+		established bool
+		retries     int
+	)
+	for !established && retries < 10 {
+		con, err := net.Dial("tcp", t.Addr())
+		if con != nil {
+			_ = con.Close()
+		}
+		if err != nil {
+			retries++
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+		established = true
+	}
+
 	return &tcpTunnel{t}, nil
 }
 
