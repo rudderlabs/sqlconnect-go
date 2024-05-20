@@ -16,7 +16,7 @@ require (
 	github.com/databricks/databricks-sql-go v1.5.5
 	github.com/dlclark/regexp2 v1.11.0
 	github.com/gliderlabs/ssh v0.3.7
-	github.com/go-sql-driver/mysql v1.8.0
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/ory/dockertest/v3 v3.10.0
