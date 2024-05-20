@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"strconv"
 	"testing"
+	"time"
 
 	sshx "github.com/gliderlabs/ssh"
 	"github.com/stretchr/testify/require"
@@ -92,6 +94,15 @@ func newSshServer(t *testing.T, port int) (server *testsshserver, privateKey []b
 		err := server.ListenAndServe()
 		require.Equal(t, sshx.ErrServerClosed, err)
 	}()
+
+	require.Eventually(t, func() bool {
+		con, err := net.Dial("tcp", server.Server.Addr)
+		if err != nil {
+			return false
+		}
+		_ = con.Close()
+		return true
+	}, 1*time.Second, 10*time.Millisecond)
 
 	return
 }
