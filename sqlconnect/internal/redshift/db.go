@@ -54,6 +54,13 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SELECT schema_name FROM svv_redshift_schemas WHERE schema_name = '%[1]s'", schema)
 				}
+				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
+					stmt := fmt.Sprintf("SELECT column_name, data_type FROM SVV_COLUMNS WHERE table_schema = '%[1]s' AND table_name = '%[2]s'", schema, table)
+					if catalog != "" {
+						stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", catalog)
+					}
+					return stmt + " ORDER BY ordinal_position ASC", "column_name", "data_type"
+				}
 				return cmds
 			}),
 		),
