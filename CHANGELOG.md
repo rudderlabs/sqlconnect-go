@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.2.0...v1.3.0) (2024-06-07)
+
+
+### Features
+
+* **databricks:** bump github.com/databricks/databricks-sql-go from 1.5.5 to 1.5.6 ([#86](https://github.com/rudderlabs/sqlconnect-go/issues/86)) ([b20a89e](https://github.com/rudderlabs/sqlconnect-go/commit/b20a89e1eaa8a3377678a223270c1356cc47c4c2))
+* **snowflake:** bump github.com/snowflakedb/gosnowflake from 1.10.0 to 1.10.1 ([#88](https://github.com/rudderlabs/sqlconnect-go/issues/88)) ([f210281](https://github.com/rudderlabs/sqlconnect-go/commit/f210281f04b0df5f8c6c66845811330c1133ed07))
+
+
+### Bug Fixes
+
+* **redshift:** listcolumns doesn't return any results for views with no schema binding ([#91](https://github.com/rudderlabs/sqlconnect-go/issues/91)) ([9489790](https://github.com/rudderlabs/sqlconnect-go/commit/9489790010455d84c60b7d6a04c649ad2cddb83a))
+
 ## [1.2.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.1.7...v1.2.0) (2024-05-20)
 
 
