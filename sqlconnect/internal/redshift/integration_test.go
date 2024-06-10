@@ -64,6 +64,8 @@ func ExtraTests(t *testing.T, db sqlconnect.DB) {
 	t.Run("list columns with non schema binding", func(t *testing.T) {
 		ctx := context.Background()
 		schema := sqlconnect.SchemaRef{Name: integrationtest.GenerateTestSchema(strings.ToLower)}
+		err := db.CreateSchema(ctx, schema)
+		require.NoErrorf(t, err, "it should be able to create schema")
 		nonSchemaBindedView := sqlconnect.NewRelationRef(strings.ToLower("column_mappings_test_vw_ns"), sqlconnect.WithSchema(schema.Name))
 		integrationtest.ExecuteStatements(t, db, schema.Name, "testdata/column-mapping-ns-view-test-seed.sql")
 
