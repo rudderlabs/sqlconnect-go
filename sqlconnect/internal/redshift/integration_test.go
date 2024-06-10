@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	integrationtest "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/integration_test"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift"
 )
@@ -26,6 +27,7 @@ func TestRedshiftDB(t *testing.T) {
 			strings.ToLower,
 			integrationtest.Options{
 				LegacySupport: true,
+				ExtraTests:    ExtraTests,
 			},
 		)
 
@@ -47,7 +49,15 @@ func TestRedshiftDB(t *testing.T) {
 			strings.ToLower,
 			integrationtest.Options{
 				LegacySupport: true,
+				ExtraTests:    ExtraTests,
 			},
 		)
+	})
+}
+
+func ExtraTests(t *testing.T, db sqlconnect.DB) {
+
+	t.Run("list with non schema binding", func(t *testing.T) {
+
 	})
 }

@@ -26,6 +26,8 @@ type Options struct {
 	LegacySupport bool
 
 	IncludesViewsInListTables bool
+
+	ExtraTests func(t *testing.T, db sqlconnect.DB)
 }
 
 func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMessage, formatfn func(string) string, opts Options) {
@@ -642,6 +644,12 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 	})
+
+	if opts.ExtraTests != nil {
+		t.Run("extra tests", func(t *testing.T) {
+			opts.ExtraTests(t, db)
+		})
+	}
 }
 
 func GenerateTestSchema(formatfn func(string) string) string {
