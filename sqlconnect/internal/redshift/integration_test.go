@@ -7,11 +7,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/require"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	integrationtest "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/integration_test"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift"
-	"github.com/samber/lo"
-	"github.com/stretchr/testify/require"
 )
 
 func TestRedshiftDB(t *testing.T) {
@@ -60,7 +61,6 @@ func TestRedshiftDB(t *testing.T) {
 }
 
 func ExtraTests(t *testing.T, db sqlconnect.DB) {
-
 	t.Run("list columns with non schema binding", func(t *testing.T) {
 		ctx := context.Background()
 		schema := sqlconnect.SchemaRef{Name: integrationtest.GenerateTestSchema(strings.ToLower)}
