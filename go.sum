@@ -87,8 +87,8 @@ github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.11 h1:o4T+fKxA
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.11/go.mod h1:84oZdJ+VjuJKs9v1UTC9NaodRZRseOXCTgku+vQJWR8=
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.17.5 h1:f9RyWNtS8oH7cZlbn+/JNPpjUk5+5fLd5lM9M0i49Ys=
 github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.17.5/go.mod h1:h5CoMZV2VF297/VLhRhO1WF+XYWOzXo+4HsObA4HjBQ=
-github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.25.8 h1:n1Uz0fNJlm4GQ2BMe/CkIWPsgbFvz19U0hYidik8U1k=
-github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.25.8/go.mod h1:pQhhoLWIg8JpA9LKC3Nd8IsFMrTSYS6DT06Tf/rT0hg=
+github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.25.10 h1:FZiVA6SGDCxNUjoJ/CizSudFScdPvPQNbLtPgmrlUUk=
+github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.25.10/go.mod h1:jnDZbfq7zPFvAnigSNc6iaOQ2TTAnzzQdNJQgHvg29s=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.53.1 h1:6cnno47Me9bRykw9AEv9zkXE+5or7jz8TsskTTccbgc=
 github.com/aws/aws-sdk-go-v2/service/s3 v1.53.1/go.mod h1:qmdkIIAC+GCLASF7R2whgNrJADz0QZPX+Seiw/i4S3o=
 github.com/aws/aws-sdk-go-v2/service/sso v1.20.11 h1:gEYM2GSpr4YNWc6hCd5nod4+d4kd9vWIAWrmGuLdlMw=
