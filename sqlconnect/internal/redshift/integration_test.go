@@ -80,7 +80,7 @@ func ExtraTests(t *testing.T, db sqlconnect.DB) {
 
 		viewExists, err := db.TableExists(ctx, nonSchemaBindedView)
 		require.NoError(t, err, "it should be able to check if a table exists")
-		require.True(t, viewExists, "it should return true for a table that exists")
+		require.True(t, viewExists, "it should return true for a view that exists")
 
 		selectViewStmt := sqlconnect.QueryDef{Table: nonSchemaBindedView, OrderBy: &sqlconnect.QueryOrder{Column: strings.ToLower("_order"), Order: "ASC"}}
 		selectViewSQL := selectViewStmt.ToSQL(db)
