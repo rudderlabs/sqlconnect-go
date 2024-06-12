@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.3.0...v1.3.1) (2024-06-12)
+
+
+### Bug Fixes
+
+* listcolumns returns an empty list instead of an error in case the relation doesn't exist ([#99](https://github.com/rudderlabs/sqlconnect-go/issues/99)) ([bfe30c7](https://github.com/rudderlabs/sqlconnect-go/commit/bfe30c7b2a899175de89931d7375aa1e191a64a7))
+
+
+### Miscellaneous
+
+* **redshift:** add tests for non schema binding views ([#92](https://github.com/rudderlabs/sqlconnect-go/issues/92)) ([7c9398c](https://github.com/rudderlabs/sqlconnect-go/commit/7c9398c985afeeb69791061a3e40ccb0fe4783bb))
+
 ## [1.3.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.2.0...v1.3.0) (2024-06-07)
 
 
