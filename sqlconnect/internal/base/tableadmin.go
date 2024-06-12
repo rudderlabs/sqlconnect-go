@@ -177,6 +177,12 @@ func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) 
 	if err := columns.Err(); err != nil {
 		return nil, fmt.Errorf("iterating list columns for %s: %w", relation.String(), err)
 	}
+
+	// check if relation exists before returning columns
+	if len(res) == 0 {
+		return nil, fmt.Errorf("cannot fetch columns for %s: relation does not exist", relation.String())
+	}
+
 	return res, nil
 }
 

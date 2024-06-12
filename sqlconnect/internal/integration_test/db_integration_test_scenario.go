@@ -207,6 +207,12 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 
 		t.Run("list columns", func(t *testing.T) {
+			t.Run("with nonexistent relation", func(t *testing.T) {
+				nonExistentRelation := sqlconnect.NewRelationRef(formatfn("foobar"), sqlconnect.WithSchema(schema.Name))
+				_, err := db.ListColumns(ctx, nonExistentRelation)
+				require.Error(t, err, "it should throw an error when columns are listed for a nonexistent relation")
+			})
+
 			t.Run("with context cancelled", func(t *testing.T) {
 				_, err := db.ListColumns(cancelledCtx, table)
 				require.Error(t, err, "it should not be able to list columns with a cancelled context")
