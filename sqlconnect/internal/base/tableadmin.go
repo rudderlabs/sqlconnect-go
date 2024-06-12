@@ -132,15 +132,6 @@ func (db *DB) TableExists(ctx context.Context, relation sqlconnect.RelationRef) 
 
 // ListColumns returns a list of columns for the given table
 func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) ([]sqlconnect.ColumnRef, error) {
-	// check if relation exists before returning columns
-	exists, err := db.TableExists(ctx, relation)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, fmt.Errorf("cannot fetch columns for %s: relation does not exist", relation.String())
-	}
-
 	var res []sqlconnect.ColumnRef
 	stmt, nameCol, typeCol := db.sqlCommands.ListColumns(UnquotedIdentifier(relation.Catalog), UnquotedIdentifier(relation.Schema), UnquotedIdentifier(relation.Name))
 	columns, err := db.QueryContext(ctx, stmt)
@@ -151,6 +142,10 @@ func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) 
 	cols, err := columns.Columns()
 	if err != nil {
 		return nil, fmt.Errorf("getting columns in list columns for %s: %w", relation.String(), err)
+	}
+	// check if relation exists before returning columns
+	if len(cols) == 0 {
+		return nil, fmt.Errorf("cannot fetch columns for %s: relation does not exist", relation.String())
 	}
 	cols = lo.Map(cols, func(col string, _ int) string { return strings.ToLower(col) })
 
