@@ -140,7 +140,7 @@ func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) 
 	if !exists {
 		return nil, fmt.Errorf("cannot fetch columns for %s: relation does not exist", relation.String())
 	}
-	
+
 	var res []sqlconnect.ColumnRef
 	stmt, nameCol, typeCol := db.sqlCommands.ListColumns(UnquotedIdentifier(relation.Catalog), UnquotedIdentifier(relation.Schema), UnquotedIdentifier(relation.Name))
 	columns, err := db.QueryContext(ctx, stmt)
