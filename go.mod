@@ -26,6 +26,7 @@ require (
 	github.com/tidwall/gjson v1.17.1
 	github.com/tidwall/sjson v1.2.5
 	github.com/trinodb/trino-go-client v0.315.0
+	github.com/youmark/pkcs8 v0.0.0-20240424034433-3c2c7870ae76
 	golang.org/x/crypto v0.24.0
 	google.golang.org/api v0.182.0
 )
