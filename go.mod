@@ -1,6 +1,7 @@
 module github.com/rudderlabs/sqlconnect-go
 
-go 1.22.3
+go 1.22.4
+
 require (
 	cloud.google.com/go v0.114.0
 	cloud.google.com/go/bigquery v1.61.0
