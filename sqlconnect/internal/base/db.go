@@ -123,21 +123,21 @@ type (
 		CurrentCatalog func() string
 		// Provides the SQL command to create a schema
 		CreateSchema func(schema QuotedIdentifier) string
-		// Provides the SQL command to list all schemas
+		// Provides the SQL command to list all schemas **
 		ListSchemas func() (sql, columnName string)
-		// Provides the SQL command to check if a schema exists
+		// Provides the SQL command to check if a schema exists **
 		SchemaExists func(schema UnquotedIdentifier) string
 		// Provides the SQL command to drop a schema
 		DropSchema func(schema QuotedIdentifier) string
 		// Provides the SQL command to create a test table
 		CreateTestTable func(table QuotedIdentifier) string
-		// Provides the SQL command(s) to list all tables in a schema along with the column name that contains the table name in the result set
+		// Provides the SQL command(s) to list all tables in a schema along with the column name that contains the table name in the result set **
 		ListTables func(schema UnquotedIdentifier) (sqlAndColumnNamePairs []lo.Tuple2[string, string])
-		// Provides the SQL command(s) to list all tables in a schema with a prefix along with the column name that contains the table name in the result set
+		// Provides the SQL command(s) to list all tables in a schema with a prefix along with the column name that contains the table name in the result set **
 		ListTablesWithPrefix func(schema UnquotedIdentifier, prefix string) []lo.Tuple2[string, string]
-		// Provides the SQL command to check if a table exists
+		// Provides the SQL command to check if a table exists **
 		TableExists func(schema, table UnquotedIdentifier) string
-		// Provides the SQL command to list all columns in a table along with the column names in the result set that point to the name and type
+		// Provides the SQL command to list all columns in a table along with the column names in the result set that point to the name and type **
 		ListColumns func(catalog, schema, table UnquotedIdentifier) (sql, nameCol, typeCol string)
 		// Provides the SQL command to count the rows in a table
 		CountTableRows func(table QuotedIdentifier) string
