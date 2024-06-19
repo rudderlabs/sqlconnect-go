@@ -89,8 +89,8 @@ func (c *Config) ParsePrivateKey() (*rsa.PrivateKey, error) {
 
 // normalisePem formats the content of certificates and keys by adding necessary newlines around specific markers.
 func normalisePem(content string) string {
-	// Remove all existing newline characters
-	formattedContent := strings.ReplaceAll(content, "\n", "")
+	// Remove all existing newline characters and replace them with a space
+	formattedContent := strings.ReplaceAll(content, "\n", " ")
 
 	// Add a newline after specific BEGIN markers
 	formattedContent = strings.Replace(formattedContent, "-----BEGIN CERTIFICATE-----", "-----BEGIN CERTIFICATE-----\n", 1)
