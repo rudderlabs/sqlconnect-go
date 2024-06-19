@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.4.0...v1.4.1) (2024-06-19)
+
+
+### Bug Fixes
+
+* **snowflake:** private keys provided through a textarea not being normalised properly ([#106](https://github.com/rudderlabs/sqlconnect-go/issues/106)) ([b15ffc5](https://github.com/rudderlabs/sqlconnect-go/commit/b15ffc524b4b56743a562fead8ec8f8621f1c8c0))
+
 ## [1.4.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.3.1...v1.4.0) (2024-06-18)
 
 
