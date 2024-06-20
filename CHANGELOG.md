@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.4.1...v1.5.0) (2024-06-20)
+
+
+### Features
+
+* **redshift:** support external relations ([#108](https://github.com/rudderlabs/sqlconnect-go/issues/108)) ([737f1ed](https://github.com/rudderlabs/sqlconnect-go/commit/737f1ed44c2d974d2a293288126c4d0fd2750739))
+
 ## [1.4.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.4.0...v1.4.1) (2024-06-19)
 
 
