@@ -21,7 +21,7 @@
     "_character": "string",
     "_date": "datetime",
     "_time": "time without time zone",
-    "_timetz": "timetz",
+    "_timetz": "time with time zone",
     "_timestamptz": "datetime",
     "_timestampntz": "datetime",
     "_timestampwtz": "datetime",

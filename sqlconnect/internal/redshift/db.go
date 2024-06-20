@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	_ "github.com/lib/pq" // postgres driver
+	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 
 	redshiftdriver "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift/driver"
@@ -49,15 +50,28 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 					return "SELECT current_database()"
 				}
 				cmds.ListSchemas = func() (string, string) {
-					return "SELECT schema_name FROM svv_redshift_schemas", "schema_name"
+					return "SELECT schema_name FROM svv_all_schemas", "schema_name"
 				}
 				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
-					return fmt.Sprintf("SELECT schema_name FROM svv_redshift_schemas WHERE schema_name = '%[1]s'", schema)
+					return fmt.Sprintf("SELECT schema_name FROM svv_all_schemas WHERE schema_name = '%[1]s'", schema)
+				}
+				cmds.ListTables = func(schema base.UnquotedIdentifier) (sqlAndColumnNamePairs []lo.Tuple2[string, string]) {
+					return []lo.Tuple2[string, string]{
+						{A: fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name = '%[1]s'", schema), B: "table_name"},
+					}
+				}
+				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+					return []lo.Tuple2[string, string]{
+						{A: fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name='%[1]s' AND table_name LIKE '%[2]s'", schema, prefix+"%"), B: "table_name"},
+					}
+				}
+				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
+					return fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name='%[1]s' and table_name = '%[2]s'", schema, table)
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
-					stmt := fmt.Sprintf("SELECT column_name, data_type FROM SVV_COLUMNS WHERE table_schema = '%[1]s' AND table_name = '%[2]s'", schema, table)
+					stmt := fmt.Sprintf("SELECT column_name, data_type FROM SVV_ALL_COLUMNS WHERE schema_name = '%[1]s' AND table_name = '%[2]s'", schema, table)
 					if catalog != "" {
-						stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", catalog)
+						stmt += fmt.Sprintf(" AND database_name = '%[1]s'", catalog)
 					}
 					return stmt + " ORDER BY ordinal_position ASC", "column_name", "data_type"
 				}
