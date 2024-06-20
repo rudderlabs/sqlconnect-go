@@ -32,8 +32,6 @@ type Options struct {
 
 func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMessage, formatfn func(string) string, opts Options) {
 	schema := sqlconnect.SchemaRef{Name: GenerateTestSchema(formatfn)}
-	configJSON, err := sjson.SetBytes(configJSON, "rudderSchema", schema.Name)
-	require.NoError(t, err, "it should be able to set the rudder schema")
 	db, err := sqlconnect.NewDB(warehouse, configJSON)
 	require.NoError(t, err, "it should be able to create a new DB")
 	defer func() { _ = db.Close() }()
