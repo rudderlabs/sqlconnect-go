@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
 func TestQueryDef(t *testing.T) {
@@ -61,4 +62,12 @@ func (d testDialect) QuoteTable(relation sqlconnect.RelationRef) string {
 		return fmt.Sprintf(`"%s"."%s"`, relation.Schema, relation.Name)
 	}
 	return fmt.Sprintf(`"%s"`, relation.Name)
+}
+
+func (d testDialect) NormaliseIdentifier(identifier string) string {
+	return base.NormaliseIdentifier(identifier, '"', func(s string) string { return s })
+}
+
+func (d testDialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, error) {
+	return base.ParseRelationRef(identifier, '"', func(s string) string { return s })
 }

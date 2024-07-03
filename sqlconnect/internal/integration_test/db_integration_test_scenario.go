@@ -143,6 +143,20 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 	})
 
+	t.Run("dialect", func(t *testing.T) {
+		// Create an unquoted table
+		unquotedTable := "UnQuoted_TablE"
+		identifier := db.QuoteIdentifier(schema.Name) + "." + unquotedTable
+		_, err := db.Exec("CREATE TABLE " + identifier + " (c1 int)")
+		require.NoError(t, err, "it should be able to create an unquoted table")
+
+		table, err := db.ParseRelationRef(identifier)
+		require.NoError(t, err, "it should be able to parse an unquoted table")
+		exists, err := db.TableExists(ctx, table)
+		require.NoError(t, err, "it should be able to check if a table exists")
+		require.True(t, exists, "it should return true for a table that exists")
+	})
+
 	t.Run("table admin", func(t *testing.T) {
 		table := sqlconnect.NewRelationRef(formatfn("test_table"), sqlconnect.WithSchema(schema.Name))
 

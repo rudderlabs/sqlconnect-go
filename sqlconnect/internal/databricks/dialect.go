@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
 type dialect struct{}
@@ -24,4 +25,15 @@ func (d dialect) QuoteIdentifier(name string) string {
 // FormatTableName formats a table name, typically by lower or upper casing it, depending on the database
 func (d dialect) FormatTableName(name string) string {
 	return strings.ToLower(name)
+}
+
+// NormaliseIdentifier normalises identifier parts that are unquoted, typically by lower or upper casing them, depending on the database
+func (d dialect) NormaliseIdentifier(identifier string) string {
+	return base.NormaliseIdentifier(identifier, '`', strings.ToLower)
+}
+
+// ParseRelationRef parses a string into a RelationRef after normalising the identifier and stripping out surrounding quotes.
+// The result is a RelationRef with case-sensitive fields, i.e. it can be safely quoted (see [QuoteTable] and, for instance, used for matching against the database's information schema.
+func (d dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, error) {
+	return base.ParseRelationRef(identifier, '`', strings.ToLower)
 }
