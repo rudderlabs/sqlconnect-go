@@ -3,6 +3,7 @@ package postgres
 import (
 	"encoding/json"
 	"strconv"
+	"time"
 )
 
 // mapping of database column types to rudder types
@@ -33,6 +34,7 @@ var columnTypeMappings = map[string]string{
 	"time without time zone":      "datetime",
 	"time with time zone":         "datetime",
 	"timetz":                      "datetime",
+	"1266":                        "datetime",
 	"timestamptz":                 "datetime",
 	"timestamp without time zone": "datetime",
 	"timestamp with time zone":    "datetime",
@@ -59,11 +61,31 @@ func jsonRowMapper(databaseTypeName string, value any) any {
 			if n, err := strconv.ParseFloat(string(v), 64); err == nil {
 				return n
 			}
+		case string:
+			if n, err := strconv.ParseFloat(v, 64); err == nil {
+				return n
+			}
 		}
+	case "1266":
+		if value != nil {
+			if t, err := time.Parse("15:04:05-07", value.(string)); err == nil {
+				value = t.UTC().Format(time.RFC3339)
+			}
+		}
+	case "TIME", "TIME WITHOUT TIME ZONE":
+		switch v := value.(type) {
+		case string:
+			if t, err := time.Parse("15:04:05", v); err == nil {
+				value = t.UTC().Format(time.RFC3339)
+			}
+		}
+
 	default:
 		switch v := value.(type) {
 		case []byte:
 			return string(v)
+		case time.Time:
+			return v.UTC()
 		}
 	}
 

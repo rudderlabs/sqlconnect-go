@@ -8,6 +8,7 @@ import (
 
 	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/sjson"
 
 	pgresource "github.com/rudderlabs/rudder-go-kit/testhelper/docker/resource/postgres"
 	integrationtest "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/integration_test"
@@ -34,15 +35,32 @@ func TestPostgresDB(t *testing.T) {
 	configJSON, err := json.Marshal(config)
 	require.NoError(t, err, "it should be able to marshal config to json")
 
-	integrationtest.TestDatabaseScenarios(
-		t,
-		postgres.DatabaseType,
-		configJSON,
-		strings.ToLower,
-		integrationtest.Options{
-			LegacySupport: true,
-		},
-	)
+	t.Run("pgx driver", func(t *testing.T) {
+		integrationtest.TestDatabaseScenarios(
+			t,
+			postgres.DatabaseType,
+			configJSON,
+			strings.ToLower,
+			integrationtest.Options{
+				LegacySupport: true,
+			},
+		)
+	})
+
+	t.Run("pq driver", func(t *testing.T) {
+		var err error
+		configJSON, err = sjson.SetBytes(configJSON, "useLegacyDriver", true)
+		require.NoError(t, err, "it should be able to set useLegacyDriver to true")
+		integrationtest.TestDatabaseScenarios(
+			t,
+			postgres.DatabaseType,
+			configJSON,
+			strings.ToLower,
+			integrationtest.Options{
+				LegacySupport: true,
+			},
+		)
+	})
 
 	integrationtest.TestSshTunnelScenarios(t, postgres.DatabaseType, configJSON)
 }

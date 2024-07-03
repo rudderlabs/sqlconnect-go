@@ -2,6 +2,7 @@ package redshift
 
 import (
 	"strconv"
+	"time"
 )
 
 var columnTypeMappings = map[string]string{
@@ -33,6 +34,7 @@ var columnTypeMappings = map[string]string{
 	"time without time zone":      "datetime",
 	"time with time zone":         "datetime",
 	"timetz":                      "datetime",
+	"1266":                        "datetime",
 	"timestamptz":                 "datetime",
 	"timestamp without time zone": "datetime",
 	"timestamp with time zone":    "datetime",
@@ -53,10 +55,25 @@ func jsonRowMapper(databaseTypeName string, value any) any {
 				return n
 			}
 		}
+	case "1266":
+		if value != nil {
+			if t, err := time.Parse("15:04:05-07", value.(string)); err == nil {
+				value = t.UTC().Format(time.RFC3339Nano)
+			}
+		}
+	case "TIME", "TIME WITHOUT TIME ZONE":
+		switch v := value.(type) {
+		case string:
+			if t, err := time.Parse("15:04:05", v); err == nil {
+				value = t.UTC().Format(time.RFC3339Nano)
+			}
+		}
 	default:
 		switch v := value.(type) {
 		case []byte:
 			return string(v)
+		case time.Time:
+			return v.UTC()
 		}
 	}
 

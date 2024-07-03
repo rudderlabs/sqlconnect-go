@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"fmt"
 
-	_ "github.com/lib/pq" // postgres driver
+	_ "github.com/jackc/pgx/v5/stdlib" // pgx driver
+	_ "github.com/lib/pq"              // postgres driver
 	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/postgres"
 	redshiftdriver "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift/driver"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
-	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/postgres"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 )
 
@@ -98,8 +99,11 @@ func newPostgresDB(credentialsJSON json.RawMessage) (*sql.DB, func() error, erro
 		config.Host = tunnel.Host()
 		config.Port = tunnel.Port()
 	}
-
-	db, err := sql.Open(postgres.DatabaseType, config.ConnectionString())
+	driverName := postgres.PgxDriver
+	if config.UseLegacyDriver {
+		driverName = "postgres"
+	}
+	db, err := sql.Open(driverName, config.ConnectionString())
 	if err != nil {
 		return nil, nil, err
 	}
