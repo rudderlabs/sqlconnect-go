@@ -31,5 +31,5 @@
     "_TIMESTAMPTZ": "datetime",
     "_VARIANT": "json",
     "_OBJECT": "OBJECT",
-    "_ARRAY": "ARRAY"
+    "_ARRAY": "array"
 }
