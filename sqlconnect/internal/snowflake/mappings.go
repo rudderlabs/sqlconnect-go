@@ -47,7 +47,7 @@ var columnTypeMappings = map[string]string{
 	"TIMESTAMP_TZ":     "datetime",
 	"VARIANT":          "json",
 	"OBJECT":           "json",
-	"ARRAY":            "json",
+	"ARRAY":            "array",
 }
 
 var (
