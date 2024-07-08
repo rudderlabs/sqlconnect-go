@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -517,6 +518,9 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 					require.Truef(t, ok, "column of type datetime should be parsed as a datetime %q: %v", col.Name, actualRow[col.Name])
 					_, err := time.Parse(time.RFC3339, datetime)
 					require.NoErrorf(t, err, "column of type datetime should be a RFC3339 string %q: %v", col.Name, actualRow[col.Name])
+				case "array":
+					require.Truef(t, reflect.TypeOf(actualRow[col.Name]).Kind() == reflect.Slice, "column of type array should be a slice %q: %v", col.Name, actualRow[col.Name])
+
 				case "json":
 					// this can be anything
 				default:

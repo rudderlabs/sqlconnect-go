@@ -44,6 +44,7 @@ func legacyColumnTypeMapper(columnType base.ColumnType) string {
 		"TIMESTAMP_LTZ":    "datetime",
 		"TIMESTAMP_TZ":     "datetime",
 		"VARIANT":          "json",
+		"ARRAY":            "array",
 	}
 	databaseTypeName := strings.ToUpper(re.ReplaceAllString(columnType.DatabaseTypeName(), ""))
 	if mappedType, ok := columnTypeMappings[strings.ToUpper(databaseTypeName)]; ok {
