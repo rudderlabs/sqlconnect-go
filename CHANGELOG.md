@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.6.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.5.0...v1.6.0) (2024-07-08)
+
+
+### Features
+
+* add array data type support for legacy mappings in snowflake ([#123](https://github.com/rudderlabs/sqlconnect-go/issues/123)) ([b564a72](https://github.com/rudderlabs/sqlconnect-go/commit/b564a72a53e6f7fbe86ca149861d88ce62457149))
+* **databricks:** bump github.com/databricks/databricks-sql-go from 1.5.6 to 1.5.7 ([#93](https://github.com/rudderlabs/sqlconnect-go/issues/93)) ([96770f4](https://github.com/rudderlabs/sqlconnect-go/commit/96770f4857a6547ab82f09e0cf6d1c66b10cdc7a))
+* **redshift:** bump github.com/aws/aws-sdk-go-v2/service/redshiftdata from 1.25.8 to 1.27.1 ([#117](https://github.com/rudderlabs/sqlconnect-go/issues/117)) ([1dfb79d](https://github.com/rudderlabs/sqlconnect-go/commit/1dfb79d09a77625d8ab90351aef4ec33f160300b))
+
+
+### Miscellaneous
+
+* update code owners ([#124](https://github.com/rudderlabs/sqlconnect-go/issues/124)) ([8478198](https://github.com/rudderlabs/sqlconnect-go/commit/847819862f22b006114ce1f92bd5a5aae550f5b9))
+
 ## [1.5.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.4.1...v1.5.0) (2024-06-20)
 
 
