@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.24
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.27.1
 	github.com/databricks/databricks-sql-go v1.5.7
-	github.com/dlclark/regexp2 v1.11.0
+	github.com/dlclark/regexp2 v1.11.1
 	github.com/gliderlabs/ssh v0.3.7
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/google/uuid v1.6.0
