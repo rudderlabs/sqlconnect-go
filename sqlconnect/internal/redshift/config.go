@@ -30,6 +30,10 @@ type Config struct {
 	SecretAccessKey string `json:"secretAccessKey"`
 	SessionToken    string `json:"sessionToken"`
 
+	RoleARN               string        `json:"roleARN"`
+	ExternalID            string        `json:"externalID"`
+	RoleARNExpiryDuration time.Duration `json:"roleARNExpiryDuration"` // default: 1h
+
 	Timeout          time.Duration `json:"timeout"`          // default: no timeout
 	MinPolling       time.Duration `json:"minPolling"`       // default: 10ms
 	MaxPolling       time.Duration `json:"maxPolling"`       // default: 5s

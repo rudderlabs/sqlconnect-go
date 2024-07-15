@@ -19,7 +19,11 @@ type redshiftDataConnector struct {
 }
 
 func (c *redshiftDataConnector) Connect(ctx context.Context) (driver.Conn, error) {
-	client, err := newRedshiftDataClient(ctx, c.cfg, c.cfg.LoadOpts()...)
+	loadOpts, err := c.cfg.LoadOpts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	client, err := newRedshiftDataClient(ctx, c.cfg, loadOpts...)
 	if err != nil {
 		return nil, err
 	}
