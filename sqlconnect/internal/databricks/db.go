@@ -37,6 +37,8 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 			config.MinRetryWaitTime,
 			config.MaxRetryWaitTime,
 		),
+		databricks.WithTimeout(config.Timeout),
+		databricks.WithSessionParams(config.SessionParams),
 		databricks.WithUserAgentEntry("Rudderstack"),
 	)
 	tunnelCloser := sshtunnel.NoTunnelCloser
