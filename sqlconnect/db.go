@@ -101,8 +101,20 @@ type JsonRowMapper interface {
 type Dialect interface {
 	// QuoteTable quotes a table name
 	QuoteTable(table RelationRef) string
+
 	// QuoteIdentifier quotes an identifier, e.g. a column name
 	QuoteIdentifier(name string) string
+
 	// FormatTableName formats a table name, typically by lower or upper casing it, depending on the database
+	//
+	// Deprecated: to be removed in future versions, since its behaviour is not consistent across databases, e.g. using lowercase for BigQuery while it shouldn't.
+	// If you want to have a consistent behaviour across databases, use [NormaliseIdentifier] and [ParseRelationRef] instead.
 	FormatTableName(name string) string
+
+	// NormaliseIdentifier normalises the identifier's parts that are unquoted, typically by lower or upper casing them, depending on the database
+	NormaliseIdentifier(identifier string) string
+
+	// ParseRelationRef parses a string into a RelationRef after normalising the identifier and stripping out surrounding quotes.
+	// The result is a RelationRef with case-sensitive fields, i.e. it can be safely quoted (see [QuoteTable] and, for instance, used for matching against the database's information schema.
+	ParseRelationRef(identifier string) (RelationRef, error)
 }

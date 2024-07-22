@@ -27,4 +27,43 @@ func TestDialect(t *testing.T) {
 		quoted = d.QuoteTable(sqlconnect.NewRelationRef("table", sqlconnect.WithSchema("schema")))
 		require.Equal(t, "`schema`.`table`", quoted, "schema and table name should be quoted with backticks")
 	})
+
+	t.Run("normalise identifier", func(t *testing.T) {
+		normalised := d.NormaliseIdentifier("column")
+		require.Equal(t, "column", normalised, "column name should be normalised")
+
+		normalised = d.NormaliseIdentifier("COLUMN")
+		require.Equal(t, "COLUMN", normalised, "column name should be normalised")
+
+		normalised = d.NormaliseIdentifier("`ColUmn`")
+		require.Equal(t, "`ColUmn`", normalised, "quoted column name should not be normalised")
+
+		normalised = d.NormaliseIdentifier("TaBle.`ColUmn`")
+		require.Equal(t, "TaBle.`ColUmn`", normalised, "non quoted parts should be normalised")
+
+		normalised = d.NormaliseIdentifier("`Sh``EmA`.TABLE.`ColUmn`")
+		require.Equal(t, "`Sh``EmA`.TABLE.`ColUmn`", normalised, "non quoted parts should be normalised")
+	})
+
+	t.Run("parse relation", func(t *testing.T) {
+		parsed, err := d.ParseRelationRef(`table`)
+		require.NoError(t, err)
+		require.Equal(t, sqlconnect.RelationRef{Name: "table"}, parsed)
+
+		parsed, err = d.ParseRelationRef("TABLE")
+		require.NoError(t, err)
+		require.Equal(t, sqlconnect.RelationRef{Name: "TABLE"}, parsed)
+
+		parsed, err = d.ParseRelationRef("`TaBle`")
+		require.NoError(t, err)
+		require.Equal(t, sqlconnect.RelationRef{Name: "TaBle"}, parsed)
+
+		parsed, err = d.ParseRelationRef("ScHeMA.`TaBle`")
+		require.NoError(t, err)
+		require.Equal(t, sqlconnect.RelationRef{Schema: "ScHeMA", Name: "TaBle"}, parsed)
+
+		parsed, err = d.ParseRelationRef("`CaTa``LoG`.ScHeMA.`TaBle`")
+		require.NoError(t, err)
+		require.Equal(t, sqlconnect.RelationRef{Catalog: "CaTa`LoG", Schema: "ScHeMA", Name: "TaBle"}, parsed)
+	})
 }
