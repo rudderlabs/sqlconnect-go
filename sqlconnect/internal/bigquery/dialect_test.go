@@ -18,6 +18,8 @@ func TestDialect(t *testing.T) {
 	t.Run("quote identifier", func(t *testing.T) {
 		quoted := d.QuoteIdentifier("column")
 		require.Equal(t, "`column`", quoted, "column name should be quoted with backticks")
+
+		require.Equal(t, "`col\\`umn`", d.QuoteIdentifier("col`umn"), "column name with backtick should be escaped")
 	})
 
 	t.Run("quote table", func(t *testing.T) {
@@ -41,8 +43,8 @@ func TestDialect(t *testing.T) {
 		normalised = d.NormaliseIdentifier("TaBle.`ColUmn`")
 		require.Equal(t, "TaBle.`ColUmn`", normalised, "non quoted parts should be normalised")
 
-		normalised = d.NormaliseIdentifier("`Sh``EmA`.TABLE.`ColUmn`")
-		require.Equal(t, "`Sh``EmA`.TABLE.`ColUmn`", normalised, "non quoted parts should be normalised")
+		normalised = d.NormaliseIdentifier("`Sh\\`EmA`.TABLE.`Co\\'lUmn`")
+		require.Equal(t, "`Sh\\`EmA`.TABLE.`Co\\'lUmn`", normalised, "non quoted parts should be normalised")
 	})
 
 	t.Run("parse relation", func(t *testing.T) {
@@ -62,8 +64,8 @@ func TestDialect(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, sqlconnect.RelationRef{Schema: "ScHeMA", Name: "TaBle"}, parsed)
 
-		parsed, err = d.ParseRelationRef("`CaTa``LoG`.ScHeMA.`TaBle`")
+		parsed, err = d.ParseRelationRef("`CaTa``LoG`.ScHeMA.`TaB\\`\\\"\\'le`")
 		require.NoError(t, err)
-		require.Equal(t, sqlconnect.RelationRef{Catalog: "CaTa`LoG", Schema: "ScHeMA", Name: "TaBle"}, parsed)
+		require.Equal(t, sqlconnect.RelationRef{Catalog: "CaTa`LoG", Schema: "ScHeMA", Name: "TaB`\"'le"}, parsed)
 	})
 }

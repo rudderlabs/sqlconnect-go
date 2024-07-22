@@ -45,6 +45,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		DB: base.NewDB(
 			db,
 			tunnelCloser,
+			base.WithDialect(dialect{}),
 			base.WithColumnTypeMapper(columnTypeMapper),
 			base.WithJsonRowMapper(jsonRowMapper),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
@@ -59,7 +60,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 					}
 				}
 				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
-					return fmt.Sprintf(`SHOW TABLES FROM "%[1]s" LIKE '%[2]s'`, schema, table)
+					return fmt.Sprintf(`SHOW TABLES FROM "%[1]s" LIKE '%[2]s'`, schema, base.EscapeSqlString(table))
 				}
 				cmds.TruncateTable = func(table base.QuotedIdentifier) string {
 					return fmt.Sprintf(`DELETE FROM %[1]s`, table)

@@ -32,7 +32,7 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 				return "SELECT schema_name FROM information_schema.schemata", "schema_name"
 			},
 			SchemaExists: func(schema UnquotedIdentifier) string {
-				return fmt.Sprintf("SELECT schema_name FROM information_schema.schemata where schema_name = '%[1]s'", schema)
+				return fmt.Sprintf("SELECT schema_name FROM information_schema.schemata where schema_name = '%[1]s'", EscapeSqlString(schema))
 			},
 			DropSchema: func(schema QuotedIdentifier) string { return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema) },
 			CreateTestTable: func(table QuotedIdentifier) string {
@@ -40,21 +40,21 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 			},
 			ListTables: func(schema UnquotedIdentifier) []lo.Tuple2[string, string] {
 				return []lo.Tuple2[string, string]{
-					{A: fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema = '%[1]s'", schema), B: "table_name"},
+					{A: fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema = '%[1]s'", EscapeSqlString(schema)), B: "table_name"},
 				}
 			},
 			ListTablesWithPrefix: func(schema UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 				return []lo.Tuple2[string, string]{
-					{A: fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='%[1]s' AND table_name LIKE '%[2]s'", schema, prefix+"%"), B: "table_name"},
+					{A: fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='%[1]s' AND table_name LIKE '%[2]s'", EscapeSqlString(schema), prefix+"%"), B: "table_name"},
 				}
 			},
 			TableExists: func(schema, table UnquotedIdentifier) string {
-				return fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='%[1]s' and table_name = '%[2]s'", schema, table)
+				return fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='%[1]s' and table_name = '%[2]s'", EscapeSqlString(schema), EscapeSqlString(table))
 			},
 			ListColumns: func(catalog, schema, table UnquotedIdentifier) (string, string, string) {
-				stmt := fmt.Sprintf("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '%[1]s' AND table_name = '%[2]s'", schema, table)
+				stmt := fmt.Sprintf("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '%[1]s' AND table_name = '%[2]s'", EscapeSqlString(schema), EscapeSqlString(table))
 				if catalog != "" {
-					stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", catalog)
+					stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", EscapeSqlString(catalog))
 				}
 				return stmt + " ORDER BY ordinal_position ASC", "column_name", "data_type"
 			},

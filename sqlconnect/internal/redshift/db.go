@@ -1,9 +1,11 @@
 package redshift
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	_ "github.com/lib/pq" // postgres driver
 	"github.com/samber/lo"
@@ -38,11 +40,19 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	var caseSensitive string
+
+	func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = db.QueryRowContext(ctx, "show enable_case_sensitive_identifier").Scan(&caseSensitive)
+	}()
 
 	return &DB{
 		DB: base.NewDB(
 			db,
 			tunnelCloser,
+			base.WithDialect(dialect{caseSensitive: caseSensitive == "on"}),
 			base.WithColumnTypeMappings(getColumnTypeMappings(useLegacyMappings)),
 			base.WithJsonRowMapper(getJonRowMapper(useLegacyMappings)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
@@ -53,25 +63,25 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 					return "SELECT schema_name FROM svv_all_schemas", "schema_name"
 				}
 				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
-					return fmt.Sprintf("SELECT schema_name FROM svv_all_schemas WHERE schema_name = '%[1]s'", schema)
+					return fmt.Sprintf("SELECT schema_name FROM svv_all_schemas WHERE schema_name = '%[1]s'", base.EscapeSqlString(schema))
 				}
 				cmds.ListTables = func(schema base.UnquotedIdentifier) (sqlAndColumnNamePairs []lo.Tuple2[string, string]) {
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name = '%[1]s'", schema), B: "table_name"},
+						{A: fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name = '%[1]s'", base.EscapeSqlString(schema)), B: "table_name"},
 					}
 				}
 				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name='%[1]s' AND table_name LIKE '%[2]s'", schema, prefix+"%"), B: "table_name"},
+						{A: fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name='%[1]s' AND table_name LIKE '%[2]s'", base.EscapeSqlString(schema), prefix+"%"), B: "table_name"},
 					}
 				}
 				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
-					return fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name='%[1]s' and table_name = '%[2]s'", schema, table)
+					return fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name='%[1]s' and table_name = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
-					stmt := fmt.Sprintf("SELECT column_name, data_type FROM SVV_ALL_COLUMNS WHERE schema_name = '%[1]s' AND table_name = '%[2]s'", schema, table)
+					stmt := fmt.Sprintf("SELECT column_name, data_type FROM SVV_ALL_COLUMNS WHERE schema_name = '%[1]s' AND table_name = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
 					if catalog != "" {
-						stmt += fmt.Sprintf(" AND database_name = '%[1]s'", catalog)
+						stmt += fmt.Sprintf(" AND database_name = '%[1]s'", base.EscapeSqlString(catalog))
 					}
 					return stmt + " ORDER BY ordinal_position ASC", "column_name", "data_type"
 				}

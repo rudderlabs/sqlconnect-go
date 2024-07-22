@@ -2,6 +2,7 @@ package sqlconnect_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -54,7 +55,7 @@ func (d testDialect) FormatTableName(name string) string {
 }
 
 func (d testDialect) QuoteIdentifier(name string) string {
-	return fmt.Sprintf(`"%s"`, name)
+	return fmt.Sprintf(`"%s"`, strings.ReplaceAll(name, `"`, `""`))
 }
 
 func (d testDialect) QuoteTable(relation sqlconnect.RelationRef) string {

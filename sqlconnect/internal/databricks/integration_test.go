@@ -43,7 +43,8 @@ func TestDatabricksDB(t *testing.T) {
 			[]byte(configJSON),
 			strings.ToLower,
 			integrationtest.Options{
-				LegacySupport: true,
+				LegacySupport:                  true,
+				SpecialCharactersInQuotedTable: "`-",
 			},
 		)
 	})
@@ -63,7 +64,8 @@ func TestDatabricksDB(t *testing.T) {
 			[]byte(configJSON),
 			strings.ToLower,
 			integrationtest.Options{
-				LegacySupport: true,
+				LegacySupport:                  true,
+				SpecialCharactersInQuotedTable: "_A", // No special characters allowed
 			},
 		)
 

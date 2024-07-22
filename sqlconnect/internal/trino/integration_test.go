@@ -24,7 +24,9 @@ func TestTrinoDB(t *testing.T) {
 		trino.DatabaseType,
 		[]byte(configJSON),
 		strings.ToLower,
-		integrationtest.Options{},
+		integrationtest.Options{
+			SpecialCharactersInQuotedTable: "_12", // No special characters allowed in table names :/
+		},
 	)
 
 	integrationtest.TestSshTunnelScenarios(t, trino.DatabaseType, []byte(configJSON))
