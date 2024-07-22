@@ -265,6 +265,10 @@ func TestRedshiftDriver(t *testing.T) {
 					err = tx.Commit()
 					require.NoError(t, err, "it should be able to commit the transaction")
 
+					rowsAffected, err := res.RowsAffected()
+					require.NoError(t, err, "it should be able to get rows affected after commit")
+					require.EqualValues(t, 1, rowsAffected, "rows affected should be 1")
+
 					var countAfter int
 					err = db.QueryRowContext(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM "%s"."test_table"`, schema)).Scan(&countAfter)
 					require.NoError(t, err, "it should be able to execute a prepared statement")
