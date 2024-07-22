@@ -22,6 +22,10 @@ type Config struct {
 	MaxRetryWaitTime time.Duration `json:"maxRetryWaitTime"` // default: 30s
 	MaxConnIdleTime  time.Duration `json:"maxConnIdleTime"`  // default: disabled
 
+	Timeout time.Duration `json:"timeout"` // default: no timeout
+
+	SessionParams map[string]string `json:"sessionParams"`
+
 	UseLegacyMappings bool `json:"useLegacyMappings"`
 }
 
