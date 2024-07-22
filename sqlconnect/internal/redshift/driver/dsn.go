@@ -78,7 +78,7 @@ func (cfg *RedshiftConfig) LoadOpts(ctx context.Context) ([]func(*config.LoadOpt
 				o.ExternalID = aws.String(cfg.ExternalID)
 			}
 			o.RoleSessionName = roleSessionName
-			o.Duration = cfg.GetRoleARNExpiry()
+			o.Duration = cfg.RoleARNExpiry
 		})))
 	}
 	opts = append(opts, config.WithRetryMaxAttempts(cfg.GetRetryMaxAttempts()))
@@ -281,13 +281,6 @@ func (cfg *RedshiftConfig) GetRetryMaxAttempts() int {
 		return 20
 	}
 	return cfg.RetryMaxAttempts
-}
-
-func (cfg *RedshiftConfig) GetRoleARNExpiry() time.Duration {
-	if cfg.RoleARNExpiry <= 0 {
-		return 15 * time.Minute
-	}
-	return cfg.RoleARNExpiry
 }
 
 func ParseDSN(dsn string) (*RedshiftConfig, error) {
