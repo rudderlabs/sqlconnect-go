@@ -102,6 +102,18 @@ func TestRedshiftDataConfig__String(t *testing.T) {
 			},
 			expected: "admin@cluster(default)/dev?accessKeyId=accessKeyID&region=us-east-1&secretAccessKey=secretAccessKey&sessionToken=sessionToken",
 		},
+		{
+			dsn: &RedshiftConfig{
+				ClusterIdentifier: "default",
+				DbUser:            "admin",
+				Database:          "dev",
+				Region:            "us-east-1",
+				RoleARN:           "roleARN",
+				ExternalID:        "externalID",
+				RoleARNExpiry:     15 * time.Minute,
+			},
+			expected: "admin@cluster(default)/dev?externalID=externalID&region=us-east-1&roleARN=roleARN&roleARNExpiry=15m0s",
+		},
 	}
 
 	for _, c := range cases {

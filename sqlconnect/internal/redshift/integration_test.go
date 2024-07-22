@@ -40,23 +40,42 @@ func TestRedshiftDB(t *testing.T) {
 	})
 
 	t.Run("redshift data driver", func(t *testing.T) {
-		configJSON, ok := os.LookupEnv("REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS")
-		if !ok {
-			if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
-				t.Fatal("REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS environment variable not set")
-			}
-			t.Skip("skipping redshift data driver integration test due to lack of a test environment")
-		}
-		integrationtest.TestDatabaseScenarios(
-			t,
-			redshift.DatabaseType,
-			[]byte(configJSON),
-			strings.ToLower,
-			integrationtest.Options{
-				LegacySupport: true,
-				ExtraTests:    ExtraTests,
+		testCases := []struct {
+			name           string
+			credentialsKey string
+		}{
+			{
+				name:           "with AccessKeyID and cfg.SecretAccessKey",
+				credentialsKey: "REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS",
 			},
-		)
+			{
+				name:           "with RoleARN",
+				credentialsKey: "REDSHIFT_DATA_TEST_ENVIRONMENT_ROLE_ARN_CREDENTIALS",
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				configJSON, ok := os.LookupEnv(tc.credentialsKey)
+				if !ok {
+					if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
+						t.Fatalf("%s environment variable not set", tc.credentialsKey)
+					}
+					t.Skipf("skipping redshift data driver integration test (%s) due to lack of a test environment", tc.name)
+				}
+
+				integrationtest.TestDatabaseScenarios(
+					t,
+					redshift.DatabaseType,
+					[]byte(configJSON),
+					strings.ToLower,
+					integrationtest.Options{
+						LegacySupport: true,
+						ExtraTests:    ExtraTests,
+					},
+				)
+			})
+		}
 	})
 }
 
