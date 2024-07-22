@@ -68,11 +68,11 @@ func (cfg *RedshiftConfig) LoadOpts(ctx context.Context) ([]func(*config.LoadOpt
 		)))
 	}
 	if cfg.RoleARN != "" {
-		awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.Region))
+		stsCfg, err := config.LoadDefaultConfig(ctx, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("load default aws config: %w", err)
 		}
-		stsSvc := sts.NewFromConfig(awsCfg)
+		stsSvc := sts.NewFromConfig(stsCfg)
 		opts = append([]func(*config.LoadOptions) error{}, config.WithCredentialsProvider(stscreds.NewAssumeRoleProvider(stsSvc, cfg.RoleARN, func(o *stscreds.AssumeRoleOptions) {
 			if cfg.ExternalID != "" {
 				o.ExternalID = aws.String(cfg.ExternalID)
