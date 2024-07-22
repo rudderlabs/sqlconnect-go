@@ -110,9 +110,9 @@ func TestRedshiftDataConfig__String(t *testing.T) {
 				Region:            "us-east-1",
 				RoleARN:           "roleARN",
 				ExternalID:        "externalID",
-				RoleARNExpiry:     10 * time.Minute,
+				RoleARNExpiry:     15 * time.Minute,
 			},
-			expected: "admin@cluster(default)/dev?externalID=externalID&region=us-east-1&roleARN=roleARN&roleARNExpiry=10m0s",
+			expected: "admin@cluster(default)/dev?externalID=externalID&region=us-east-1&roleARN=roleARN&roleARNExpiry=15m0s",
 		},
 	}
 

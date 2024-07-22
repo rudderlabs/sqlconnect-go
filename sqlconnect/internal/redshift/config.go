@@ -32,7 +32,7 @@ type Config struct {
 
 	RoleARN       string        `json:"roleARN"`
 	ExternalID    string        `json:"externalID"`
-	RoleARNExpiry time.Duration `json:"roleARNExpiry"` // default: 1h
+	RoleARNExpiry time.Duration `json:"roleARNExpiry"` // default: 15m
 
 	Timeout          time.Duration `json:"timeout"`          // default: no timeout
 	MinPolling       time.Duration `json:"minPolling"`       // default: 10ms

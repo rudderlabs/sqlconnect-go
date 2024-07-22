@@ -33,7 +33,7 @@ type RedshiftConfig struct {
 	SecretAccessKey     string        `json:"secretAccessKey"`
 	SessionToken        string        `json:"sessionToken"`
 	RoleARN             string        `json:"roleARN"`
-	RoleARNExpiry       time.Duration `json:"roleARNExpiry"` // default: 1h
+	RoleARNExpiry       time.Duration `json:"roleARNExpiry"` // default: 15m
 	ExternalID          string        `json:"externalID"`
 	Timeout             time.Duration `json:"timeout"`          // default: no timeout
 	MinPolling          time.Duration `json:"polling"`          // default: 10ms
@@ -285,7 +285,7 @@ func (cfg *RedshiftConfig) GetRetryMaxAttempts() int {
 
 func (cfg *RedshiftConfig) GetRoleARNExpiry() time.Duration {
 	if cfg.RoleARNExpiry <= 0 {
-		return 1 * time.Hour
+		return 15 * time.Minute
 	}
 	return cfg.RoleARNExpiry
 }
