@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.6.0...v1.7.0) (2024-07-22)
+
+
+### Features
+
+* add dialect#normaliseidentifier and dialect#parserelationref ([#120](https://github.com/rudderlabs/sqlconnect-go/issues/120)) ([31d700d](https://github.com/rudderlabs/sqlconnect-go/commit/31d700d5a6b92a9bf7f27945e96811636ddd0d65))
+* **redshift:** add support for assuming an iam role for redshift ([#132](https://github.com/rudderlabs/sqlconnect-go/issues/132)) ([180a706](https://github.com/rudderlabs/sqlconnect-go/commit/180a7068b8b839f5fa763499514aa3a608ce628f))
+* **redshift:** bump github.com/aws/aws-sdk-go-v2/service/redshiftdata from 1.27.1 to 1.27.3 ([#137](https://github.com/rudderlabs/sqlconnect-go/issues/137)) ([ec10cc4](https://github.com/rudderlabs/sqlconnect-go/commit/ec10cc476d1f8d698bf8814f5dc3d038563a39ec))
+
+
+### Miscellaneous
+
+* additional params for databricks driver ([#133](https://github.com/rudderlabs/sqlconnect-go/issues/133)) ([9c34f3f](https://github.com/rudderlabs/sqlconnect-go/commit/9c34f3f935dd84a614e96eb2b07dd5cd090aacff))
+
 ## [1.6.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.5.0...v1.6.0) (2024-07-08)
 
 
