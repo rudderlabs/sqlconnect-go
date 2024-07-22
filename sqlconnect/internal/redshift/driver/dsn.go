@@ -18,28 +18,27 @@ import (
 )
 
 const (
-	roleSessionName    = "rudderstack-aws-redshift-access"
-	roleExpiryDuration = 1 * time.Hour
+	roleSessionName = "rudderstack-aws-redshift-access"
 )
 
 type RedshiftConfig struct {
-	ClusterIdentifier     string        `json:"clusterIdentifier"`
-	Database              string        `json:"database"`
-	DbUser                string        `json:"user"`
-	WorkgroupName         string        `json:"workgroupName"`
-	SecretsARN            string        `json:"secretsARN"`
-	Region                string        `json:"region"`
-	SharedConfigProfile   string        `json:"sharedConfigProfile"`
-	AccessKeyID           string        `json:"accessKeyId"`
-	SecretAccessKey       string        `json:"secretAccessKey"`
-	SessionToken          string        `json:"sessionToken"`
-	RoleARN               string        `json:"roleARN"`
-	RoleARNExpiryDuration time.Duration `json:"roleARNExpiryDuration"` // default: 1h
-	ExternalID            string        `json:"externalID"`
-	Timeout               time.Duration `json:"timeout"`          // default: no timeout
-	MinPolling            time.Duration `json:"polling"`          // default: 10ms
-	MaxPolling            time.Duration `json:"maxPolling"`       // default: 5s
-	RetryMaxAttempts      int           `json:"retryMaxAttempts"` // default: 20
+	ClusterIdentifier   string        `json:"clusterIdentifier"`
+	Database            string        `json:"database"`
+	DbUser              string        `json:"user"`
+	WorkgroupName       string        `json:"workgroupName"`
+	SecretsARN          string        `json:"secretsARN"`
+	Region              string        `json:"region"`
+	SharedConfigProfile string        `json:"sharedConfigProfile"`
+	AccessKeyID         string        `json:"accessKeyId"`
+	SecretAccessKey     string        `json:"secretAccessKey"`
+	SessionToken        string        `json:"sessionToken"`
+	RoleARN             string        `json:"roleARN"`
+	RoleARNExpiry       time.Duration `json:"roleARNExpiry"` // default: 1h
+	ExternalID          string        `json:"externalID"`
+	Timeout             time.Duration `json:"timeout"`          // default: no timeout
+	MinPolling          time.Duration `json:"polling"`          // default: 10ms
+	MaxPolling          time.Duration `json:"maxPolling"`       // default: 5s
+	RetryMaxAttempts    int           `json:"retryMaxAttempts"` // default: 20
 
 	Params url.Values
 }
@@ -55,6 +54,9 @@ func (cfg *RedshiftConfig) Sanitize() {
 
 func (cfg *RedshiftConfig) LoadOpts(ctx context.Context) ([]func(*config.LoadOptions) error, error) {
 	var opts []func(*config.LoadOptions) error
+	if cfg.Region != "" {
+		opts = append(opts, config.WithRegion(cfg.Region))
+	}
 	if cfg.SharedConfigProfile != "" {
 		opts = append(opts, config.WithSharedConfigProfile(cfg.SharedConfigProfile))
 	}
@@ -71,12 +73,12 @@ func (cfg *RedshiftConfig) LoadOpts(ctx context.Context) ([]func(*config.LoadOpt
 			return nil, fmt.Errorf("load default aws config: %w", err)
 		}
 		stsSvc := sts.NewFromConfig(awsCfg)
-		opts = append(opts, config.WithCredentialsProvider(stscreds.NewAssumeRoleProvider(stsSvc, cfg.RoleARN, func(o *stscreds.AssumeRoleOptions) {
+		opts = append([]func(*config.LoadOptions) error{}, config.WithCredentialsProvider(stscreds.NewAssumeRoleProvider(stsSvc, cfg.RoleARN, func(o *stscreds.AssumeRoleOptions) {
 			if cfg.ExternalID != "" {
 				o.ExternalID = aws.String(cfg.ExternalID)
 			}
 			o.RoleSessionName = roleSessionName
-			o.Duration = cfg.GetRoleARNExpiryDuration()
+			o.Duration = cfg.GetRoleARNExpiry()
 		})))
 	}
 	opts = append(opts, config.WithRetryMaxAttempts(cfg.GetRetryMaxAttempts()))
@@ -157,10 +159,10 @@ func (cfg *RedshiftConfig) String() string {
 	} else {
 		params.Del("externalID")
 	}
-	if cfg.RoleARNExpiryDuration > 0 {
-		params.Add("roleARNExpiryDuration", cfg.RoleARNExpiryDuration.String())
+	if cfg.RoleARNExpiry > 0 {
+		params.Add("roleARNExpiry", cfg.RoleARNExpiry.String())
 	} else {
-		params.Del("roleARNExpiryDuration")
+		params.Del("roleARNExpiry")
 	}
 	encodedParams := params.Encode()
 	if encodedParams != "" {
@@ -228,12 +230,12 @@ func (cfg *RedshiftConfig) setParams(params url.Values) error {
 		cfg.ExternalID = params.Get("externalID")
 		cfg.Params.Del("externalID")
 	}
-	if params.Has("roleARNExpiryDuration") {
-		cfg.RoleARNExpiryDuration, err = time.ParseDuration(params.Get("roleARNExpiryDuration"))
+	if params.Has("roleARNExpiry") {
+		cfg.RoleARNExpiry, err = time.ParseDuration(params.Get("roleARNExpiry"))
 		if err != nil {
-			return fmt.Errorf("parse role arn expiry duration as duration: %w", err)
+			return fmt.Errorf("parse role arn expiry as duration: %w", err)
 		}
-		cfg.Params.Del("roleARNExpiryDuration")
+		cfg.Params.Del("roleARNExpiry")
 	}
 	if len(cfg.Params) == 0 {
 		cfg.Params = nil
@@ -281,11 +283,11 @@ func (cfg *RedshiftConfig) GetRetryMaxAttempts() int {
 	return cfg.RetryMaxAttempts
 }
 
-func (cfg *RedshiftConfig) GetRoleARNExpiryDuration() time.Duration {
-	if cfg.RoleARNExpiryDuration <= 0 {
-		return roleExpiryDuration
+func (cfg *RedshiftConfig) GetRoleARNExpiry() time.Duration {
+	if cfg.RoleARNExpiry <= 0 {
+		return 1 * time.Hour
 	}
-	return cfg.RoleARNExpiryDuration
+	return cfg.RoleARNExpiry
 }
 
 func ParseDSN(dsn string) (*RedshiftConfig, error) {

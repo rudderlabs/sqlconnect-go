@@ -38,12 +38,6 @@ jobs:
           - package: sqlconnect/internal
             exclude: sqlconnect-go/sqlconnect/internal/(bigquery|databricks|mysql|postgres|redshift|snowflake|trino)
     steps:
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_REDSHIFT_GINKGO_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_REDSHIFT_GINKGO_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:

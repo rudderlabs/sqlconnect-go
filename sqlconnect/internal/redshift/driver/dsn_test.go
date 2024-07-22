@@ -104,15 +104,15 @@ func TestRedshiftDataConfig__String(t *testing.T) {
 		},
 		{
 			dsn: &RedshiftConfig{
-				ClusterIdentifier:     "default",
-				DbUser:                "admin",
-				Database:              "dev",
-				Region:                "us-east-1",
-				RoleARN:               "roleARN",
-				ExternalID:            "externalID",
-				RoleARNExpiryDuration: 10 * time.Minute,
+				ClusterIdentifier: "default",
+				DbUser:            "admin",
+				Database:          "dev",
+				Region:            "us-east-1",
+				RoleARN:           "roleARN",
+				ExternalID:        "externalID",
+				RoleARNExpiry:     10 * time.Minute,
 			},
-			expected: "admin@cluster(default)/dev?externalID=externalID&region=us-east-1&roleARN=roleARN&roleARNExpiryDuration=10m0s",
+			expected: "admin@cluster(default)/dev?externalID=externalID&region=us-east-1&roleARN=roleARN&roleARNExpiry=10m0s",
 		},
 	}
 
