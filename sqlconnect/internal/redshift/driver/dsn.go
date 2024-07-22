@@ -68,7 +68,7 @@ func (cfg *RedshiftConfig) LoadOpts(ctx context.Context) ([]func(*config.LoadOpt
 		)))
 	}
 	if cfg.RoleARN != "" {
-		awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.Region))
+		awsCfg, err := config.LoadDefaultConfig(ctx, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("load default aws config: %w", err)
 		}
