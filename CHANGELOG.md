@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.7.0...v1.7.1) (2024-07-24)
+
+
+### Bug Fixes
+
+* dialect quoting and normalisation inconsistencies ([#143](https://github.com/rudderlabs/sqlconnect-go/issues/143)) ([7a11657](https://github.com/rudderlabs/sqlconnect-go/commit/7a116576a86354585257a710e1497caacce6140a))
+
+
+### Miscellaneous
+
+* **redshift-data:** assert that rows affected are available after commit ([#141](https://github.com/rudderlabs/sqlconnect-go/issues/141)) ([6b64477](https://github.com/rudderlabs/sqlconnect-go/commit/6b644771f1f536187249c973432a86c155c5959a))
+
 ## [1.7.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.6.0...v1.7.0) (2024-07-22)
 
 
