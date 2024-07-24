@@ -1,13 +1,16 @@
-package databricks
+package redshift
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
-type dialect struct{}
+type dialect struct {
+	caseSensitive bool
+}
 
 // QuoteTable quotes a table name
 func (d dialect) QuoteTable(table sqlconnect.RelationRef) string {
@@ -19,7 +22,7 @@ func (d dialect) QuoteTable(table sqlconnect.RelationRef) string {
 
 // QuoteIdentifier quotes an identifier, e.g. a column name
 func (d dialect) QuoteIdentifier(name string) string {
-	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
+	return fmt.Sprintf(`"%s"`, strings.ReplaceAll(name, `"`, `""`))
 }
 
 // FormatTableName formats a table name, typically by lower or upper casing it, depending on the database
@@ -29,15 +32,16 @@ func (d dialect) FormatTableName(name string) string {
 
 // NormaliseIdentifier normalises all identifier parts by lower casing them.
 func (d dialect) NormaliseIdentifier(identifier string) string {
-	// Identifiers are case-insensitive
-	// https://docs.databricks.com/en/sql/language-manual/sql-ref-identifiers.html#:~:text=Identifiers%20are%20case%2Dinsensitive
-	// Unity Catalog stores all object names as lowercase
-	// https://docs.databricks.com/en/sql/language-manual/sql-ref-names.html#:~:text=Unity%20Catalog%20stores%20all%20object%20names%20as%20lowercase
+	if d.caseSensitive {
+		return base.NormaliseIdentifier(identifier, '"', strings.ToLower)
+	}
+	// ASCII letters in standard and delimited identifiers are case-insensitive and are folded to lowercase in the database
+	// https://docs.aws.amazon.com/redshift/latest/dg/r_names.html#:~:text=ASCII%20letters%20in%20standard%20and%20delimited%20identifiers%20are%20case%2Dinsensitive%20and%20are%20folded%20to%20lowercase%20in%20the%20database
 	return strings.ToLower(identifier)
 }
 
 // ParseRelationRef parses a string into a RelationRef after normalising the identifier and stripping out surrounding quotes.
 // The result is a RelationRef with case-sensitive fields, i.e. it can be safely quoted (see [QuoteTable] and, for instance, used for matching against the database's information schema.
 func (d dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, error) {
-	return base.ParseRelationRef(strings.ToLower(identifier), '`', strings.ToLower)
+	return base.ParseRelationRef(strings.ToLower(identifier), '"', strings.ToLower)
 }

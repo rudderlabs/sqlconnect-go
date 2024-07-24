@@ -19,7 +19,7 @@ func (d dialect) QuoteTable(table sqlconnect.RelationRef) string {
 
 // QuoteIdentifier quotes an identifier, e.g. a column name
 func (d dialect) QuoteIdentifier(name string) string {
-	return fmt.Sprintf(`"%s"`, name)
+	return fmt.Sprintf(`"%s"`, strings.ReplaceAll(name, `"`, `""`))
 }
 
 // FormatTableName formats a table name, typically by lower or upper casing it, depending on the database
@@ -98,4 +98,9 @@ func doNormaliseIdentifier(identifier string, quote rune, normF func(string) str
 		}
 	}
 	return result.String()
+}
+
+// EscapeSqlString escapes a string for use in SQL, e.g. by doubling single quotes
+func EscapeSqlString(value UnquotedIdentifier) string {
+	return strings.ReplaceAll(string(value), "'", "''")
 }

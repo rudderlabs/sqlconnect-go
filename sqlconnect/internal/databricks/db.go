@@ -77,14 +77,16 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 					return "SELECT current_catalog()"
 				}
 				cmds.ListSchemas = func() (string, string) { return "SHOW SCHEMAS", "schema_name" }
-				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string { return fmt.Sprintf(`SHOW SCHEMAS LIKE '%s'`, schema) }
+				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
+					return fmt.Sprintf(`SHOW SCHEMAS LIKE '%s'`, base.EscapeSqlString(schema))
+				}
 
 				cmds.CreateTestTable = func(table base.QuotedIdentifier) string {
 					return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %[1]s (c1 INT, c2 STRING)", table)
 				}
 				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SHOW TABLES IN `%s`", schema), B: "tableName"},
+						{A: fmt.Sprintf("SHOW TABLES IN `%s`", base.EscapeSqlString(schema)), B: "tableName"},
 					}
 				}
 				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
@@ -93,7 +95,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 					}
 				}
 				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
-					return fmt.Sprintf("SHOW TABLES IN `%[1]s` LIKE '%[2]s'", schema, table)
+					return fmt.Sprintf("SHOW TABLES IN `%[1]s` LIKE '%[2]s'", schema, base.EscapeSqlString(table))
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
 					if catalog == "" || !informationSchema {

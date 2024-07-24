@@ -24,7 +24,8 @@ func TestBigqueryDB(t *testing.T) {
 		[]byte(configJSON),
 		strings.ToLower,
 		integrationtest.Options{
-			LegacySupport: true,
+			LegacySupport:                  true,
+			SpecialCharactersInQuotedTable: "-",
 		},
 	)
 }

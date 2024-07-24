@@ -28,6 +28,8 @@ type Options struct {
 
 	IncludesViewsInListTables bool
 
+	SpecialCharactersInQuotedTable string // special characters to test in quoted table identifiers (default: <space>,",',`")
+
 	ExtraTests func(t *testing.T, db sqlconnect.DB)
 }
 
@@ -144,17 +146,58 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 	})
 
 	t.Run("dialect", func(t *testing.T) {
-		// Create an unquoted table
-		unquotedTable := "UnQuoted_TablE"
-		identifier := db.QuoteIdentifier(schema.Name) + "." + unquotedTable
-		_, err := db.Exec("CREATE TABLE " + identifier + " (c1 int)")
-		require.NoError(t, err, "it should be able to create an unquoted table")
+		t.Run("with unquoted table", func(t *testing.T) {
+			identifier := db.QuoteIdentifier(schema.Name) + "." + "UnQuoted_TablE"
+			_, err := db.Exec("CREATE TABLE " + identifier + " (c1 int)")
+			require.NoError(t, err, "it should be able to create an unquoted table")
 
-		table, err := db.ParseRelationRef(identifier)
-		require.NoError(t, err, "it should be able to parse an unquoted table")
-		exists, err := db.TableExists(ctx, table)
-		require.NoError(t, err, "it should be able to check if a table exists")
-		require.True(t, exists, "it should return true for a table that exists")
+			table, err := db.ParseRelationRef(identifier)
+			require.NoError(t, err, "it should be able to parse an unquoted table")
+
+			alltables, err := db.ListTables(ctx, schema)
+			require.NoError(t, err, "it should be able to list tables")
+
+			exists, err := db.TableExists(ctx, table)
+			require.NoErrorf(t, err, "it should be able to check if a table exists: %s allTables: %+v", table, alltables)
+			require.Truef(t, exists, "it should return true for a table that exists: %s allTables: %+v", table, alltables)
+		})
+
+		t.Run("with quoted table", func(t *testing.T) {
+			identifier := db.QuoteIdentifier(schema.Name) + "." + db.QuoteIdentifier("Quoted_TablE")
+			_, err := db.Exec("CREATE TABLE " + identifier + " (c1 int)")
+			require.NoErrorf(t, err, "it should be able to create a quoted table: %s", identifier)
+
+			table, err := db.ParseRelationRef(identifier)
+			require.NoError(t, err, "it should be able to parse a quoted table")
+
+			alltables, err := db.ListTables(ctx, schema)
+			require.NoError(t, err, "it should be able to list tables")
+
+			exists, err := db.TableExists(ctx, table)
+			require.NoErrorf(t, err, "it should be able to check if a table exists: %s allTables: %+v", table, alltables)
+			require.Truef(t, exists, "it should return true for a table that exists: %s allTables: %+v", table, alltables)
+		})
+
+		t.Run("with quoted table and special characters", func(t *testing.T) {
+			specialCharacters := " \"`'"
+			if len(opts.SpecialCharactersInQuotedTable) > 0 {
+				specialCharacters = opts.SpecialCharactersInQuotedTable
+			}
+
+			identifier := db.QuoteIdentifier(schema.Name) + "." + db.QuoteIdentifier("Quoted_TablE"+specialCharacters)
+			_, err := db.Exec("CREATE TABLE " + identifier + " (c1 int)")
+			require.NoErrorf(t, err, "it should be able to create a quoted table: %s", identifier)
+
+			table, err := db.ParseRelationRef(identifier)
+			require.NoError(t, err, "it should be able to parse a quoted table")
+
+			alltables, err := db.ListTables(ctx, schema)
+			require.NoError(t, err, "it should be able to list tables")
+
+			exists, err := db.TableExists(ctx, table)
+			require.NoErrorf(t, err, "it should be able to check if a table exists: %s allTables: %+v", table, alltables)
+			require.Truef(t, exists, "it should return true for a table that exists: %s allTables: %+v", table, alltables)
+		})
 	})
 
 	t.Run("table admin", func(t *testing.T) {

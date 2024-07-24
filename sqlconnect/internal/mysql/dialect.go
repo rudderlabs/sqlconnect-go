@@ -19,7 +19,7 @@ func (d dialect) QuoteTable(table sqlconnect.RelationRef) string {
 
 // QuoteIdentifier quotes an identifier, e.g. a column name
 func (d dialect) QuoteIdentifier(name string) string {
-	return "`" + name + "`"
+	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 }
 
 // FormatTableName formats a table name, typically by lower or upper casing it, depending on the database

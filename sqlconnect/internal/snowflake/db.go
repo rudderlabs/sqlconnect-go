@@ -47,7 +47,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				}
 				cmds.ListSchemas = func() (string, string) { return "SHOW TERSE SCHEMAS", "name" }
 				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
-					return fmt.Sprintf("SHOW TERSE SCHEMAS LIKE '%[1]s'", schema)
+					return fmt.Sprintf("SHOW TERSE SCHEMAS LIKE '%[1]s'", base.EscapeSqlString(schema))
 				}
 				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
@@ -61,7 +61,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 					}
 				}
 				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
-					return fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%[1]s' AND TABLE_NAME = '%[2]s'", schema, table)
+					return fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%[1]s' AND TABLE_NAME = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
 					if catalog != "" {
