@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/snowflakedb/gosnowflake"
 	"github.com/youmark/pkcs8"
@@ -26,6 +27,10 @@ type Config struct {
 	PrivateKey           string `json:"privateKey"`
 	PrivateKeyPassphrase string `json:"privateKeyPassphrase"`
 
+	Application string `json:"application"`
+
+	LoginTimeout time.Duration `json:"loginTimeout"` // default: 5m
+
 	KeepSessionAlive  bool `json:"keepSessionAlive"`
 	UseLegacyMappings bool `json:"useLegacyMappings"`
 }
@@ -40,6 +45,8 @@ func (c Config) ConnectionString() (dsn string, err error) {
 		Warehouse:     c.Warehouse,
 		Schema:        c.Schema,
 		Role:          c.Role,
+		Application:   c.Application,
+		LoginTimeout:  c.LoginTimeout,
 	}
 
 	if c.UseKeyPairAuth {
