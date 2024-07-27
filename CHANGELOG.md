@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.7.1...v1.7.2) (2024-07-27)
+
+
+### Miscellaneous
+
+* passing application and login timeout for snowflake config ([#144](https://github.com/rudderlabs/sqlconnect-go/issues/144)) ([c92fd85](https://github.com/rudderlabs/sqlconnect-go/commit/c92fd85c9578054b4e2acaaf2d7a8369e8dbc1fd))
+
 ## [1.7.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.7.0...v1.7.1) (2024-07-24)
 
 
