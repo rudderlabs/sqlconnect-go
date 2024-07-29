@@ -43,5 +43,6 @@ func (d dialect) NormaliseIdentifier(identifier string) string {
 // ParseRelationRef parses a string into a RelationRef after normalising the identifier and stripping out surrounding quotes.
 // The result is a RelationRef with case-sensitive fields, i.e. it can be safely quoted (see [QuoteTable] and, for instance, used for matching against the database's information schema.
 func (d dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, error) {
-	return base.ParseRelationRef(strings.ToLower(identifier), '"', strings.ToLower)
+	identifier = d.NormaliseIdentifier(identifier)
+	return base.ParseRelationRef(identifier, '"', strings.ToLower)
 }
