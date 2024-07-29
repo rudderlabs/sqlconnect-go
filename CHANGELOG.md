@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.3](https://github.com/rudderlabs/sqlconnect-go/compare/v1.7.2...v1.7.3) (2024-07-29)
+
+
+### Bug Fixes
+
+* **redshift:** dialect#parserelationref doesn't honour enable_case_sensitive_identifier ([#146](https://github.com/rudderlabs/sqlconnect-go/issues/146)) ([359c230](https://github.com/rudderlabs/sqlconnect-go/commit/359c2304c54acccd7045dabaccf4bfe004cfe5f0))
+
 ## [1.7.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.7.1...v1.7.2) (2024-07-27)
 
 
