@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.4](https://github.com/rudderlabs/sqlconnect-go/compare/v1.7.3...v1.7.4) (2024-07-30)
+
+
+### Miscellaneous
+
+* **deps:** bump github.com/docker/docker from 26.1.3+incompatible to 26.1.4+incompatible in the go_modules group ([#151](https://github.com/rudderlabs/sqlconnect-go/issues/151)) ([e9b0b68](https://github.com/rudderlabs/sqlconnect-go/commit/e9b0b68237c03014b17ba14eac97745c9f5c6f96))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.34.2 to 0.35.1 ([#148](https://github.com/rudderlabs/sqlconnect-go/issues/148)) ([8de9c7b](https://github.com/rudderlabs/sqlconnect-go/commit/8de9c7b36d6e4206d682722c40fa84624b0d688a))
+* **deps:** bump google.golang.org/api from 0.188.0 to 0.189.0 ([#150](https://github.com/rudderlabs/sqlconnect-go/issues/150)) ([e9631fb](https://github.com/rudderlabs/sqlconnect-go/commit/e9631fb4429e86907bd194f6d216d9298e3ba0bf))
+
 ## [1.7.3](https://github.com/rudderlabs/sqlconnect-go/compare/v1.7.2...v1.7.3) (2024-07-29)
 
 
