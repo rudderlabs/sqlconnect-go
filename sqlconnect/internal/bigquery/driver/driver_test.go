@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/option"
 
@@ -158,7 +159,7 @@ func TestBigqueryDriver(t *testing.T) {
 			err = rows.Scan(&c1, &c2)
 			require.NoError(t, err, "it should be able to scan the row")
 			require.EqualValues(t, 1, c1, "it should be able to get the correct value")
-			require.Nil(t, c2, "it should be able to get the correct value")
+			require.EqualValues(t, []bigquery.Value{}, c2, "it should be able to get the correct value")
 			require.False(t, rows.Next(), "it shouldn't have next row")
 
 			require.NoError(t, rows.Err())
