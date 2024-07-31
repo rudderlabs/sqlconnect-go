@@ -23,6 +23,8 @@ type Config struct {
 	// SkipHostValidation is used to skip host validation during tests
 	SkipHostValidation bool `json:"skipHostValidation"`
 	UseLegacyMappings  bool `json:"useLegacyMappings"`
+	// UseLegacyDriver is used to use the legacy pq driver
+	UseLegacyDriver bool `json:"useLegacyDriver"`
 }
 
 func (c Config) ConnectionString() string {

@@ -4,7 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	_ "github.com/lib/pq" // postgres driver
+	_ "github.com/jackc/pgx/v5/stdlib" // pgx driver
+	_ "github.com/lib/pq"              // postgres driver
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
@@ -13,6 +14,7 @@ import (
 
 const (
 	DatabaseType = "postgres"
+	PgxDriver    = "pgx/v5"
 )
 
 // NewDB creates a new postgres db client
@@ -35,7 +37,11 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 		config.Port = tunnel.Port()
 	}
 
-	db, err := sql.Open(DatabaseType, config.ConnectionString())
+	driverName := PgxDriver
+	if config.UseLegacyDriver {
+		driverName = "postgres"
+	}
+	db, err := sql.Open(driverName, config.ConnectionString())
 	if err != nil {
 		return nil, err
 	}

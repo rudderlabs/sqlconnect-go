@@ -1,6 +1,9 @@
 package postgres
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 var legacyColumnTypeMappings = map[string]string{
 	"int":                         "int",
@@ -31,6 +34,7 @@ var legacyColumnTypeMappings = map[string]string{
 	"boolean":                     "boolean",
 	"bool":                        "boolean",
 	"jsonb":                       "json",
+	"1266":                        "TIMETZ",
 }
 
 // legacyJsonRowMapper maps a row's scanned column to a json object's field
@@ -46,10 +50,25 @@ func legacyJsonRowMapper(databaseTypeName string, value any) any {
 		case string:
 			return json.RawMessage(v)
 		}
+	case "1266":
+		if value != nil {
+			if t, err := time.Parse("15:04:05-07", value.(string)); err == nil {
+				value = t.UTC().Format(time.RFC3339)
+			}
+		}
+	case "TIME", "TIME WITHOUT TIME ZONE":
+		switch v := value.(type) {
+		case string:
+			if t, err := time.Parse("15:04:05", v); err == nil {
+				value = t.UTC().Format(time.RFC3339)
+			}
+		}
 	default:
 		switch v := value.(type) {
 		case []byte:
 			return string(v)
+		case time.Time:
+			return v.UTC()
 		}
 	}
 	return value

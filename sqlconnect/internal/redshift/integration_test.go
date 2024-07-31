@@ -9,6 +9,7 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/sjson"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	integrationtest "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/integration_test"
@@ -16,7 +17,7 @@ import (
 )
 
 func TestRedshiftDB(t *testing.T) {
-	t.Run("postgres driver", func(t *testing.T) {
+	t.Run("pgx driver", func(t *testing.T) {
 		configJSON, ok := os.LookupEnv("REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS")
 		if !ok {
 			if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
@@ -24,6 +25,32 @@ func TestRedshiftDB(t *testing.T) {
 			}
 			t.Skip("skipping redshift postgres driver integration test due to lack of a test environment")
 		}
+
+		integrationtest.TestDatabaseScenarios(
+			t,
+			redshift.DatabaseType,
+			[]byte(configJSON),
+			strings.ToLower,
+			integrationtest.Options{
+				LegacySupport: true,
+				ExtraTests:    ExtraTests,
+			},
+		)
+
+		integrationtest.TestSshTunnelScenarios(t, redshift.DatabaseType, []byte(configJSON))
+	})
+
+	t.Run("pq driver", func(t *testing.T) {
+		configJSON, ok := os.LookupEnv("REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS")
+		if !ok {
+			if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
+				t.Fatal("REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS environment variable not set")
+			}
+			t.Skip("skipping redshift postgres driver integration test due to lack of a test environment")
+		}
+		var err error
+		configJSON, err = sjson.Set(configJSON, "useLegacyDriver", true)
+		require.NoError(t, err, "it should be able to set useLegacyDriver to true")
 
 		integrationtest.TestDatabaseScenarios(
 			t,
