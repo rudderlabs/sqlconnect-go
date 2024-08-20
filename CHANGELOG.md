@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.8.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.7.4...v1.8.0) (2024-08-20)
+
+
+### Features
+
+* **bigquery:** bump cloud.google.com/go/bigquery from 1.61.0 to 1.62.0 ([#149](https://github.com/rudderlabs/sqlconnect-go/issues/149)) ([44c5261](https://github.com/rudderlabs/sqlconnect-go/commit/44c5261095a7cfba48a459bb3a1dd1f91becbba0))
+* **databricks:** bump github.com/databricks/databricks-sql-go from 1.5.7 to 1.6.0 ([#154](https://github.com/rudderlabs/sqlconnect-go/issues/154)) ([14852fe](https://github.com/rudderlabs/sqlconnect-go/commit/14852fe186ef68d7ad4ae5a6950cbafff6f7087b))
+
+
+### Miscellaneous
+
+* **deps:** bump github.com/dlclark/regexp2 from 1.11.2 to 1.11.4 ([#156](https://github.com/rudderlabs/sqlconnect-go/issues/156)) ([2cdf0a9](https://github.com/rudderlabs/sqlconnect-go/commit/2cdf0a92ffc3581f6ee0d54804276dc43326cece))
+* **deps:** bump github.com/docker/docker from 26.1.4+incompatible to 26.1.5+incompatible in the go_modules group ([#159](https://github.com/rudderlabs/sqlconnect-go/issues/159)) ([b977026](https://github.com/rudderlabs/sqlconnect-go/commit/b977026151e9e32146a7c6e51fb81cf3fcbd55d5))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.35.1 to 0.36.2 ([#157](https://github.com/rudderlabs/sqlconnect-go/issues/157)) ([7c397be](https://github.com/rudderlabs/sqlconnect-go/commit/7c397be1baca90106c8ca3454c74b81273835799))
+* **deps:** bump github.com/tidwall/gjson from 1.17.1 to 1.17.3 ([#155](https://github.com/rudderlabs/sqlconnect-go/issues/155)) ([7d02298](https://github.com/rudderlabs/sqlconnect-go/commit/7d02298bbf6bf2dc95db36b255583cbbc06b1ea3))
+
 ## [1.7.4](https://github.com/rudderlabs/sqlconnect-go/compare/v1.7.3...v1.7.4) (2024-07-30)
 
 
