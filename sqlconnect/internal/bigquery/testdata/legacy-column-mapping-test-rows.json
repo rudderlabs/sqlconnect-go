@@ -38,7 +38,7 @@
     },
     {
         "_order": 2,
-        "_array": null,
+        "_array": [],
         "_bignumeric": 0,
         "_bignumericnoscale": 0,
         "_bigdecimal": 0,
@@ -75,7 +75,7 @@
     },
     {
         "_order": 3,
-        "_array": null,
+        "_array": [],
         "_bignumeric": null,
         "_bignumericnoscale": null,
         "_bigdecimal": null,
