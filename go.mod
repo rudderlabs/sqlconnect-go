@@ -29,7 +29,7 @@ require (
 	github.com/trinodb/trino-go-client v0.315.0
 	github.com/youmark/pkcs8 v0.0.0-20240424034433-3c2c7870ae76
 	golang.org/x/crypto v0.25.0
-	golang.org/x/sync v0.7.0
+	golang.org/x/sync v0.8.0
 	google.golang.org/api v0.189.0
 )
 
