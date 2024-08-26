@@ -1,0 +1,36 @@
+name: cleanup test schemas
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 3 * * 6'
+
+permissions:
+  id-token: write # allows the JWT to be requested from GitHub's OIDC provider
+  contents: read # This is required for actions/checkout
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+      - run: go version
+      - run: go mod download
+      - name: cleanup
+        env:
+          REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS }}
+          REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS }}
+          REDSHIFT_DATA_TEST_ENVIRONMENT_ROLE_ARN_CREDENTIALS: ${{ secrets.REDSHIFT_DATA_TEST_ENVIRONMENT_ROLE_ARN_CREDENTIALS }}
+          SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS }}
+          BIGQUERY_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.BIGQUERY_TEST_ENVIRONMENT_CREDENTIALS }}
+          DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS }}
+          TRINO_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.TRINO_TEST_ENVIRONMENT_CREDENTIALS }}
+          SNOWFLAKE_TEST_AUTH_KEYPAIR_ENCRYPTED_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_AUTH_KEYPAIR_ENCRYPTED_CREDENTIALS }}
+          SNOWFLAKE_TEST_AUTH_KEYPAIR_UNENCRYPTED_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_AUTH_KEYPAIR_UNENCRYPTED_CREDENTIALS }}
+        run: |
+          go run sqlconnect/cmd/cleanup/cleanup.go
+          
+        
