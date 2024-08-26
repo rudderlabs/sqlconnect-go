@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/tidwall/sjson"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/bigquery"
@@ -33,32 +34,42 @@ func main() {
 		{Env: "TRINO_TEST_ENVIRONMENT_CREDENTIALS", Type: trino.DatabaseType},
 	}
 
+	g, ctx := errgroup.WithContext(context.Background())
+	g.SetLimit(4)
 	for _, c := range cleanupConfigs {
-		configJSON, ok := os.LookupEnv(c.Env)
-		if !ok {
-			log.Fatalf("%s environment variable not set", c.Env)
-		}
-		if c.Fn != nil {
-			configJSON = c.Fn(configJSON)
-		}
-		db, err := sqlconnect.NewDB(c.Type, []byte(configJSON))
-		if err != nil {
-			log.Fatalf("[%s] failed to create db: %v", c.Type, err)
-		}
-		schemas, err := db.ListSchemas(context.Background())
-		if err != nil {
-			log.Fatalf("[%s] failed to list schemas: %v", c.Type, err)
-		}
-		for _, schema := range schemas {
-			if strings.Contains(strings.ToLower(schema.Name), "tsqlcon_") {
-				err := db.DropSchema(context.Background(), schema)
-				if err != nil {
-					log.Printf("[%s] failed to drop schema: %v", c.Type, err)
-				} else {
-					log.Printf("[%s] dropped schema %s", c.Type, schema)
+		c := c
+		g.Go(func() error {
+			configJSON, ok := os.LookupEnv(c.Env)
+			if !ok {
+				log.Fatalf("%s environment variable not set", c.Env)
+			}
+			if c.Fn != nil {
+				configJSON = c.Fn(configJSON)
+			}
+			db, err := sqlconnect.NewDB(c.Type, []byte(configJSON))
+			if err != nil {
+				log.Fatalf("[%s] failed to create db: %v", c.Type, err)
+			}
+			schemas, err := db.ListSchemas(ctx)
+			if err != nil {
+				log.Fatalf("[%s] failed to list schemas: %v", c.Type, err)
+			}
+			for _, schema := range schemas {
+				if strings.Contains(strings.ToLower(schema.Name), "tsqlcon_") {
+					err := db.DropSchema(ctx, schema)
+					if err != nil {
+						log.Printf("[%s] failed to drop schema: %v", c.Type, err)
+					} else {
+						log.Printf("[%s] dropped schema %s", c.Type, schema)
+					}
 				}
 			}
-		}
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		log.Fatalf("cleanup failed: %v", err)
 	}
 }
 
