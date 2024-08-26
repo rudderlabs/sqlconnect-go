@@ -20,7 +20,7 @@ require (
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/rudderlabs/rudder-go-kit v0.36.2
 	github.com/rudderlabs/sql-tunnels v0.1.7
-	github.com/samber/lo v1.46.0
+	github.com/samber/lo v1.47.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/snowflakedb/gosnowflake v1.10.1
 	github.com/stretchr/testify v1.9.0
