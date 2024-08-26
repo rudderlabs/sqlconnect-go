@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.9.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.8.0...v1.9.0) (2024-08-26)
+
+
+### Features
+
+* **trino:** bump github.com/trinodb/trino-go-client from 0.315.0 to 0.316.0 ([#167](https://github.com/rudderlabs/sqlconnect-go/issues/167)) ([6ec9892](https://github.com/rudderlabs/sqlconnect-go/commit/6ec9892a3049e80b15d5d40a58b54d168db73765))
+
+
+### Bug Fixes
+
+* invalid path for cleanup-test-schemas ([#163](https://github.com/rudderlabs/sqlconnect-go/issues/163)) ([0f5a676](https://github.com/rudderlabs/sqlconnect-go/commit/0f5a6763eb90474a0b35ad6a19d663398d516c21))
+
+
+### Miscellaneous
+
+* cleanup test schemas periodically ([#161](https://github.com/rudderlabs/sqlconnect-go/issues/161)) ([668e73f](https://github.com/rudderlabs/sqlconnect-go/commit/668e73f9d71fe7a114806f4217f6f4b2a8aee2bf))
+* **deps:** bump github.com/aws/aws-sdk-go-v2/service/sts from 1.30.3 to 1.30.5 ([#166](https://github.com/rudderlabs/sqlconnect-go/issues/166)) ([154aae8](https://github.com/rudderlabs/sqlconnect-go/commit/154aae874da7130b0ce204d6530c0801f28c3e59))
+* **deps:** bump github.com/samber/lo from 1.46.0 to 1.47.0 ([#165](https://github.com/rudderlabs/sqlconnect-go/issues/165)) ([2f1a72f](https://github.com/rudderlabs/sqlconnect-go/commit/2f1a72feac0af4ca3c254994635d8084f48b5a33))
+* **deps:** bump google.golang.org/api from 0.189.0 to 0.194.0 ([#164](https://github.com/rudderlabs/sqlconnect-go/issues/164)) ([55aaa55](https://github.com/rudderlabs/sqlconnect-go/commit/55aaa553c848f80110093a7d8beb92244f744a11))
+
 ## [1.8.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.7.4...v1.8.0) (2024-08-20)
 
 
