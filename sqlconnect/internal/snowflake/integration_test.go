@@ -24,8 +24,7 @@ func TestSnowflakeDB(t *testing.T) {
 		[]byte(configJSON),
 		strings.ToUpper,
 		integrationtest.Options{
-			LegacySupport:             true,
-			IncludesViewsInListTables: true,
+			LegacySupport: true,
 		},
 	)
 }
