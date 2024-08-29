@@ -26,9 +26,7 @@ type Options struct {
 	// LegacySupport enables the use of legacy column mappings
 	LegacySupport bool
 
-	IncludesViewsInListTables bool
-
-	SpecialCharactersInQuotedTable string // special characters to test in quoted table identifiers (default: <space>,",',`")
+	SpecialCharactersInQuotedTable string // special characters to test in quoted table identifiers (default: <space>,",',``)
 
 	ExtraTests func(t *testing.T, db sqlconnect.DB)
 }
@@ -202,6 +200,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 
 	t.Run("table admin", func(t *testing.T) {
 		table := sqlconnect.NewRelationRef(formatfn("test_table"), sqlconnect.WithSchema(schema.Name))
+		view := sqlconnect.NewRelationRef(formatfn("test_view"), sqlconnect.WithSchema(schema.Name))
 
 		t.Run("table doesn't exist", func(t *testing.T) {
 			t.Run("with context cancelled", func(t *testing.T) {
@@ -227,6 +226,11 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			require.True(t, exists, "it should return true for a table that was just created")
 		})
 
+		t.Run("create view", func(t *testing.T) {
+			_, err := db.ExecContext(ctx, fmt.Sprintf("CREATE VIEW %s AS SELECT * FROM %s", db.QuoteTable(view), db.QuoteTable(table)))
+			require.NoError(t, err, "it should be able to create a view")
+		})
+
 		t.Run("list tables", func(t *testing.T) {
 			t.Run("with context cancelled", func(t *testing.T) {
 				_, err := db.ListTables(cancelledCtx, schema)
@@ -238,18 +242,12 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			require.Contains(t, tables, table, "it should contain the created table")
 		})
 
-		if opts.IncludesViewsInListTables {
-			t.Run("list tables with views", func(t *testing.T) {
-				view := table
-				view.Name = formatfn(table.Name + "_view")
-				_, err := db.Exec(fmt.Sprintf("CREATE VIEW %s AS SELECT * FROM %s", db.QuoteTable(view), db.QuoteTable(table)))
-				require.NoError(t, err, "it should be able to create a view")
-				tables, err := db.ListTables(ctx, schema)
-				require.NoError(t, err, "it should be able to list tables")
-				require.Contains(t, tables, view, "it should contain the created view")
-				require.Contains(t, tables, view, "it should contain the table as well")
-			})
-		}
+		t.Run("list tables with views", func(t *testing.T) {
+			tables, err := db.ListTables(ctx, schema)
+			require.NoError(t, err, "it should be able to list tables")
+			require.Contains(t, tables, view, "it should contain the created view")
+			require.Contains(t, tables, table, "it should contain the table as well")
+		})
 
 		t.Run("list tables with prefix", func(t *testing.T) {
 			t.Run("with context cancelled", func(t *testing.T) {
@@ -311,6 +309,21 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				tableWithInvalidCatalog.Catalog = "invalid"
 				cols, _ := db.ListColumns(ctx, tableWithInvalidCatalog)
 				require.Empty(t, cols, "it should return an empty list of columns for an invalid catalog")
+			})
+
+			t.Run("list columns for view", func(t *testing.T) {
+				columns, err := db.ListColumns(ctx, view)
+				columns = lo.Map(columns, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+					require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
+					col.RawType = ""
+					return col
+				})
+				require.NoError(t, err, "it should be able to list columns for a view")
+				require.Len(t, columns, 2, "it should return the correct number of columns")
+				require.ElementsMatch(t, columns, []sqlconnect.ColumnRef{
+					{Name: formatfn("c1"), Type: "int"},
+					{Name: formatfn("c2"), Type: "string"},
+				}, "it should return the correct columns")
 			})
 		})
 
