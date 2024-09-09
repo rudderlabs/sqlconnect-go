@@ -5,7 +5,10 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"time"
+
+	"github.com/rudderlabs/goqu/v10"
 )
 
 var (
@@ -98,23 +101,61 @@ type JsonRowMapper interface {
 	JSONRowMapper() RowMapper[map[string]any]
 }
 
-type Dialect interface {
-	// QuoteTable quotes a table name
-	QuoteTable(table RelationRef) string
+type (
+	Dialect interface {
+		// QuoteTable quotes a table name
+		QuoteTable(table RelationRef) string
 
-	// QuoteIdentifier quotes an identifier, e.g. a column name
-	QuoteIdentifier(name string) string
+		// QuoteIdentifier quotes an identifier, e.g. a column name
+		QuoteIdentifier(name string) string
 
-	// FormatTableName formats a table name, typically by lower or upper casing it, depending on the database
-	//
-	// Deprecated: to be removed in future versions, since its behaviour is not consistent across databases, e.g. using lowercase for BigQuery while it shouldn't.
-	// If you want to have a consistent behaviour across databases, use [NormaliseIdentifier] and [ParseRelationRef] instead.
-	FormatTableName(name string) string
+		// FormatTableName formats a table name, typically by lower or upper casing it, depending on the database
+		//
+		// Deprecated: to be removed in future versions, since its behaviour is not consistent across databases, e.g. using lowercase for BigQuery while it shouldn't.
+		// If you want to have a consistent behaviour across databases, use [NormaliseIdentifier] and [ParseRelationRef] instead.
+		FormatTableName(name string) string
 
-	// NormaliseIdentifier normalises the identifier's parts that are unquoted, typically by lower or upper casing them, depending on the database
-	NormaliseIdentifier(identifier string) string
+		// NormaliseIdentifier normalises the identifier's parts that are unquoted, typically by lower or upper casing them, depending on the database
+		NormaliseIdentifier(identifier string) string
 
-	// ParseRelationRef parses a string into a RelationRef after normalising the identifier and stripping out surrounding quotes.
-	// The result is a RelationRef with case-sensitive fields, i.e. it can be safely quoted (see [QuoteTable] and, for instance, used for matching against the database's information schema.
-	ParseRelationRef(identifier string) (RelationRef, error)
-}
+		// ParseRelationRef parses a string into a RelationRef after normalising the identifier and stripping out surrounding quotes.
+		// The result is a RelationRef with case-sensitive fields, i.e. it can be safely quoted (see [QuoteTable] and, for instance, used for matching against the database's information schema.
+		ParseRelationRef(identifier string) (RelationRef, error)
+
+		// QueryCondition returns a dialect-specific query condition sql string for the provided identifier, operator and value(s).
+		//
+		// E.g. QueryCondition("age", "gt", 18) returns "age > 18"
+		//
+		// Each operator has a different number of arguments, e.g. [eq] requires one argument, [in] requires at least one argument, etc.
+		// See [op] package for the list of supported operators
+		QueryCondition(identifier, operator string, args ...any) (sql string, err error)
+
+		// GoquExpressionToSQL converts an Expression to a SQL string
+		GoquExpressionToSQL(expression GoquExpression) (sql string, err error)
+
+		// Expressions returns the dialect-specific expressions
+		Expressions() Expressions
+	}
+
+	// GoquExpression represents a goqu expression
+	GoquExpression = goqu.Expression
+
+	// Expressions provides dialect-specific expressions
+	Expressions interface {
+		// TimestampAdd returns an expression that adds the interval to the timestamp value.
+		// The value can either be a string literal (column, timestamp, function etc.) or a [time.Time] value.
+		TimestampAdd(timeValue any, interval int, unit string) (Expression, error)
+
+		// DateAdd returns an expression that adds the interval to the date value.
+		// The value can either be a string literal (column, timestamp, function etc.) or a [time.Time] value.
+		// Values are cast to [DATE].
+		DateAdd(dateValue any, interval int, unit string) (Expression, error)
+	}
+
+	// Expression represents a dialect-specific expression.
+	// One can get the expression's SQL string by calling [String()] on it.
+	Expression interface {
+		GoquExpression() GoquExpression
+		fmt.Stringer
+	}
+)

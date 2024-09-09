@@ -7,7 +7,9 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
-type dialect struct{}
+type dialect struct {
+	*GoquDialect
+}
 
 // QuoteTable quotes a table name
 func (d dialect) QuoteTable(table sqlconnect.RelationRef) string {

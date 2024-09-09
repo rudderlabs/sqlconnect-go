@@ -44,6 +44,13 @@ func WithDialect(dialect sqlconnect.Dialect) Option {
 	}
 }
 
+// WithGoquDialect sets the goqu dialect for the client
+func WithGoquDialect(gqd *GoquDialect) Option {
+	return func(db *DB) {
+		db.Dialect = &dialect{gqd}
+	}
+}
+
 // WithSQLCommandsOverride allows for overriding some of the sql commands that the client uses
 func WithSQLCommandsOverride(override func(defaultCommands SQLCommands) SQLCommands) Option {
 	return func(db *DB) {
