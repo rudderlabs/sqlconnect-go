@@ -23,7 +23,7 @@ func GoquExpressions() *base.Expressions {
 			return goqu.L(fmt.Sprintf("(?::TIMESTAMP + INTERVAL '%d %s')", interval, unit), timeValue)
 		},
 		DateAdd: func(dateValue any, interval int, unit string) goqu.Expression {
-			return goqu.L(fmt.Sprintf("(DATE(?::TIMESTAMP) + INTERVAL '%d %s')", interval, unit), dateValue)
+			return goqu.L(fmt.Sprintf("(DATE(?) + INTERVAL '%d %s')", interval, unit), dateValue)
 		},
 	}
 }

@@ -21,7 +21,7 @@ func GoquExpressions() *base.Expressions {
 			return goqu.L(fmt.Sprintf("DATEADD(%s, %d, CAST(? AS TIMESTAMP))", unit, interval), timeValue)
 		},
 		DateAdd: func(dateValue any, interval int, unit string) goqu.Expression {
-			return goqu.L(fmt.Sprintf("DATEADD(%s, %d, DATE(CAST(? AS TIMESTAMP)))", unit, interval), dateValue)
+			return goqu.L(fmt.Sprintf("DATEADD(%s, %d, DATE(?))", unit, interval), dateValue)
 		},
 	}
 }

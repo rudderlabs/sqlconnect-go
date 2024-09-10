@@ -30,7 +30,7 @@ type Expressions struct {
 
 func (gq *GoquDialect) QueryCondition(identifier, operator string, args ...any) (sql string, err error) {
 	args = lo.Map(args, func(a any, _ int) any {
-		if s, ok := a.(sqlconnect.Expression); ok {
+		if s, ok := a.(sqlconnect.Expression); ok { // unwrap sqlconnect.Expression
 			return s.GoquExpression()
 		}
 		return a
