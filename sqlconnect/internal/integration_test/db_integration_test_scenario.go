@@ -19,6 +19,7 @@ import (
 
 	"github.com/rudderlabs/rudder-go-kit/testhelper/rand"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/op"
 	sqlconnectutil "github.com/rudderlabs/sqlconnect-go/sqlconnect/util"
 )
 
@@ -140,6 +141,288 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				err := db.DropSchema(ctx, sqlconnect.SchemaRef{Name: "nonexistent"})
 				require.Error(t, err, "it shouldn't be able to drop a non-existent schema")
 			})
+		})
+	})
+
+	t.Run("goqu dialect", func(t *testing.T) {
+		table := sqlconnect.NewRelationRef(formatfn("goqu_test"), sqlconnect.WithSchema(schema.Name))
+		ExecuteStatements(t, db, schema.Name, "testdata/goqu-test-seed.sql")
+
+		const (
+			stringCol = "_string"
+			stringVal = "string"
+
+			intCol = "_int"
+			intVal = 1
+
+			floatCol = "_float"
+			floatVal = 1.1
+
+			boolCol = "_boolean"
+			boolVal = true
+
+			timeCol = "_timestamp"
+			timeVal = "2021-01-01T00:00:00Z"
+		)
+		timestampVal, err := time.Parse(time.RFC3339, timeVal)
+		require.NoError(t, err, "it should be able to parse the timestamp value")
+
+		validateCondition := func(t *testing.T, condition string, count int) {
+			rows, err := db.GetRowCountForQuery(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s WHERE %s", table, condition))
+			require.NoErrorf(t, err, "it should be able to get row count for query with condition %q", condition)
+			require.Equal(t, count, rows, "it should return %d rows for query with condition %q", count, condition)
+		}
+
+		getQueryCondition := func(t *testing.T, col, op string, val ...any) string {
+			sql, err := db.QueryCondition(col, op, val...)
+			require.NoError(t, err, "it should be able to generate a query condition")
+			return sql
+		}
+
+		getTimestampAddExpression := func(t *testing.T, timeValue any, interval int, unit string) any {
+			expr, err := db.Expressions().TimestampAdd(timeValue, interval, unit)
+			require.NoError(t, err, "it should be able to generate a time add expression")
+			return expr
+		}
+
+		getDateAddExpression := func(t *testing.T, dateValue any, interval int, unit string) any {
+			expr, err := db.Expressions().DateAdd(dateValue, interval, unit)
+			require.NoError(t, err, "it should be able to generate a date add expression")
+			return expr
+		}
+
+		t.Run(string(op.Nnull), func(t *testing.T) {
+			op := string(op.Nnull)
+			rowCount := 1
+			validateCondition(t, getQueryCondition(t, stringCol, op), rowCount)
+			validateCondition(t, getQueryCondition(t, intCol, op), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op), rowCount)
+			validateCondition(t, getQueryCondition(t, boolCol, op), rowCount)
+			validateCondition(t, getQueryCondition(t, timeCol, op), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op, "invalid")
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.Null), func(t *testing.T) {
+			op := string(op.Null)
+			rowCount := 0
+			validateCondition(t, getQueryCondition(t, stringCol, op), rowCount)
+			validateCondition(t, getQueryCondition(t, intCol, op), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op), rowCount)
+			validateCondition(t, getQueryCondition(t, boolCol, op), rowCount)
+			validateCondition(t, getQueryCondition(t, timeCol, op), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op, "invalid")
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.Eq), func(t *testing.T) {
+			op := string(op.Eq)
+			rowCount := 1
+			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
+			validateCondition(t, getQueryCondition(t, intCol, op, intVal), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal), rowCount)
+			validateCondition(t, getQueryCondition(t, boolCol, op, boolVal), rowCount)
+			validateCondition(t, getQueryCondition(t, timeCol, op, timestampVal), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op, "one", "two")
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.Neq), func(t *testing.T) {
+			op := string(op.Neq)
+			rowCount := 0
+			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
+			validateCondition(t, getQueryCondition(t, intCol, op, intVal), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal), rowCount)
+			validateCondition(t, getQueryCondition(t, boolCol, op, boolVal), rowCount)
+			validateCondition(t, getQueryCondition(t, timeCol, op, timestampVal), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op, "one", "two")
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.In), func(t *testing.T) {
+			op := string(op.In)
+			rowCount := 1
+			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
+			validateCondition(t, getQueryCondition(t, intCol, op, intVal), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal), rowCount)
+			validateCondition(t, getQueryCondition(t, boolCol, op, boolVal), rowCount)
+			// in for timestamps is not supported for databricks
+			// validateCondition(t, getQueryCondition(t, timeCol, op, timestampVal), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op)
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.Nin), func(t *testing.T) {
+			op := string(op.Nin)
+			rowCount := 0
+			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
+			validateCondition(t, getQueryCondition(t, intCol, op, intVal), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal), rowCount)
+			validateCondition(t, getQueryCondition(t, boolCol, op, boolVal), rowCount)
+			// in for timestamps is not supported for databricks
+			// validateCondition(t, getQueryCondition(t, timeCol, op, timestampVal), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op)
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.Like), func(t *testing.T) {
+			op := string(op.Like)
+			rowCount := 1
+			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op)
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.NLike), func(t *testing.T) {
+			op := string(op.NLike)
+			rowCount := 0
+			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op)
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.Gt), func(t *testing.T) {
+			op := string(op.Gt)
+			rowCount := 1
+			validateCondition(t, getQueryCondition(t, intCol, op, intVal-1), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal-1.0), rowCount)
+			validateCondition(t, getQueryCondition(t, timeCol, op, timestampVal.Add(-1*time.Hour)), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op)
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.Gte), func(t *testing.T) {
+			op := string(op.Gte)
+			rowCount := 1
+			validateCondition(t, getQueryCondition(t, intCol, op, intVal), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal), rowCount)
+			validateCondition(t, getQueryCondition(t, timeCol, op, timestampVal), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op)
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.Lt), func(t *testing.T) {
+			op := string(op.Lt)
+			rowCount := 1
+			validateCondition(t, getQueryCondition(t, intCol, op, intVal+1), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal+1.0), rowCount)
+			validateCondition(t, getQueryCondition(t, timeCol, op, timestampVal.Add(time.Hour)), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op)
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.Lte), func(t *testing.T) {
+			op := string(op.Lte)
+			rowCount := 1
+			validateCondition(t, getQueryCondition(t, intCol, op, intVal), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal), rowCount)
+			validateCondition(t, getQueryCondition(t, timeCol, op, timestampVal), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op)
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.Btw), func(t *testing.T) {
+			op := string(op.Btw)
+			rowCount := 1
+			validateCondition(t, getQueryCondition(t, intCol, op, intVal-1, intVal+1), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal-1.0, floatVal+1.0), rowCount)
+			validateCondition(t, getQueryCondition(t, timeCol, op, timestampVal.Add(-1*time.Hour), timestampVal.Add(time.Hour)), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op)
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run(string(op.Nbtw), func(t *testing.T) {
+			op := string(op.Nbtw)
+			rowCount := 0
+			validateCondition(t, getQueryCondition(t, intCol, op, intVal-1, intVal+1), rowCount)
+			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal-1.0, floatVal+1.0), rowCount)
+			validateCondition(t, getQueryCondition(t, timeCol, op, timestampVal.Add(-1*time.Hour), timestampVal.Add(time.Hour)), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition(stringCol, op)
+				require.Error(t, err, "it should return an error for invalid arguments")
+			})
+		})
+
+		t.Run("invalid operator", func(t *testing.T) {
+			_, err = db.QueryCondition("column", "someop")
+			require.Error(t, err, "it should return an error for an invalid operator")
+			require.ErrorContains(t, err, "unsupported operator: someop", "it should return an error for an invalid operator")
+		})
+
+		t.Run(string(op.Inlast)+" operator", func(t *testing.T) {
+			op := string(op.Inlast)
+			rowCount := 0
+			validateCondition(t, getQueryCondition(t, "DATE("+timeCol+")", op, 1, "day"), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition("col", op)
+				require.Error(t, err, "it should return an error for no arguments")
+
+				_, err = db.QueryCondition("col", op, "1", "day")
+				require.Error(t, err, "it should return an error for invalid 1st argument")
+
+				_, err = db.QueryCondition("col", op, 1, 2)
+				require.Error(t, err, "it should return an error for invalid 2nd argument")
+
+				_, err = db.QueryCondition("col", op, 1, "day", 3)
+				require.Error(t, err, "it should return an error for invalid number of arguments")
+			})
+		})
+
+		t.Run("time add", func(t *testing.T) {
+			op := string(op.Lt)
+			rowCount := 1
+
+			validateCondition(t, getQueryCondition(t, timeCol, op, getTimestampAddExpression(t, timestampVal, 1, "hour")), rowCount)
+			validateCondition(t, getQueryCondition(t, timeCol, op, getTimestampAddExpression(t, "CURRENT_TIMESTAMP", -1, "day")), rowCount)
+		})
+
+		t.Run("date add", func(t *testing.T) {
+			op := string(op.Lt)
+			rowCount := 1
+
+			validateCondition(t, getQueryCondition(t, "DATE("+timeCol+")", op, getDateAddExpression(t, timestampVal, 1, "day")), rowCount)
+			validateCondition(t, getQueryCondition(t, "DATE("+timeCol+")", op, getDateAddExpression(t, "CURRENT_TIMESTAMP", -1, "day")), rowCount)
 		})
 	})
 
@@ -291,12 +574,13 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				tableWithCatalog := table
 				tableWithCatalog.Catalog = currentCatalog
 				columns, err := db.ListColumns(ctx, tableWithCatalog)
+				require.NoErrorf(t, err, "it should be able to list columns for %s", tableWithCatalog)
 				columns = lo.Map(columns, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
 					require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
 					col.RawType = ""
 					return col
 				})
-				require.NoError(t, err, "it should be able to list columns")
+
 				require.Len(t, columns, 2, "it should return the correct number of columns")
 				require.ElementsMatch(t, columns, []sqlconnect.ColumnRef{
 					{Name: formatfn("c1"), Type: "int"},

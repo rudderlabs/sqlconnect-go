@@ -8,7 +8,9 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
-type dialect struct{}
+type dialect struct {
+	*base.GoquDialect
+}
 
 var (
 	escape   = regexp.MustCompile("('|\"|`)")

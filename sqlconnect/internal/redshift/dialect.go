@@ -9,6 +9,7 @@ import (
 )
 
 type dialect struct {
+	*base.GoquDialect
 	caseSensitive bool
 }
 

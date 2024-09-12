@@ -30,7 +30,7 @@ type QueryOrder struct {
 
 func (query *QueryDef) ToSQL(d Dialect) string {
 	var cols string
-	if query.Columns == nil || len(query.Columns) == 0 {
+	if len(query.Columns) == 0 {
 		cols = "*"
 	} else {
 		for i, column := range query.Columns {

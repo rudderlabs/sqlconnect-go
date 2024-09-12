@@ -48,7 +48,9 @@ func TestQueryDef(t *testing.T) {
 	})
 }
 
-type testDialect struct{}
+type testDialect struct {
+	*base.GoquDialect
+}
 
 func (d testDialect) FormatTableName(name string) string {
 	return name

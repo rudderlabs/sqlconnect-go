@@ -44,6 +44,7 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 		DB: base.NewDB(
 			db,
 			tunnelCloser,
+			base.WithGoquDialect(base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())),
 			base.WithColumnTypeMappings(getColumnTypeMappings(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 		),

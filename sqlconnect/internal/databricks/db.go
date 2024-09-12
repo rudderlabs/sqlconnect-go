@@ -69,7 +69,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 		DB: base.NewDB(
 			db,
 			tunnelCloser,
-			base.WithDialect(dialect{}),
+			base.WithDialect(dialect{base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())}),
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
