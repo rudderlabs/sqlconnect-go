@@ -29,6 +29,8 @@ const (
 	Between Operator = "between"
 	// v < left OR v > right
 	NotBetween Operator = "notbetween"
+	// left >= now() - INTERVAL right
+	NbfInterval Operator = "nbfinterval"
 
 	// IS NOT NULL
 	IsSet Operator = "isset"
@@ -38,7 +40,7 @@ const (
 
 func IsValid(op Operator) bool {
 	switch op {
-	case Eq, Neq, In, NotIn, Gt, Gte, Lt, Lte, Like, NotLike, Between, NotBetween, IsSet, NotSet:
+	case Eq, Neq, In, NotIn, Gt, Gte, Lt, Lte, Like, NotLike, Between, NotBetween, NbfInterval, IsSet, NotSet:
 		return true
 	}
 	return false

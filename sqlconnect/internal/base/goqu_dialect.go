@@ -107,6 +107,26 @@ func (gq *GoquDialect) QueryCondition(identifier, operator string, args ...any) 
 			return "", fmt.Errorf("notbetween operator requires exactly two arguments, got %d", len(args))
 		}
 		expr = goqu.C(identifier).NotBetween(exp.NewRangeVal(args[0], args[1]))
+	case "nbfinterval":
+		if len(args) != 2 {
+			return "", fmt.Errorf("nbfinterval operator requires exactly two arguments, got %d", len(args))
+		}
+		var (
+			interval int
+			unit     string
+			ok       bool
+		)
+		if interval, ok = args[0].(int); !ok {
+			return "", fmt.Errorf("nbfinterval operator requires first argument to be an integer")
+		}
+		if unit, ok = args[1].(string); !ok {
+			return "", fmt.Errorf("nbfinterval operator requires second argument to be a string")
+		}
+		dateAddExpr, err := gq.DateAdd("CURRENT_DATE", -interval, unit)
+		if err != nil {
+			return "", err
+		}
+		expr = goqu.C(identifier).Gte(dateAddExpr.GoquExpression())
 	default:
 		return "", fmt.Errorf("unsupported operator: %s", operator)
 	}

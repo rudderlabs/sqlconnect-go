@@ -389,6 +389,26 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			require.ErrorContains(t, err, "unsupported operator: someop", "it should return an error for an invalid operator")
 		})
 
+		t.Run("nbfinterval operator", func(t *testing.T) {
+			op := string(op.NbfInterval)
+			rowCount := 0
+			validateCondition(t, getQueryCondition(t, "DATE("+timeCol+")", op, 1, "day"), rowCount)
+
+			t.Run("with invalid arguments", func(t *testing.T) {
+				_, err := db.QueryCondition("col", op)
+				require.Error(t, err, "it should return an error for no arguments")
+
+				_, err = db.QueryCondition("col", op, "1", "day")
+				require.Error(t, err, "it should return an error for invalid 1st argument")
+
+				_, err = db.QueryCondition("col", op, 1, 2)
+				require.Error(t, err, "it should return an error for invalid 2nd argument")
+
+				_, err = db.QueryCondition("col", op, 1, "day", 3)
+				require.Error(t, err, "it should return an error for invalid number of arguments")
+			})
+		})
+
 		t.Run("time add", func(t *testing.T) {
 			op := string(op.Lt)
 			rowCount := 1
