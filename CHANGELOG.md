@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.10.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.9.0...v1.10.0) (2024-09-12)
+
+
+### Features
+
+* **databricks:** bump github.com/databricks/databricks-sql-go from 1.6.0 to 1.6.1 ([#174](https://github.com/rudderlabs/sqlconnect-go/issues/174)) ([8cab1fd](https://github.com/rudderlabs/sqlconnect-go/commit/8cab1fdbb1fde4df74b8e81840bd154490c2f2e0))
+* **snowflake:** bump github.com/snowflakedb/gosnowflake from 1.10.1 to 1.11.1 ([#171](https://github.com/rudderlabs/sqlconnect-go/issues/171)) ([e64ba77](https://github.com/rudderlabs/sqlconnect-go/commit/e64ba772de37547cfc3b3c1a959da9aac6329fe5))
+* support dialect-aware query conditions ([#180](https://github.com/rudderlabs/sqlconnect-go/issues/180)) ([08906ee](https://github.com/rudderlabs/sqlconnect-go/commit/08906eedb00c205803b30e4e480b4802ef573c22))
+
+
+### Miscellaneous
+
+* all warehouses support views in ListTables ([#169](https://github.com/rudderlabs/sqlconnect-go/issues/169)) ([098a378](https://github.com/rudderlabs/sqlconnect-go/commit/098a378e9f57cc56697f9163d4c9873e2d2959b4))
+* **deps:** bump github.com/aws/aws-sdk-go-v2/credentials from 1.17.27 to 1.17.32 ([#179](https://github.com/rudderlabs/sqlconnect-go/issues/179)) ([47afb2e](https://github.com/rudderlabs/sqlconnect-go/commit/47afb2ede6cb7411484edffb6314a562eb031ac5))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.36.2 to 0.40.0 ([#178](https://github.com/rudderlabs/sqlconnect-go/issues/178)) ([a4ee52e](https://github.com/rudderlabs/sqlconnect-go/commit/a4ee52e37a30574057ea09caf25f91084e27580b))
+* **deps:** bump google.golang.org/api from 0.194.0 to 0.196.0 ([#177](https://github.com/rudderlabs/sqlconnect-go/issues/177)) ([aaee20d](https://github.com/rudderlabs/sqlconnect-go/commit/aaee20da26c5191b10bf8f0b875a7942f06ba98b))
+
 ## [1.9.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.8.0...v1.9.0) (2024-08-26)
 
 
