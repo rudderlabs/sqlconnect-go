@@ -10,7 +10,7 @@ const (
 	// IN (...)
 	In Operator = "in"
 	// NOT IN (...)
-	NotIn Operator = "notin"
+	Nin Operator = "nin"
 
 	// >
 	Gt Operator = "gt"
@@ -24,23 +24,24 @@ const (
 	// LIKE
 	Like Operator = "like"
 	// NOT LIKE
-	NotLike Operator = "notlike"
+	NLike Operator = "nlike"
 	// left <= v <= right
-	Between Operator = "between"
+	Btw Operator = "btw"
 	// v < left OR v > right
-	NotBetween Operator = "notbetween"
+	Nbtw Operator = "nbtw"
 	// left >= now() - INTERVAL right
-	NbfInterval Operator = "nbfinterval"
+	Inlast Operator = "inlast"
+
+	// IS NULL
+	Null Operator = "null"
 
 	// IS NOT NULL
-	IsSet Operator = "isset"
-	// IS NULL
-	NotSet Operator = "notset"
+	Nnull Operator = "nnull"
 )
 
 func IsValid(op Operator) bool {
 	switch op {
-	case Eq, Neq, In, NotIn, Gt, Gte, Lt, Lte, Like, NotLike, Between, NotBetween, NbfInterval, IsSet, NotSet:
+	case Eq, Neq, In, Nin, Gt, Gte, Lt, Lte, Like, NLike, Btw, Nbtw, Inlast, Nnull, Null:
 		return true
 	}
 	return false

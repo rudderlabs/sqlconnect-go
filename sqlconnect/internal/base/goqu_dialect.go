@@ -2,6 +2,7 @@ package base
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/samber/lo"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/rudderlabs/goqu/v10/exp"
 	"github.com/rudderlabs/goqu/v10/sqlgen"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/op"
 )
 
 func NewGoquDialect(dialect string, o *sqlgen.SQLDialectOptions, expressions *Expressions) *GoquDialect {
@@ -36,80 +38,80 @@ func (gq *GoquDialect) QueryCondition(identifier, operator string, args ...any) 
 		return a
 	})
 	var expr goqu.Expression
-	switch operator {
-	case "eq":
+	switch op.Operator(strings.ToLower(operator)) {
+	case op.Eq:
 		if len(args) != 1 {
-			return "", fmt.Errorf("eq operator requires exactly one argument, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).Eq(args[0])
-	case "neq":
+	case op.Neq:
 		if len(args) != 1 {
-			return "", fmt.Errorf("neq operator requires exactly one argument, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).Neq(args[0])
-	case "in":
+	case op.In:
 		if len(args) == 0 {
-			return "", fmt.Errorf("in operator requires at least one argument")
+			return "", fmt.Errorf("%s operator requires at least one argument", operator)
 		}
 		expr = goqu.C(identifier).In(args...)
-	case "notin":
+	case op.Nin:
 		if len(args) == 0 {
-			return "", fmt.Errorf("notin operator requires at least one argument")
+			return "", fmt.Errorf("%s operator requires at least one argument", operator)
 		}
 		expr = goqu.C(identifier).NotIn(args...)
-	case "like":
+	case op.Like:
 		if len(args) != 1 {
-			return "", fmt.Errorf("like operator requires exactly one argument, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).Like(args[0])
-	case "notlike":
+	case op.NLike:
 		if len(args) != 1 {
-			return "", fmt.Errorf("notlike operator requires exactly one argument, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).NotLike(args[0])
-	case "isset":
+	case op.Nnull:
 		if len(args) != 0 {
-			return "", fmt.Errorf("isset operator requires no arguments, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires no arguments, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).IsNotNull()
-	case "notset":
+	case op.Null:
 		if len(args) != 0 {
-			return "", fmt.Errorf("isnotset operator requires no arguments, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires no arguments, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).IsNull()
-	case "gt":
+	case op.Gt:
 		if len(args) != 1 {
-			return "", fmt.Errorf("gt operator requires exactly one argument, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).Gt(args[0])
-	case "gte":
+	case op.Gte:
 		if len(args) != 1 {
-			return "", fmt.Errorf("gte operator requires exactly one argument, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).Gte(args[0])
-	case "lt":
+	case op.Lt:
 		if len(args) != 1 {
-			return "", fmt.Errorf("lt operator requires exactly one argument, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).Lt(args[0])
-	case "lte":
+	case op.Lte:
 		if len(args) != 1 {
-			return "", fmt.Errorf("lte operator requires exactly one argument, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).Lte(args[0])
-	case "between":
+	case op.Btw:
 		if len(args) != 2 {
-			return "", fmt.Errorf("between operator requires exactly two arguments, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires exactly two arguments, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).Between(exp.NewRangeVal(args[0], args[1]))
-	case "notbetween":
+	case op.Nbtw:
 		if len(args) != 2 {
-			return "", fmt.Errorf("notbetween operator requires exactly two arguments, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires exactly two arguments, got %d", operator, len(args))
 		}
 		expr = goqu.C(identifier).NotBetween(exp.NewRangeVal(args[0], args[1]))
-	case "nbfinterval":
+	case op.Inlast:
 		if len(args) != 2 {
-			return "", fmt.Errorf("nbfinterval operator requires exactly two arguments, got %d", len(args))
+			return "", fmt.Errorf("%s operator requires exactly two arguments, got %d", operator, len(args))
 		}
 		var (
 			interval int

@@ -191,8 +191,8 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			return expr
 		}
 
-		t.Run("isset", func(t *testing.T) {
-			op := string(op.IsSet)
+		t.Run(string(op.Nnull), func(t *testing.T) {
+			op := string(op.Nnull)
 			rowCount := 1
 			validateCondition(t, getQueryCondition(t, stringCol, op), rowCount)
 			validateCondition(t, getQueryCondition(t, intCol, op), rowCount)
@@ -206,8 +206,8 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("notset", func(t *testing.T) {
-			op := string(op.NotSet)
+		t.Run(string(op.Null), func(t *testing.T) {
+			op := string(op.Null)
 			rowCount := 0
 			validateCondition(t, getQueryCondition(t, stringCol, op), rowCount)
 			validateCondition(t, getQueryCondition(t, intCol, op), rowCount)
@@ -221,7 +221,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("eq", func(t *testing.T) {
+		t.Run(string(op.Eq), func(t *testing.T) {
 			op := string(op.Eq)
 			rowCount := 1
 			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
@@ -236,7 +236,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("neq", func(t *testing.T) {
+		t.Run(string(op.Neq), func(t *testing.T) {
 			op := string(op.Neq)
 			rowCount := 0
 			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
@@ -251,7 +251,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("in", func(t *testing.T) {
+		t.Run(string(op.In), func(t *testing.T) {
 			op := string(op.In)
 			rowCount := 1
 			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
@@ -267,8 +267,8 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("notin", func(t *testing.T) {
-			op := string(op.NotIn)
+		t.Run(string(op.Nin), func(t *testing.T) {
+			op := string(op.Nin)
 			rowCount := 0
 			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
 			validateCondition(t, getQueryCondition(t, intCol, op, intVal), rowCount)
@@ -283,7 +283,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("like", func(t *testing.T) {
+		t.Run(string(op.Like), func(t *testing.T) {
 			op := string(op.Like)
 			rowCount := 1
 			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
@@ -294,8 +294,8 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("notlike", func(t *testing.T) {
-			op := string(op.NotLike)
+		t.Run(string(op.NLike), func(t *testing.T) {
+			op := string(op.NLike)
 			rowCount := 0
 			validateCondition(t, getQueryCondition(t, stringCol, op, stringVal), rowCount)
 
@@ -305,7 +305,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("gt", func(t *testing.T) {
+		t.Run(string(op.Gt), func(t *testing.T) {
 			op := string(op.Gt)
 			rowCount := 1
 			validateCondition(t, getQueryCondition(t, intCol, op, intVal-1), rowCount)
@@ -318,7 +318,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("gte", func(t *testing.T) {
+		t.Run(string(op.Gte), func(t *testing.T) {
 			op := string(op.Gte)
 			rowCount := 1
 			validateCondition(t, getQueryCondition(t, intCol, op, intVal), rowCount)
@@ -331,7 +331,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("lt", func(t *testing.T) {
+		t.Run(string(op.Lt), func(t *testing.T) {
 			op := string(op.Lt)
 			rowCount := 1
 			validateCondition(t, getQueryCondition(t, intCol, op, intVal+1), rowCount)
@@ -344,7 +344,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("lte", func(t *testing.T) {
+		t.Run(string(op.Lte), func(t *testing.T) {
 			op := string(op.Lte)
 			rowCount := 1
 			validateCondition(t, getQueryCondition(t, intCol, op, intVal), rowCount)
@@ -357,8 +357,8 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("between", func(t *testing.T) {
-			op := string(op.Between)
+		t.Run(string(op.Btw), func(t *testing.T) {
+			op := string(op.Btw)
 			rowCount := 1
 			validateCondition(t, getQueryCondition(t, intCol, op, intVal-1, intVal+1), rowCount)
 			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal-1.0, floatVal+1.0), rowCount)
@@ -370,8 +370,8 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
-		t.Run("notbetween", func(t *testing.T) {
-			op := string(op.NotBetween)
+		t.Run(string(op.Nbtw), func(t *testing.T) {
+			op := string(op.Nbtw)
 			rowCount := 0
 			validateCondition(t, getQueryCondition(t, intCol, op, intVal-1, intVal+1), rowCount)
 			validateCondition(t, getQueryCondition(t, floatCol, op, floatVal-1.0, floatVal+1.0), rowCount)
@@ -389,8 +389,8 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			require.ErrorContains(t, err, "unsupported operator: someop", "it should return an error for an invalid operator")
 		})
 
-		t.Run("nbfinterval operator", func(t *testing.T) {
-			op := string(op.NbfInterval)
+		t.Run(string(op.Inlast)+" operator", func(t *testing.T) {
+			op := string(op.Inlast)
 			rowCount := 0
 			validateCondition(t, getQueryCondition(t, "DATE("+timeCol+")", op, 1, "day"), rowCount)
 
