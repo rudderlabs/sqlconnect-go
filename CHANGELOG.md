@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.10.0...v1.10.1) (2024-09-13)
+
+
+### Miscellaneous
+
+* expression & goqu improvements ([#181](https://github.com/rudderlabs/sqlconnect-go/issues/181)) ([201389a](https://github.com/rudderlabs/sqlconnect-go/commit/201389af89bcac315ca8da7dfad2d96a4df5b898))
+
 ## [1.10.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.9.0...v1.10.0) (2024-09-12)
 
 
