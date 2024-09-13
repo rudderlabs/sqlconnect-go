@@ -176,7 +176,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		getQueryCondition := func(t *testing.T, col, op string, val ...any) string {
 			sql, err := db.QueryCondition(col, op, val...)
 			require.NoError(t, err, "it should be able to generate a query condition")
-			return sql
+			return sql.String()
 		}
 
 		getTimestampAddExpression := func(t *testing.T, timeValue any, interval int, unit string) any {

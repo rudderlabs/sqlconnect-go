@@ -122,16 +122,16 @@ type (
 		// The result is a RelationRef with case-sensitive fields, i.e. it can be safely quoted (see [QuoteTable] and, for instance, used for matching against the database's information schema.
 		ParseRelationRef(identifier string) (RelationRef, error)
 
-		// QueryCondition returns a dialect-specific query condition sql string for the provided identifier, operator and value(s).
+		// QueryCondition returns a dialect-specific query expression for the provided identifier, operator and value(s).
 		//
 		// E.g. QueryCondition("age", "gt", 18) returns "age > 18"
 		//
 		// Each operator has a different number of arguments, e.g. [eq] requires one argument, [in] requires at least one argument, etc.
 		// See [op] package for the list of supported operators
-		QueryCondition(identifier, operator string, args ...any) (sql string, err error)
+		QueryCondition(identifier, operator string, args ...any) (Expression, error)
 
-		// GoquExpressionToSQL converts an Expression to a SQL string
-		GoquExpressionToSQL(expression GoquExpression) (sql string, err error)
+		// ParseGoquExpression converts a goqu Expression to an Expression
+		ParseGoquExpression(goquExpression GoquExpression) (Expression, error)
 
 		// Expressions returns the dialect-specific expressions
 		Expressions() Expressions
@@ -150,6 +150,9 @@ type (
 		// The value can either be a string literal (column, timestamp, function etc.) or a [time.Time] value.
 		// Values are cast to [DATE].
 		DateAdd(dateValue any, interval int, unit string) (Expression, error)
+
+		// Literal creates a literal sql expression
+		Literal(sql string, args ...any) (Expression, error)
 	}
 
 	// Expression represents a dialect-specific expression.

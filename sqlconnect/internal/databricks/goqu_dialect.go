@@ -9,6 +9,10 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
+func init() {
+	goqu.RegisterDialect(DatabaseType, GoquDialectOptions())
+}
+
 func GoquDialectOptions() *sqlgen.SQLDialectOptions {
 	o := sqlgen.DefaultDialectOptions()
 	o.QuoteIdentifiers = false

@@ -30,88 +30,88 @@ type Expressions struct {
 	DateAdd      func(date any, interval int, unit string) goqu.Expression
 }
 
-func (gq *GoquDialect) QueryCondition(identifier, operator string, args ...any) (sql string, err error) {
+func (gq *GoquDialect) QueryCondition(identifier, operator string, args ...any) (sqlconnect.Expression, error) {
 	args = lo.Map(args, func(a any, _ int) any {
 		if s, ok := a.(sqlconnect.Expression); ok { // unwrap sqlconnect.Expression
 			return s.GoquExpression()
 		}
 		return a
 	})
-	var expr goqu.Expression
+	var goquExpression goqu.Expression
 	switch op.Operator(strings.ToLower(operator)) {
 	case op.Eq:
 		if len(args) != 1 {
-			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).Eq(args[0])
+		goquExpression = goqu.C(identifier).Eq(args[0])
 	case op.Neq:
 		if len(args) != 1 {
-			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).Neq(args[0])
+		goquExpression = goqu.C(identifier).Neq(args[0])
 	case op.In:
 		if len(args) == 0 {
-			return "", fmt.Errorf("%s operator requires at least one argument", operator)
+			return nil, fmt.Errorf("%s operator requires at least one argument", operator)
 		}
-		expr = goqu.C(identifier).In(args...)
+		goquExpression = goqu.C(identifier).In(args...)
 	case op.Nin:
 		if len(args) == 0 {
-			return "", fmt.Errorf("%s operator requires at least one argument", operator)
+			return nil, fmt.Errorf("%s operator requires at least one argument", operator)
 		}
-		expr = goqu.C(identifier).NotIn(args...)
+		goquExpression = goqu.C(identifier).NotIn(args...)
 	case op.Like:
 		if len(args) != 1 {
-			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).Like(args[0])
+		goquExpression = goqu.C(identifier).Like(args[0])
 	case op.NLike:
 		if len(args) != 1 {
-			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).NotLike(args[0])
+		goquExpression = goqu.C(identifier).NotLike(args[0])
 	case op.Nnull:
 		if len(args) != 0 {
-			return "", fmt.Errorf("%s operator requires no arguments, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires no arguments, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).IsNotNull()
+		goquExpression = goqu.C(identifier).IsNotNull()
 	case op.Null:
 		if len(args) != 0 {
-			return "", fmt.Errorf("%s operator requires no arguments, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires no arguments, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).IsNull()
+		goquExpression = goqu.C(identifier).IsNull()
 	case op.Gt:
 		if len(args) != 1 {
-			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).Gt(args[0])
+		goquExpression = goqu.C(identifier).Gt(args[0])
 	case op.Gte:
 		if len(args) != 1 {
-			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).Gte(args[0])
+		goquExpression = goqu.C(identifier).Gte(args[0])
 	case op.Lt:
 		if len(args) != 1 {
-			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).Lt(args[0])
+		goquExpression = goqu.C(identifier).Lt(args[0])
 	case op.Lte:
 		if len(args) != 1 {
-			return "", fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires exactly one argument, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).Lte(args[0])
+		goquExpression = goqu.C(identifier).Lte(args[0])
 	case op.Btw:
 		if len(args) != 2 {
-			return "", fmt.Errorf("%s operator requires exactly two arguments, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires exactly two arguments, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).Between(exp.NewRangeVal(args[0], args[1]))
+		goquExpression = goqu.C(identifier).Between(exp.NewRangeVal(args[0], args[1]))
 	case op.Nbtw:
 		if len(args) != 2 {
-			return "", fmt.Errorf("%s operator requires exactly two arguments, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires exactly two arguments, got %d", operator, len(args))
 		}
-		expr = goqu.C(identifier).NotBetween(exp.NewRangeVal(args[0], args[1]))
+		goquExpression = goqu.C(identifier).NotBetween(exp.NewRangeVal(args[0], args[1]))
 	case op.Inlast:
 		if len(args) != 2 {
-			return "", fmt.Errorf("%s operator requires exactly two arguments, got %d", operator, len(args))
+			return nil, fmt.Errorf("%s operator requires exactly two arguments, got %d", operator, len(args))
 		}
 		var (
 			interval int
@@ -119,26 +119,28 @@ func (gq *GoquDialect) QueryCondition(identifier, operator string, args ...any) 
 			ok       bool
 		)
 		if interval, ok = args[0].(int); !ok {
-			return "", fmt.Errorf("nbfinterval operator requires first argument to be an integer")
+			return nil, fmt.Errorf("nbfinterval operator requires first argument to be an integer")
 		}
 		if unit, ok = args[1].(string); !ok {
-			return "", fmt.Errorf("nbfinterval operator requires second argument to be a string")
+			return nil, fmt.Errorf("nbfinterval operator requires second argument to be a string")
 		}
 		dateAddExpr, err := gq.DateAdd("CURRENT_DATE", -interval, unit)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		expr = goqu.C(identifier).Gte(dateAddExpr.GoquExpression())
+		goquExpression = goqu.C(identifier).Gte(dateAddExpr.GoquExpression())
 	default:
-		return "", fmt.Errorf("unsupported operator: %s", operator)
+		return nil, fmt.Errorf("unsupported operator: %s", operator)
 	}
-
-	return gq.GoquExpressionToSQL(expr)
+	return gq.ParseGoquExpression(goquExpression)
 }
 
-func (gq *GoquDialect) GoquExpressionToSQL(expression sqlconnect.GoquExpression) (sql string, err error) {
-	sql, _, err = sqlgen.GenerateExpressionSQL(gq.esg, false, expression)
-	return
+func (gq *GoquDialect) ParseGoquExpression(goquExpression sqlconnect.GoquExpression) (sqlconnect.Expression, error) {
+	sql, _, err := sqlgen.GenerateExpressionSQL(gq.esg, false, goquExpression)
+	if err != nil {
+		return nil, err
+	}
+	return &expression{Expression: goquExpression, sql: sql}, nil
 }
 
 func (gq *GoquDialect) Expressions() sqlconnect.Expressions {
@@ -187,6 +189,12 @@ func (gq *GoquDialect) DateAdd(timeValue any, interval int, unit string) (sqlcon
 	}
 
 	goquExpression := gq.expressions.DateAdd(v, interval, unit)
+	sql, _, err := sqlgen.GenerateExpressionSQL(gq.esg, false, goquExpression)
+	return &expression{Expression: goquExpression, sql: sql}, err
+}
+
+func (gq *GoquDialect) Literal(sql string, args ...any) (sqlconnect.Expression, error) {
+	goquExpression := goqu.L(sql, args...)
 	sql, _, err := sqlgen.GenerateExpressionSQL(gq.esg, false, goquExpression)
 	return &expression{Expression: goquExpression, sql: sql}, err
 }
