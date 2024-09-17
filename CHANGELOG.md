@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.10.1...v1.11.0) (2024-09-17)
+
+
+### Features
+
+* add support to provide query_tag for snowflake connection ([#188](https://github.com/rudderlabs/sqlconnect-go/issues/188)) ([27b3df9](https://github.com/rudderlabs/sqlconnect-go/commit/27b3df9b59806b3daec366a531d090c18188b995))
+
 ## [1.10.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.10.0...v1.10.1) (2024-09-13)
 
 
