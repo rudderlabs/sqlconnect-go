@@ -31,8 +31,9 @@ type Config struct {
 
 	LoginTimeout time.Duration `json:"loginTimeout"` // default: 5m
 
-	KeepSessionAlive  bool `json:"keepSessionAlive"`
-	UseLegacyMappings bool `json:"useLegacyMappings"`
+	KeepSessionAlive  bool   `json:"keepSessionAlive"`
+	UseLegacyMappings bool   `json:"useLegacyMappings"`
+	QueryTag          string `json:"queryTag"`
 }
 
 func (c Config) ConnectionString() (dsn string, err error) {
@@ -47,6 +48,7 @@ func (c Config) ConnectionString() (dsn string, err error) {
 		Role:          c.Role,
 		Application:   c.Application,
 		LoginTimeout:  c.LoginTimeout,
+		Params:        make(map[string]*string),
 	}
 
 	if c.UseKeyPairAuth {
@@ -59,10 +61,12 @@ func (c Config) ConnectionString() (dsn string, err error) {
 	}
 
 	if c.KeepSessionAlive {
-		params := make(map[string]*string)
 		valueTrue := "true"
-		params["client_session_keep_alive"] = &valueTrue
-		sc.Params = params
+		sc.Params["client_session_keep_alive"] = &valueTrue
+	}
+
+	if c.QueryTag != "" {
+		sc.Params["query_tag"] = &c.QueryTag
 	}
 
 	dsn, err = gosnowflake.DSN(&sc)
