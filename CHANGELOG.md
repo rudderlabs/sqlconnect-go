@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.11.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.11.0...v1.11.1) (2024-09-20)
+
+
+### Bug Fixes
+
+* **bigquery:** goqu dialect is not registered ([#190](https://github.com/rudderlabs/sqlconnect-go/issues/190)) ([40c292b](https://github.com/rudderlabs/sqlconnect-go/commit/40c292bb49d905040f0469e9400dea2c9a600c2b))
+
+
+### Miscellaneous
+
+* **deps:** bump github.com/aws/aws-sdk-go-v2/config from 1.27.27 to 1.27.35 ([#193](https://github.com/rudderlabs/sqlconnect-go/issues/193)) ([62eafea](https://github.com/rudderlabs/sqlconnect-go/commit/62eafea5afcc1f656e6e900397bc84968dd15b70))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.40.0 to 0.42.0 ([#185](https://github.com/rudderlabs/sqlconnect-go/issues/185)) ([b14ede5](https://github.com/rudderlabs/sqlconnect-go/commit/b14ede59fd1708b1f9d5395c7a258d0ccbea4e03))
+* **deps:** bump google.golang.org/api from 0.197.0 to 0.198.0 ([#192](https://github.com/rudderlabs/sqlconnect-go/issues/192)) ([753c456](https://github.com/rudderlabs/sqlconnect-go/commit/753c45688de516532e886a9c19373ad835645a03))
+
 ## [1.11.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.10.1...v1.11.0) (2024-09-17)
 
 
