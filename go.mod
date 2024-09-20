@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.30.5
 	github.com/aws/aws-sdk-go-v2/config v1.27.35
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.33
-	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.27.3
+	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.28.3
 	github.com/aws/aws-sdk-go-v2/service/sts v1.30.8
 	github.com/databricks/databricks-sql-go v1.6.1
 	github.com/dlclark/regexp2 v1.11.4
