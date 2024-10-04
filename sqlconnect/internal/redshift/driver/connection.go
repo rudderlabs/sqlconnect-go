@@ -313,6 +313,9 @@ func (c *redshiftConnection) wait(ctx context.Context, id *string) (output *reds
 			output = nil
 			return true
 		}
+		if *output.Id != *id {
+			panic(fmt.Errorf("asked to describe statement %q, but got answer for %q: %+v", *id, *output.Id, output))
+		}
 		if isFinishedStatus(output.Status) {
 			return true
 		}
