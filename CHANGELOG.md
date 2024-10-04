@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.12.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.11.1...v1.12.0) (2024-10-04)
+
+
+### Features
+
+* **bigquery:** bump cloud.google.com/go/bigquery from 1.62.0 to 1.63.1 ([#204](https://github.com/rudderlabs/sqlconnect-go/issues/204)) ([882d8b6](https://github.com/rudderlabs/sqlconnect-go/commit/882d8b667091df59cc766523e5e0c09a518d5fa5))
+* **redshift:** bump github.com/aws/aws-sdk-go-v2/service/redshiftdata from 1.27.3 to 1.29.4 ([#206](https://github.com/rudderlabs/sqlconnect-go/issues/206)) ([408beec](https://github.com/rudderlabs/sqlconnect-go/commit/408beec63ea2ce80ac1c0064a4ab763c4cf096b0))
+
+
+### Miscellaneous
+
+* bump go version to 1.23 ([#205](https://github.com/rudderlabs/sqlconnect-go/issues/205)) ([84d0de7](https://github.com/rudderlabs/sqlconnect-go/commit/84d0de72bf9e0d040b75d2cfc0b4e51daf58a1d1))
+* **deps:** bump github.com/aws/aws-sdk-go-v2/config from 1.27.35 to 1.27.40 ([#207](https://github.com/rudderlabs/sqlconnect-go/issues/207)) ([8a8f430](https://github.com/rudderlabs/sqlconnect-go/commit/8a8f430bef08ad7ec0a8ed90cd99dce6fbf5c5ec))
+* **deps:** bump github.com/aws/aws-sdk-go-v2/service/sts from 1.30.8 to 1.31.3 ([#202](https://github.com/rudderlabs/sqlconnect-go/issues/202)) ([4d6aee0](https://github.com/rudderlabs/sqlconnect-go/commit/4d6aee01df76926b7f24110d4991ec6f7b4b8c4a))
+
 ## [1.11.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.11.0...v1.11.1) (2024-09-20)
 
 
