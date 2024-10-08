@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.13.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.12.0...v1.13.0) (2024-10-08)
+
+
+### Features
+
+* **redshift:** bump github.com/aws/aws-sdk-go-v2/service/redshiftdata from 1.29.4 to 1.30.1 ([#216](https://github.com/rudderlabs/sqlconnect-go/issues/216)) ([efefea6](https://github.com/rudderlabs/sqlconnect-go/commit/efefea6bed4a434227e8fc0fb221677dcea8aff8))
+* **trino:** bump github.com/trinodb/trino-go-client from 0.316.0 to 0.317.0 ([#214](https://github.com/rudderlabs/sqlconnect-go/issues/214)) ([f11118d](https://github.com/rudderlabs/sqlconnect-go/commit/f11118d0caa07e0c137a6b867a8a1b1f3c19df18))
+
+
+### Miscellaneous
+
+* **deps:** bump github.com/aws/aws-sdk-go-v2/config from 1.27.40 to 1.27.41 ([#211](https://github.com/rudderlabs/sqlconnect-go/issues/211)) ([1a35100](https://github.com/rudderlabs/sqlconnect-go/commit/1a35100a187fed341f3d841a2b82703c0898b94c))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.42.0 to 0.43.0 ([#213](https://github.com/rudderlabs/sqlconnect-go/issues/213)) ([1bfe41d](https://github.com/rudderlabs/sqlconnect-go/commit/1bfe41d74810070fb87809cec6345e28b3f61fea))
+* **deps:** bump rudderlabs/pr-description-enforcer from 1.0.0 to 1.1.0 ([#209](https://github.com/rudderlabs/sqlconnect-go/issues/209)) ([4349e7f](https://github.com/rudderlabs/sqlconnect-go/commit/4349e7fcea5948521a5edda47e26948ac21c74d4))
+
 ## [1.12.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.11.1...v1.12.0) (2024-10-04)
 
 
