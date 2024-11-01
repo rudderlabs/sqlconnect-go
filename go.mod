@@ -3,7 +3,7 @@ module github.com/rudderlabs/sqlconnect-go
 go 1.23.2
 
 require (
-	cloud.google.com/go v0.115.1
+	cloud.google.com/go v0.116.0
 	cloud.google.com/go/bigquery v1.63.1
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/aws/aws-sdk-go-v2 v1.32.1
