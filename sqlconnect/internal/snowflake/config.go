@@ -34,6 +34,9 @@ type Config struct {
 	KeepSessionAlive  bool   `json:"keepSessionAlive"`
 	UseLegacyMappings bool   `json:"useLegacyMappings"`
 	QueryTag          string `json:"queryTag"`
+	Host              string `json:"host"`
+	UseOAuth          bool   `json:"use_oauth"`
+	OAuthToken        string `json:"oauth_token"`
 }
 
 func (c Config) ConnectionString() (dsn string, err error) {
@@ -58,6 +61,10 @@ func (c Config) ConnectionString() (dsn string, err error) {
 			return "", fmt.Errorf("parsing private key: %w", err)
 		}
 		sc.PrivateKey = privateKey
+	} else if c.UseOAuth {
+		sc.Authenticator = gosnowflake.AuthTypeOAuth
+		sc.Host = c.Host
+		sc.Token = c.OAuthToken
 	}
 
 	if c.KeepSessionAlive {
