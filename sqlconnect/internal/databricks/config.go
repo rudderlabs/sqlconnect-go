@@ -27,6 +27,12 @@ type Config struct {
 	SessionParams map[string]string `json:"sessionParams"`
 
 	UseLegacyMappings bool `json:"useLegacyMappings"`
+	// SkipColumnNormalization skips normalizing column names during ListColumns and ListColumnsForSqlQuery.
+	// Databricks is returning column names case sensitive from information schema, even though it is case insensitive.
+	// So, by default table names are returned normalized by databricks, whereas column names are not.
+	// To avoid this inconsistency, we are normalizing column names by default.
+	// If you want to skip this normalization, set this flag to true.
+	SkipColumnNormalization bool `json:"skipColumnNormalisation"`
 }
 
 func (c *Config) Parse(input json.RawMessage) error {
