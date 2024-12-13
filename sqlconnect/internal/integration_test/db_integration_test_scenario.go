@@ -2,6 +2,7 @@ package integrationtest
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -608,6 +609,75 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 					{Name: formatfn("c1"), Type: "int"},
 					{Name: formatfn("c2"), Type: "string"},
 				}, "it should return the correct columns")
+			})
+
+			t.Run("list columns with mixed case", func(t *testing.T) {
+				unquotedColumn := "cOluMnA"
+				normalizedUnquotedColumn := db.NormaliseIdentifier(unquotedColumn)
+				quotedColumn := db.QuoteIdentifier("QuOted_CoLuMnB")
+				normalizedQuotedColumn := db.NormaliseIdentifier(quotedColumn)
+				parsedRel, err := db.ParseRelationRef(quotedColumn)
+				require.NoError(t, err, "it should be able to parse a quoted column")
+				normalizedQuotedColumnWithoutQuotes := parsedRel.Name
+
+				tableIdentifier := db.QuoteIdentifier(schema.Name) + "." + db.QuoteIdentifier("table_mixed_case")
+				_, err = db.Exec(fmt.Sprintf("CREATE TABLE %[1]s (%[2]s int, %[3]s int)", tableIdentifier, unquotedColumn, quotedColumn))
+				require.NoErrorf(t, err, "it should be able to create a quoted table: %s", tableIdentifier)
+
+				table, err := db.ParseRelationRef(tableIdentifier)
+				require.NoError(t, err, "it should be able to parse a quoted table")
+
+				t.Run("without catalog", func(t *testing.T) {
+					columns, err := db.ListColumns(ctx, table)
+					columns = lo.Map(columns, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+						require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
+						col.RawType = ""
+						return col
+					})
+					require.NoError(t, err, "it should be able to list columns")
+					require.Len(t, columns, 2, "it should return the correct number of columns")
+					require.ElementsMatch(t, columns, []sqlconnect.ColumnRef{
+						{Name: normalizedUnquotedColumn, Type: "int"},
+						{Name: normalizedQuotedColumnWithoutQuotes, Type: "int"},
+					}, "it should return the correct columns")
+
+					var c1, c2 int
+					err = db.QueryRow(fmt.Sprintf("SELECT %[1]s, %[2]s FROM %[3]s", normalizedUnquotedColumn, normalizedQuotedColumn, tableIdentifier)).Scan(&c1, &c2)
+					require.ErrorIs(t, err, sql.ErrNoRows, "it should get a no rows error (supports normalised column names)")
+				})
+
+				t.Run("with catalog", func(t *testing.T) {
+					tableWithCatalog := table
+					tableWithCatalog.Catalog = currentCatalog
+					columns, err := db.ListColumns(ctx, tableWithCatalog)
+					require.NoErrorf(t, err, "it should be able to list columns for %s", tableWithCatalog)
+					columns = lo.Map(columns, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+						require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
+						col.RawType = ""
+						return col
+					})
+
+					require.Len(t, columns, 2, "it should return the correct number of columns")
+					require.ElementsMatch(t, columns, []sqlconnect.ColumnRef{
+						{Name: normalizedUnquotedColumn, Type: "int"},
+						{Name: normalizedQuotedColumnWithoutQuotes, Type: "int"},
+					}, "it should return the correct columns")
+				})
+
+				t.Run("for sql query", func(t *testing.T) {
+					columns, err := db.ListColumnsForSqlQuery(ctx, "SELECT * FROM "+tableIdentifier)
+					columns = lo.Map(columns, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+						require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
+						col.RawType = ""
+						return col
+					})
+					require.NoError(t, err, "it should be able to list columns")
+					require.Len(t, columns, 2, "it should return the correct number of columns")
+					require.ElementsMatch(t, columns, []sqlconnect.ColumnRef{
+						{Name: normalizedUnquotedColumn, Type: "int"},
+						{Name: normalizedQuotedColumnWithoutQuotes, Type: "int"},
+					}, "it should return the correct columns")
+				})
 			})
 		})
 
