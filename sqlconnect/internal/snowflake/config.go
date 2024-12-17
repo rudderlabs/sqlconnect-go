@@ -42,6 +42,14 @@ type Config struct {
 
 func (c Config) ConnectionString() (dsn string, err error) {
 	if c.UseOAuth {
+		fmt.Println("sqlconnect: Account: " + c.Account)
+		fmt.Println("sqlconnect: Region: " + c.Region)
+		fmt.Println("sqlconnect: Token: " + c.OAuthToken)
+		fmt.Println("sqlconnect: Warehouse: " + c.Warehouse)
+		fmt.Println("sqlconnect: Schema: " + c.Schema)
+		fmt.Println("sqlconnect: Host: " + c.Host)
+		fmt.Println("sqlconnect: DBName: " + c.DBName)
+
 		sc := gosnowflake.Config{
 			Authenticator:    gosnowflake.AuthTypeOAuth,
 			Account:          c.Account,
