@@ -20,6 +20,7 @@ type Config struct {
 	User      string `json:"user"`
 	Schema    string `json:"schema"`
 	Role      string `json:"role"`
+	Region    string `json:"region"`
 
 	Password string `json:"password"`
 
@@ -34,44 +35,80 @@ type Config struct {
 	KeepSessionAlive  bool   `json:"keepSessionAlive"`
 	UseLegacyMappings bool   `json:"useLegacyMappings"`
 	QueryTag          string `json:"queryTag"`
+	Host              string `json:"host"`
+	UseOAuth          bool   `json:"use_oauth"`
+	OAuthToken        string `json:"oauth_token"`
 }
 
 func (c Config) ConnectionString() (dsn string, err error) {
-	sc := gosnowflake.Config{
-		Authenticator: gosnowflake.AuthTypeSnowflake,
-		User:          c.User,
-		Password:      c.Password,
-		Account:       c.Account,
-		Database:      c.DBName,
-		Warehouse:     c.Warehouse,
-		Schema:        c.Schema,
-		Role:          c.Role,
-		Application:   c.Application,
-		LoginTimeout:  c.LoginTimeout,
-		Params:        make(map[string]*string),
-	}
+	if c.UseOAuth {
+		fmt.Println("sqlconnect: Account: " + c.Account)
+		fmt.Println("sqlconnect: Region: " + c.Region)
+		fmt.Println("sqlconnect: Token: " + c.OAuthToken)
+		fmt.Println("sqlconnect: Warehouse: " + c.Warehouse)
+		fmt.Println("sqlconnect: Schema: " + c.Schema)
+		fmt.Println("sqlconnect: Host: " + c.Host)
+		fmt.Println("sqlconnect: DBName: " + c.DBName)
 
-	if c.UseKeyPairAuth {
-		sc.Authenticator = gosnowflake.AuthTypeJwt
-		privateKey, err := c.ParsePrivateKey()
-		if err != nil {
-			return "", fmt.Errorf("parsing private key: %w", err)
+		sc := gosnowflake.Config{
+			Authenticator:    gosnowflake.AuthTypeOAuth,
+			Account:          c.Account,
+			Region:           c.Region,
+			Token:            c.OAuthToken,
+			Warehouse:        c.Warehouse,
+			Schema:           c.Schema,
+			Database:         c.DBName,
+			Host:             c.Host,
+			Protocol:         "https",
+			Port:             443,
+			KeepSessionAlive: true,
 		}
-		sc.PrivateKey = privateKey
-	}
+		dsn, err = gosnowflake.DSN(&sc)
+		if err != nil {
+			err = fmt.Errorf("creating dsn: %v", err)
+		}
+	} else {
+		sc := gosnowflake.Config{
+			Authenticator: gosnowflake.AuthTypeSnowflake,
+			User:          c.User,
+			Password:      c.Password,
+			Account:       c.Account,
+			Database:      c.DBName,
+			Warehouse:     c.Warehouse,
+			Schema:        c.Schema,
+			Role:          c.Role,
+			Application:   c.Application,
+			LoginTimeout:  c.LoginTimeout,
+			Params:        make(map[string]*string),
+		}
 
-	if c.KeepSessionAlive {
-		valueTrue := "true"
-		sc.Params["client_session_keep_alive"] = &valueTrue
-	}
+		if c.UseKeyPairAuth {
+			sc.Authenticator = gosnowflake.AuthTypeJwt
+			privateKey, err := c.ParsePrivateKey()
+			if err != nil {
+				return "", fmt.Errorf("parsing private key: %w", err)
+			}
+			sc.PrivateKey = privateKey
+		} else if c.UseOAuth {
+			sc.Authenticator = gosnowflake.AuthTypeOAuth
+			sc.Host = c.Host
+			sc.Token = c.OAuthToken
+			sc.User = c.User
+		}
 
-	if c.QueryTag != "" {
-		sc.Params["query_tag"] = &c.QueryTag
-	}
+		if c.KeepSessionAlive {
+			valueTrue := "true"
+			sc.Params["client_session_keep_alive"] = &valueTrue
+		}
 
-	dsn, err = gosnowflake.DSN(&sc)
-	if err != nil {
-		err = fmt.Errorf("creating dsn: %v", err)
+		if c.QueryTag != "" {
+			sc.Params["query_tag"] = &c.QueryTag
+		}
+
+		dsn, err = gosnowflake.DSN(&sc)
+		if err != nil {
+			err = fmt.Errorf("creating dsn: %v", err)
+		}
 	}
 	return
 }
