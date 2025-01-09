@@ -73,14 +73,11 @@ func (c Config) ConnectionString() (dsn string, err error) {
 	} else if c.UseOAuth {
 		sc.Authenticator = gosnowflake.AuthTypeOAuth
 		sc.Token = c.OAuthToken
-		sc.Port = 443
-		sc.Protocol = "https"
 	}
 
 	if c.KeepSessionAlive {
-		// valueTrue := "true"
-		// sc.Params["client_session_keep_alive"] = &valueTrue
-		sc.KeepSessionAlive = true
+		valueTrue := "true"
+		sc.Params["client_session_keep_alive"] = &valueTrue
 	}
 
 	if c.QueryTag != "" {
