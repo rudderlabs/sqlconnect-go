@@ -120,7 +120,8 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 				return cmds
 			}),
 		),
-		informationSchema: informationSchema,
+		informationSchema:       informationSchema,
+		skipColumnNormalization: config.SkipColumnNormalization,
 	}, nil
 }
 
@@ -132,7 +133,8 @@ func init() {
 
 type DB struct {
 	*base.DB
-	informationSchema bool
+	informationSchema       bool
+	skipColumnNormalization bool
 }
 
 func getColumnTypeMapper(config Config) func(base.ColumnType) string {

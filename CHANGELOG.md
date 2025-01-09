@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.14.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.13.0...v1.14.0) (2024-12-13)
+
+
+### Features
+
+* **bigquery:** bump cloud.google.com/go/bigquery from 1.63.1 to 1.65.0 ([#238](https://github.com/rudderlabs/sqlconnect-go/issues/238)) ([a582787](https://github.com/rudderlabs/sqlconnect-go/commit/a582787d115717db6dd74cb9e2451f32bd6019c0))
+* **databricks:** normalize column names ([#241](https://github.com/rudderlabs/sqlconnect-go/issues/241)) ([8161d20](https://github.com/rudderlabs/sqlconnect-go/commit/8161d2062f304d1ef3b37821dd5eea830816c8cf))
+* **snowflake:** bump github.com/snowflakedb/gosnowflake from 1.11.1 to 1.12.1 ([#237](https://github.com/rudderlabs/sqlconnect-go/issues/237)) ([8dbffab](https://github.com/rudderlabs/sqlconnect-go/commit/8dbffab429a99a131fb0bacd3ea7d04d6c78b958))
+* **trino:** bump github.com/trinodb/trino-go-client from 0.317.0 to 0.320.0 ([#231](https://github.com/rudderlabs/sqlconnect-go/issues/231)) ([79c9333](https://github.com/rudderlabs/sqlconnect-go/commit/79c93331eb49d1d79c75e88a0487f7740660cf88))
+
+
+### Miscellaneous
+
+* **deps:** bump codecov/codecov-action from 4 to 5 ([#234](https://github.com/rudderlabs/sqlconnect-go/issues/234)) ([5eb7be9](https://github.com/rudderlabs/sqlconnect-go/commit/5eb7be9623095fd7c373fab407a23f9b565feeb6))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.43.0 to 0.45.0 ([#235](https://github.com/rudderlabs/sqlconnect-go/issues/235)) ([e1b526f](https://github.com/rudderlabs/sqlconnect-go/commit/e1b526f98d4e5aa76f47e1baa028501b8f2ff4f6))
+* **deps:** bump github.com/tidwall/gjson from 1.17.3 to 1.18.0 ([#229](https://github.com/rudderlabs/sqlconnect-go/issues/229)) ([bbcffdb](https://github.com/rudderlabs/sqlconnect-go/commit/bbcffdbe1a3c9650c60ca02221bf071d80622d32))
+* **deps:** bump golang.org/x/crypto from 0.29.0 to 0.31.0 in the go_modules group ([#240](https://github.com/rudderlabs/sqlconnect-go/issues/240)) ([5757306](https://github.com/rudderlabs/sqlconnect-go/commit/5757306ea8bf4d93d5ed2743ba37730f4b03a923))
+
 ## [1.13.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.12.0...v1.13.0) (2024-11-01)
 
 

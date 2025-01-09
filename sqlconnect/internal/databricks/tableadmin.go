@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/samber/lo"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
@@ -19,7 +21,25 @@ func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) 
 			return nil, fmt.Errorf("catalog %s not found", relation.Catalog)
 		}
 	}
-	return db.DB.ListColumns(ctx, relation)
+	cols, err := db.DB.ListColumns(ctx, relation)
+	if db.skipColumnNormalization {
+		return cols, err
+	}
+	return lo.Map(cols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+		col.Name = db.NormaliseIdentifier(col.Name)
+		return col
+	}), err
+}
+
+func (db *DB) ListColumnsForSqlQuery(ctx context.Context, sql string) ([]sqlconnect.ColumnRef, error) {
+	cols, err := db.DB.ListColumnsForSqlQuery(ctx, sql)
+	if db.skipColumnNormalization {
+		return cols, err
+	}
+	return lo.Map(cols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+		col.Name = db.NormaliseIdentifier(col.Name)
+		return col
+	}), err
 }
 
 // RenameTable in databricks falls back to MoveTable if rename is not supported
