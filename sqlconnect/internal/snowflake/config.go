@@ -22,11 +22,18 @@ type Config struct {
 	Role      string `json:"role"`
 	Region    string `json:"region"`
 
+	Protocol string `json:"protocol"` // http or https (optional)
+	Host     string `json:"host"`     // hostname (optional)
+	Port     int    `json:"port"`     // port (optional)
+
 	Password string `json:"password"`
 
 	UseKeyPairAuth       bool   `json:"useKeyPairAuth"`
 	PrivateKey           string `json:"privateKey"`
 	PrivateKeyPassphrase string `json:"privateKeyPassphrase"`
+
+	UseOAuth   bool   `json:"useOAuth"`
+	OAuthToken string `json:"oauthToken"`
 
 	Application string `json:"application"`
 
@@ -35,80 +42,54 @@ type Config struct {
 	KeepSessionAlive  bool   `json:"keepSessionAlive"`
 	UseLegacyMappings bool   `json:"useLegacyMappings"`
 	QueryTag          string `json:"queryTag"`
-	Host              string `json:"host"`
-	UseOAuth          bool   `json:"use_oauth"`
-	OAuthToken        string `json:"oauth_token"`
 }
 
 func (c Config) ConnectionString() (dsn string, err error) {
-	if c.UseOAuth {
-		fmt.Println("sqlconnect: Account: " + c.Account)
-		fmt.Println("sqlconnect: Region: " + c.Region)
-		fmt.Println("sqlconnect: Token: " + c.OAuthToken)
-		fmt.Println("sqlconnect: Warehouse: " + c.Warehouse)
-		fmt.Println("sqlconnect: Schema: " + c.Schema)
-		fmt.Println("sqlconnect: Host: " + c.Host)
-		fmt.Println("sqlconnect: DBName: " + c.DBName)
+	sc := gosnowflake.Config{
+		Authenticator: gosnowflake.AuthTypeSnowflake,
+		User:          c.User,
+		Password:      c.Password,
+		Account:       c.Account,
+		Database:      c.DBName,
+		Warehouse:     c.Warehouse,
+		Schema:        c.Schema,
+		Role:          c.Role,
+		Region:        c.Region,
+		Protocol:      c.Protocol,
+		Host:          c.Host,
+		Port:          c.Port,
+		Application:   c.Application,
+		LoginTimeout:  c.LoginTimeout,
+		Params:        make(map[string]*string),
+	}
 
-		sc := gosnowflake.Config{
-			Authenticator:    gosnowflake.AuthTypeOAuth,
-			Account:          c.Account,
-			Region:           c.Region,
-			Token:            c.OAuthToken,
-			Warehouse:        c.Warehouse,
-			Schema:           c.Schema,
-			Database:         c.DBName,
-			Host:             c.Host,
-			Protocol:         "https",
-			Port:             443,
-			KeepSessionAlive: true,
-		}
-		dsn, err = gosnowflake.DSN(&sc)
+	if c.UseKeyPairAuth {
+		sc.Authenticator = gosnowflake.AuthTypeJwt
+		privateKey, err := c.ParsePrivateKey()
 		if err != nil {
-			err = fmt.Errorf("creating dsn: %v", err)
+			return "", fmt.Errorf("parsing private key: %w", err)
 		}
-	} else {
-		sc := gosnowflake.Config{
-			Authenticator: gosnowflake.AuthTypeSnowflake,
-			User:          c.User,
-			Password:      c.Password,
-			Account:       c.Account,
-			Database:      c.DBName,
-			Warehouse:     c.Warehouse,
-			Schema:        c.Schema,
-			Role:          c.Role,
-			Application:   c.Application,
-			LoginTimeout:  c.LoginTimeout,
-			Params:        make(map[string]*string),
-		}
+		sc.PrivateKey = privateKey
+	} else if c.UseOAuth {
+		sc.Authenticator = gosnowflake.AuthTypeOAuth
+		sc.Token = c.OAuthToken
+		sc.Port = 443
+		sc.Protocol = "https"
+	}
 
-		if c.UseKeyPairAuth {
-			sc.Authenticator = gosnowflake.AuthTypeJwt
-			privateKey, err := c.ParsePrivateKey()
-			if err != nil {
-				return "", fmt.Errorf("parsing private key: %w", err)
-			}
-			sc.PrivateKey = privateKey
-		} else if c.UseOAuth {
-			sc.Authenticator = gosnowflake.AuthTypeOAuth
-			sc.Host = c.Host
-			sc.Token = c.OAuthToken
-			sc.User = c.User
-		}
+	if c.KeepSessionAlive {
+		// valueTrue := "true"
+		// sc.Params["client_session_keep_alive"] = &valueTrue
+		sc.KeepSessionAlive = true
+	}
 
-		if c.KeepSessionAlive {
-			valueTrue := "true"
-			sc.Params["client_session_keep_alive"] = &valueTrue
-		}
+	if c.QueryTag != "" {
+		sc.Params["query_tag"] = &c.QueryTag
+	}
 
-		if c.QueryTag != "" {
-			sc.Params["query_tag"] = &c.QueryTag
-		}
-
-		dsn, err = gosnowflake.DSN(&sc)
-		if err != nil {
-			err = fmt.Errorf("creating dsn: %v", err)
-		}
+	dsn, err = gosnowflake.DSN(&sc)
+	if err != nil {
+		err = fmt.Errorf("creating dsn: %v", err)
 	}
 	return
 }
