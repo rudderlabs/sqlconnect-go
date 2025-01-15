@@ -98,6 +98,5 @@ func TestSnowflakeAuthentication(t *testing.T) {
 		defer func() { _ = db.Close() }()
 		require.NoError(t, db.Ping(), "it should be able to ping the database")
 		require.NoError(t, db.QueryRow("SELECT 1").Err())
-
 	})
 }
