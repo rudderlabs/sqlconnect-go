@@ -20,12 +20,20 @@ type Config struct {
 	User      string `json:"user"`
 	Schema    string `json:"schema"`
 	Role      string `json:"role"`
+	Region    string `json:"region"`
+
+	Protocol string `json:"protocol"` // http or https (optional)
+	Host     string `json:"host"`     // hostname (optional)
+	Port     int    `json:"port"`     // port (optional)
 
 	Password string `json:"password"`
 
 	UseKeyPairAuth       bool   `json:"useKeyPairAuth"`
 	PrivateKey           string `json:"privateKey"`
 	PrivateKeyPassphrase string `json:"privateKeyPassphrase"`
+
+	UseOAuth   bool   `json:"useOAuth"`
+	OAuthToken string `json:"oauthToken"`
 
 	Application string `json:"application"`
 
@@ -46,6 +54,10 @@ func (c Config) ConnectionString() (dsn string, err error) {
 		Warehouse:     c.Warehouse,
 		Schema:        c.Schema,
 		Role:          c.Role,
+		Region:        c.Region,
+		Protocol:      c.Protocol,
+		Host:          c.Host,
+		Port:          c.Port,
 		Application:   c.Application,
 		LoginTimeout:  c.LoginTimeout,
 		Params:        make(map[string]*string),
@@ -58,6 +70,9 @@ func (c Config) ConnectionString() (dsn string, err error) {
 			return "", fmt.Errorf("parsing private key: %w", err)
 		}
 		sc.PrivateKey = privateKey
+	} else if c.UseOAuth {
+		sc.Authenticator = gosnowflake.AuthTypeOAuth
+		sc.Token = c.OAuthToken
 	}
 
 	if c.KeepSessionAlive {
