@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.15.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.14.0...v1.15.0) (2025-01-15)
+
+
+### Features
+
+* **redshift:** bump github.com/aws/aws-sdk-go-v2/service/redshiftdata from 1.30.1 to 1.31.6 ([#256](https://github.com/rudderlabs/sqlconnect-go/issues/256)) ([651a562](https://github.com/rudderlabs/sqlconnect-go/commit/651a562589496555bf09d0fd82c3e854d5eb9c30))
+* **snowflake:** support oauth authentication ([#236](https://github.com/rudderlabs/sqlconnect-go/issues/236)) ([9bc7188](https://github.com/rudderlabs/sqlconnect-go/commit/9bc71882c3ff3506a6be31a6889beadaeab9b527))
+
+
+### Miscellaneous
+
+* **deps:** bump cloud.google.com/go from 0.116.0 to 0.118.0 ([#254](https://github.com/rudderlabs/sqlconnect-go/issues/254)) ([f1c7235](https://github.com/rudderlabs/sqlconnect-go/commit/f1c72357a16e7eb7c86be29f280e362890512ea3))
+* **deps:** bump github.com/aws/aws-sdk-go-v2 from 1.32.7 to 1.32.8 ([#252](https://github.com/rudderlabs/sqlconnect-go/issues/252)) ([c9a6308](https://github.com/rudderlabs/sqlconnect-go/commit/c9a6308111e5016575c73e2ce2a873ef89fc27c5))
+* **deps:** bump github.com/aws/aws-sdk-go-v2/config from 1.28.1 to 1.28.7 ([#249](https://github.com/rudderlabs/sqlconnect-go/issues/249)) ([e0a5f5e](https://github.com/rudderlabs/sqlconnect-go/commit/e0a5f5ebb927b02b58f6e887248f43bba3eedcef))
+* **deps:** bump github.com/gliderlabs/ssh from 0.3.7 to 0.3.8 ([#243](https://github.com/rudderlabs/sqlconnect-go/issues/243)) ([78799cb](https://github.com/rudderlabs/sqlconnect-go/commit/78799cb9b6a531cb8ff570d5a8c510b5484ec9df))
+* **deps:** bump github.com/stretchr/testify from 1.9.0 to 1.10.0 ([#244](https://github.com/rudderlabs/sqlconnect-go/issues/244)) ([11a4261](https://github.com/rudderlabs/sqlconnect-go/commit/11a42616681459a97031800ad19a51d45286eb74))
+* **deps:** bump golang.org/x/crypto from 0.31.0 to 0.32.0 ([#253](https://github.com/rudderlabs/sqlconnect-go/issues/253)) ([e7ddbd9](https://github.com/rudderlabs/sqlconnect-go/commit/e7ddbd90423e8c401d4b5fff17ac5c60e0070e87))
+* **deps:** bump golang.org/x/net from 0.31.0 to 0.33.0 in the go_modules group ([#251](https://github.com/rudderlabs/sqlconnect-go/issues/251)) ([7132109](https://github.com/rudderlabs/sqlconnect-go/commit/7132109c3d14ae29eda1ddd6c3bfa7f5eecb2dda))
+* **deps:** bump google.golang.org/api from 0.210.0 to 0.216.0 ([#255](https://github.com/rudderlabs/sqlconnect-go/issues/255)) ([76d0416](https://github.com/rudderlabs/sqlconnect-go/commit/76d041615137f3d5580aa4fb7cdd374c988d7779))
+
 ## [1.14.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.13.0...v1.14.0) (2024-12-13)
 
 
