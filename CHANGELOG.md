@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.16.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.15.0...v1.16.0) (2025-01-22)
+
+
+### Features
+
+* **trino:** bump github.com/trinodb/trino-go-client from 0.320.0 to 0.321.0 ([#261](https://github.com/rudderlabs/sqlconnect-go/issues/261)) ([33f40c6](https://github.com/rudderlabs/sqlconnect-go/commit/33f40c62d89d16ecb125b45c59aa46dedd77cdf5))
+
+
+### Miscellaneous
+
+* **deps:** bump github.com/aws/aws-sdk-go-v2/config from 1.28.7 to 1.29.1 ([#258](https://github.com/rudderlabs/sqlconnect-go/issues/258)) ([8f89697](https://github.com/rudderlabs/sqlconnect-go/commit/8f89697f61ee0d6f5837b3a6e34ef8889e430721))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.45.0 to 0.46.1 ([#257](https://github.com/rudderlabs/sqlconnect-go/issues/257)) ([2dc911e](https://github.com/rudderlabs/sqlconnect-go/commit/2dc911e0711c26bf6d71b8994448f23af15f19fc))
+
 ## [1.15.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.14.0...v1.15.0) (2025-01-15)
 
 
