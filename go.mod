@@ -32,7 +32,7 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20240424034433-3c2c7870ae76
 	golang.org/x/crypto v0.32.0
 	golang.org/x/sync v0.10.0
-	google.golang.org/api v0.218.0
+	google.golang.org/api v0.219.0
 )
 
 require (
