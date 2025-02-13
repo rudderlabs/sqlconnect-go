@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.17.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.16.0...v1.17.0) (2025-02-13)
+
+
+### Features
+
+* **redshift:** bump github.com/aws/aws-sdk-go-v2/service/redshiftdata from 1.31.6 to 1.31.12 ([#276](https://github.com/rudderlabs/sqlconnect-go/issues/276)) ([cc8db6f](https://github.com/rudderlabs/sqlconnect-go/commit/cc8db6ffcccbae1d7cd79b067694105cdd09b343))
+
+
+### Miscellaneous
+
+* **deps:** bump github.com/aws/aws-sdk-go-v2/service/sts from 1.33.12 to 1.33.14 ([#277](https://github.com/rudderlabs/sqlconnect-go/issues/277)) ([ecb6b91](https://github.com/rudderlabs/sqlconnect-go/commit/ecb6b9119495b2d7149b61c4702eee99fb97a428))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.46.1 to 0.46.2 ([#274](https://github.com/rudderlabs/sqlconnect-go/issues/274)) ([fe2b6a8](https://github.com/rudderlabs/sqlconnect-go/commit/fe2b6a860f6173189cd87087002076ff4fea3b68))
+* **deps:** bump google.golang.org/api from 0.219.0 to 0.221.0 ([#279](https://github.com/rudderlabs/sqlconnect-go/issues/279)) ([d1f6ea2](https://github.com/rudderlabs/sqlconnect-go/commit/d1f6ea227f39aec8089eaf3c7cd850b46d4435d1))
+* rerun test fails ([#280](https://github.com/rudderlabs/sqlconnect-go/issues/280)) ([c9ee171](https://github.com/rudderlabs/sqlconnect-go/commit/c9ee17161b0429cde53b01352c6817cc02e12bd8))
+
 ## [1.16.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.15.0...v1.16.0) (2025-02-03)
 
 
