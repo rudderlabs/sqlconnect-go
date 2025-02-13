@@ -1,7 +1,6 @@
 module github.com/rudderlabs/sqlconnect-go
 
-go 1.23.2
-toolchain go1.23.6
+go 1.23.5
 
 require (
 	cloud.google.com/go v0.118.1
