@@ -2,7 +2,6 @@
 
 GO=go
 LDFLAGS?=-s -w
-TESTFILE=_testok
 
 default: lint
 
@@ -12,26 +11,28 @@ generate: install-tools
 test: install-tools test-run
 
 test-run: ## Run all unit tests
-ifeq ($(filter 1,$(debug) $(RUNNER_DEBUG)),)
-	$(eval TEST_CMD = gotestsum --format pkgname-and-test-fails --)
-	$(eval TEST_OPTIONS = -p=1 -v -failfast -shuffle=on -coverprofile=profile.out -covermode=atomic -coverpkg=./... -vet=all --timeout=30m)
-else
-	$(eval TEST_CMD = SLOW=0 go test)
-	$(eval TEST_OPTIONS = -p=1 -v -failfast -shuffle=on -coverprofile=profile.out -covermode=atomic -coverpkg=./... -vet=all --timeout=30m)
-endif
 ifdef package
 ifdef exclude
-	$(eval FILES = `go list ./$(package)/... | egrep -iv '$(exclude)'`)
-	$(TEST_CMD) -count=1 $(TEST_OPTIONS) $(FILES) && touch $(TESTFILE)
+	$(eval PACKAGES = `go list ./$(package)/... | egrep -iv '$(exclude)' | xargs`)
 else
-	$(TEST_CMD) $(TEST_OPTIONS) ./$(package)/... && touch $(TESTFILE)
+	$(eval PACKAGES = "./$(package)/...")
 endif
 else ifdef exclude
-	$(eval FILES = `go list ./... | egrep -iv '$(exclude)'`)
-	$(TEST_CMD) -count=1 $(TEST_OPTIONS) $(FILES) && touch $(TESTFILE)
+	$(eval PACKAGES = `go list ./... | egrep -iv '$(exclude)' | xargs`)
 else
-	$(TEST_CMD) -count=1 $(TEST_OPTIONS) ./... && touch $(TESTFILE)
+	$(eval PACKAGES = "./...")
 endif
+
+ifeq ($(filter 1,$(debug) $(RUNNER_DEBUG)),)
+	$(eval TEST_CMD = gotestsum --rerun-fails --format pkgname-and-test-fails --packages="${PACKAGES}"  --)
+	$(eval TEST_OPTIONS = -p=1 -v -failfast -shuffle=on -coverprofile=profile.out -coverpkg=./... -covermode=atomic -vet=all --timeout=60m)
+	$(eval CMD = $(TEST_CMD) -count=1 $(TEST_OPTIONS) ${PACKAGES})
+else
+	$(eval TEST_CMD = go test)
+	$(eval TEST_OPTIONS = -p=1 -v -failfast -shuffle=on -coverprofile=profile.out -coverpkg=./... -covermode=atomic -vet=all --timeout=60m)
+	$(eval CMD = $(TEST_CMD) -count=1 $(TEST_OPTIONS) ${PACKAGES})
+endif
+	$(CMD)
 
 help: ## Show the available commands
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' ./Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
