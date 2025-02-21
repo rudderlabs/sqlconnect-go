@@ -40,8 +40,8 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 		databricks.WithSessionParams(config.SessionParams),
 		databricks.WithUserAgentEntry("Rudderstack"),
 	)
-	if config.UseOauth {
-		opts = append(opts, databricks.WithClientCredentials(config.ClientID, config.ClientSecret))
+	if config.UseOAuth {
+		opts = append(opts, databricks.WithClientCredentials(config.OAuthClientID, config.OAuthClientSecret))
 	} else {
 		opts = append(opts, databricks.WithAccessToken(config.Token))
 	}

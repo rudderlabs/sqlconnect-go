@@ -26,9 +26,9 @@ type Config struct {
 
 	SessionParams map[string]string `json:"sessionParams"`
 
-	UseOauth     bool   `json:"useOauth"`
-	ClientID     string `json:"client_id"`
-	ClientSecret string `json:"client_secret"`
+	UseOAuth          bool   `json:"useOauth"`
+	OAuthClientID     string `json:"oauthClientId"`
+	OAuthClientSecret string `json:"oauthClientSecret"`
 
 	UseLegacyMappings bool `json:"useLegacyMappings"`
 	// SkipColumnNormalization skips normalizing column names during ListColumns and ListColumnsForSqlQuery.

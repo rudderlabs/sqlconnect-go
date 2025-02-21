@@ -55,7 +55,7 @@ func TestDatabricksDB(t *testing.T) {
 			if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
 				t.Fatal("DATABRICKS_OAUTH_TEST_ENVIRONMENT_CREDENTIALS environment variable not set")
 			}
-			t.Skip("skipping databricks integration test due to lack of a test environment")
+			t.Skip("skipping databricks ouath integration test due to lack of a test environment")
 		}
 		configJSON, err := sjson.Set(oauthConfigJSON, "useOauth", true)
 		require.NoError(t, err, "failed to set useOauth")
