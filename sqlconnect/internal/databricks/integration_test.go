@@ -49,6 +49,31 @@ func TestDatabricksDB(t *testing.T) {
 		)
 	})
 
+	t.Run("with oauth", func(t *testing.T) {
+		oauthConfigJSON, ok := os.LookupEnv("DATABRICKS_OAUTH_TEST_ENVIRONMENT_CREDENTIALS")
+		if !ok {
+			if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
+				t.Fatal("DATABRICKS_OAUTH_TEST_ENVIRONMENT_CREDENTIALS environment variable not set")
+			}
+			t.Skip("skipping databricks ouath integration test due to lack of a test environment")
+		}
+		configJSON, err := sjson.Set(oauthConfigJSON, "useOauth", true)
+		require.NoError(t, err, "failed to set useOauth")
+		_, err = sqlconnect.NewDB(databricks.DatabaseType, []byte(configJSON))
+		require.NoError(t, err, "failed to create db")
+
+		integrationtest.TestDatabaseScenarios(
+			t,
+			databricks.DatabaseType,
+			[]byte(configJSON),
+			strings.ToLower,
+			integrationtest.Options{
+				LegacySupport:                  true,
+				SpecialCharactersInQuotedTable: "_A",
+			},
+		)
+	})
+
 	t.Run("without information schema", func(t *testing.T) {
 		configJSON, err := sjson.Set(configJSON, "catalog", "hive_metastore")
 		require.NoError(t, err, "failed to set catalog")
