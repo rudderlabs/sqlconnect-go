@@ -27,7 +27,6 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 	}
 
 	opts := newOpts(
-		databricks.WithAccessToken(config.Token),
 		databricks.WithServerHostname(config.Host),
 		databricks.WithPort(config.Port),
 		databricks.WithHTTPPath(config.Path),
@@ -41,6 +40,11 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 		databricks.WithSessionParams(config.SessionParams),
 		databricks.WithUserAgentEntry("Rudderstack"),
 	)
+	if config.UseOAuth {
+		opts = append(opts, databricks.WithClientCredentials(config.OAuthClientID, config.OAuthClientSecret))
+	} else {
+		opts = append(opts, databricks.WithAccessToken(config.Token))
+	}
 	tunnelCloser := sshtunnel.NoTunnelCloser
 	if config.TunnelInfo != nil {
 		tunnel, err := sshtunnel.NewSocks5Tunnel(*config.TunnelInfo)

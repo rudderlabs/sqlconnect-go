@@ -26,6 +26,10 @@ type Config struct {
 
 	SessionParams map[string]string `json:"sessionParams"`
 
+	UseOAuth          bool   `json:"useOauth"`
+	OAuthClientID     string `json:"oauthClientId"`
+	OAuthClientSecret string `json:"oauthClientSecret"`
+
 	UseLegacyMappings bool `json:"useLegacyMappings"`
 	// SkipColumnNormalization skips normalizing column names during ListColumns and ListColumnsForSqlQuery.
 	// Databricks is returning column names case sensitive from information schema, even though it is case insensitive.
