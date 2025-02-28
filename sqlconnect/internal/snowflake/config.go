@@ -46,21 +46,19 @@ type Config struct {
 
 func (c Config) ConnectionString() (dsn string, err error) {
 	sc := gosnowflake.Config{
-		Authenticator: gosnowflake.AuthTypeSnowflake,
-		User:          c.User,
-		Password:      c.Password,
-		Account:       c.Account,
-		Database:      c.DBName,
-		Warehouse:     c.Warehouse,
-		Schema:        c.Schema,
-		Role:          c.Role,
-		Region:        c.Region,
-		Protocol:      c.Protocol,
-		Host:          c.Host,
-		Port:          c.Port,
-		Application:   c.Application,
-		LoginTimeout:  c.LoginTimeout,
-		Params:        make(map[string]*string),
+		User:         c.User,
+		Account:      c.Account,
+		Database:     c.DBName,
+		Warehouse:    c.Warehouse,
+		Schema:       c.Schema,
+		Role:         c.Role,
+		Region:       c.Region,
+		Protocol:     c.Protocol,
+		Host:         c.Host,
+		Port:         c.Port,
+		Application:  c.Application,
+		LoginTimeout: c.LoginTimeout,
+		Params:       make(map[string]*string),
 	}
 
 	if c.UseKeyPairAuth {
@@ -73,6 +71,9 @@ func (c Config) ConnectionString() (dsn string, err error) {
 	} else if c.UseOAuth {
 		sc.Authenticator = gosnowflake.AuthTypeOAuth
 		sc.Token = c.OAuthToken
+	} else {
+		sc.Authenticator = gosnowflake.AuthTypeSnowflake
+		sc.Password = c.Password
 	}
 
 	if c.KeepSessionAlive {
