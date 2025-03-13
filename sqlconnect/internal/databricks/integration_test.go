@@ -58,7 +58,6 @@ func TestDatabricksDB(t *testing.T) {
 			}
 			t.Skip("skipping databricks ouath integration test due to lack of a test environment")
 		}
-		// require.NotEmpty(t, oauthConfigJSON, "DATABRICKS_OAUTH_TEST_ENVIRONMENT_CREDENTIALS environment variable is empty")
 		var oauthConfig databricks.Config
 		err := json.Unmarshal([]byte(oauthConfigJSON), &oauthConfig)
 		require.NoError(t, err, "failed to unmarshal oauth config")
@@ -78,5 +77,28 @@ func TestDatabricksDB(t *testing.T) {
 				SpecialCharactersInQuotedTable: "_A",
 			},
 		)
+	})
+
+	t.Run("without information schema", func(t *testing.T) {
+		configJSON, err := sjson.Set(configJSON, "catalog", "hive_metastore")
+		require.NoError(t, err, "failed to set catalog")
+		db, err := sqlconnect.NewDB(databricks.DatabaseType, []byte(configJSON))
+		require.NoError(t, err, "failed to create db")
+		_, err = db.Exec("SELECT * FROM INFORMATION_SCHEMA.COLUMNS LIMIT 1")
+		require.Error(t, err, "information schema should not be available")
+		require.ErrorContains(t, err, "TABLE_OR_VIEW_NOT_FOUND", "information schema should not be available")
+
+		integrationtest.TestDatabaseScenarios(
+			t,
+			databricks.DatabaseType,
+			[]byte(configJSON),
+			strings.ToLower,
+			integrationtest.Options{
+				LegacySupport:                  true,
+				SpecialCharactersInQuotedTable: "_A", // No special characters allowed
+			},
+		)
+
+		integrationtest.TestSshTunnelScenarios(t, databricks.DatabaseType, []byte(configJSON))
 	})
 }
