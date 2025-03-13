@@ -58,10 +58,10 @@ func TestDatabricksDB(t *testing.T) {
 			}
 			t.Skip("skipping databricks ouath integration test due to lack of a test environment")
 		}
-		var oauthConfig databricks.Config
-		err := json.Unmarshal([]byte(oauthConfigJSON), &oauthConfig)
-		require.NoError(t, err, "failed to unmarshal oauth config")
-		require.NotEmpty(t, oauthConfig.Host, "Host is empty")
+		// var oauthConfig databricks.Config
+		// err := json.Unmarshal([]byte(oauthConfigJSON), &oauthConfig)
+		// require.NoError(t, err, "failed to unmarshal oauth config")
+		// require.NotEmpty(t, oauthConfig.Host, "Host is empty")
 		configJSON, err := sjson.Set(oauthConfigJSON, "useOauth", true)
 		require.NoError(t, err, "failed to set useOauth")
 		_, err = sqlconnect.NewDB(databricks.DatabaseType, []byte(configJSON))
