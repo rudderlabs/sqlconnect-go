@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	databricks "github.com/databricks/databricks-sql-go"
 	"github.com/samber/lo"
@@ -64,11 +63,6 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 	db := sql.OpenDB(connector)
 	db.SetConnMaxIdleTime(config.MaxConnIdleTime)
 
-	if _, err = db.Exec("SELECT * FROM INFORMATION_SCHEMA.COLUMNS LIMIT 1"); err != nil && !strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
-		return nil, fmt.Errorf("checking if unity catalog is available: %w", err)
-	}
-	informationSchema := err == nil
-
 	return &DB{
 		DB: base.NewDB(
 			db,
@@ -102,21 +96,10 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 					return fmt.Sprintf("SHOW TABLES IN `%[1]s` LIKE '%[2]s'", schema, base.EscapeSqlString(table))
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
-					if catalog == "" || !informationSchema {
+					if catalog == "" {
 						return fmt.Sprintf("DESCRIBE TABLE `%[1]s`.`%[2]s`", schema, table), "col_name", "data_type"
 					}
-					stmt := fmt.Sprintf(`SELECT 
-											column_name, 
-											full_data_type 
-										FROM information_schema.columns 
-										WHERE table_schema = '%[1]s' 
-										AND table_name = '%[2]s'
-										AND table_catalog='%[3]s' 
-										ORDER BY ORDINAL_POSITION ASC`,
-						schema,
-						table,
-						catalog)
-					return stmt, "column_name", "full_data_type"
+					return fmt.Sprintf("DESCRIBE TABLE `%[1]s`.`%[2]s`.`%[3]s`", catalog, schema, table), "col_name", "data_type"
 				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {
 					return fmt.Sprintf("ALTER TABLE %[1]s.%[2]s RENAME TO %[1]s.%[3]s", schema, oldName, newName)
@@ -124,7 +107,6 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 				return cmds
 			}),
 		),
-		informationSchema:       informationSchema,
 		skipColumnNormalization: config.SkipColumnNormalization,
 	}, nil
 }
@@ -137,7 +119,6 @@ func init() {
 
 type DB struct {
 	*base.DB
-	informationSchema       bool
 	skipColumnNormalization bool
 }
 

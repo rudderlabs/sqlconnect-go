@@ -12,7 +12,7 @@ import (
 
 // ListColumns returns a list of columns for the given table
 func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) ([]sqlconnect.ColumnRef, error) {
-	if !db.informationSchema && relation.Catalog != "" {
+	if relation.Catalog != "" {
 		currentCatalog, err := db.CurrentCatalog(ctx) // make sure the catalog matches the current catalog
 		if err != nil {
 			return nil, fmt.Errorf("getting current catalog: %w", err)
