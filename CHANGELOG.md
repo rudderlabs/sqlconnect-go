@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.18.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.17.0...v1.18.0) (2025-02-25)
+
+
+### Features
+
+* support for databricks oauth ([#286](https://github.com/rudderlabs/sqlconnect-go/issues/286)) ([4df34db](https://github.com/rudderlabs/sqlconnect-go/commit/4df34dbca63ccfb7bc00b5af3e8957272033ef2b))
+
+
+### Miscellaneous
+
+* **deps:** bump github.com/aws/aws-sdk-go-v2/config from 1.29.4 to 1.29.7 ([#287](https://github.com/rudderlabs/sqlconnect-go/issues/287)) ([5c3cbb3](https://github.com/rudderlabs/sqlconnect-go/commit/5c3cbb38746a652149b19129add1ec96c639a17d))
+
 ## [1.17.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.16.0...v1.17.0) (2025-02-13)
 
 
