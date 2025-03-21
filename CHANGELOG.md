@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.18.0...v1.18.1) (2025-03-21)
+
+
+### Miscellaneous
+
+* **databricks:** avoid using information schema for list columns ([#295](https://github.com/rudderlabs/sqlconnect-go/issues/295)) ([b814742](https://github.com/rudderlabs/sqlconnect-go/commit/b81474227c54ad2bc0160012a386f63751ad0ad3))
+
 ## [1.18.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.17.0...v1.18.0) (2025-02-25)
 
 
