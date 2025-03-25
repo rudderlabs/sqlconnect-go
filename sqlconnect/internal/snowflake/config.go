@@ -42,25 +42,33 @@ type Config struct {
 	KeepSessionAlive  bool   `json:"keepSessionAlive"`
 	UseLegacyMappings bool   `json:"useLegacyMappings"`
 	QueryTag          string `json:"queryTag"`
+
+	Passcode           string `json:"passcode"` // To cache passcode for MFA
+	PasscodeInPassword bool   `json:"passcodeInPassword"`
 }
 
 func (c Config) ConnectionString() (dsn string, err error) {
 	sc := gosnowflake.Config{
-		Authenticator: gosnowflake.AuthTypeSnowflake,
-		User:          c.User,
-		Password:      c.Password,
-		Account:       c.Account,
-		Database:      c.DBName,
-		Warehouse:     c.Warehouse,
-		Schema:        c.Schema,
-		Role:          c.Role,
-		Region:        c.Region,
-		Protocol:      c.Protocol,
-		Host:          c.Host,
-		Port:          c.Port,
-		Application:   c.Application,
-		LoginTimeout:  c.LoginTimeout,
-		Params:        make(map[string]*string),
+		Authenticator:      gosnowflake.AuthTypeSnowflake,
+		User:               c.User,
+		Password:           c.Password,
+		Account:            c.Account,
+		Database:           c.DBName,
+		Warehouse:          c.Warehouse,
+		Schema:             c.Schema,
+		Role:               c.Role,
+		Region:             c.Region,
+		Protocol:           c.Protocol,
+		Host:               c.Host,
+		Port:               c.Port,
+		Application:        c.Application,
+		LoginTimeout:       c.LoginTimeout,
+		Params:             make(map[string]*string),
+		PasscodeInPassword: c.PasscodeInPassword,
+	}
+
+	if !c.PasscodeInPassword && c.Passcode != "" {
+		sc.Passcode = c.Passcode
 	}
 
 	if c.UseKeyPairAuth {
