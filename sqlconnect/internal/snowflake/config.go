@@ -43,13 +43,13 @@ type Config struct {
 	UseLegacyMappings bool   `json:"useLegacyMappings"`
 	QueryTag          string `json:"queryTag"`
 
-	Passcode           string `json:"passcode"` // To cache passcode for MFA
+	EnableMFACaching   bool   `json:"enableMFACaching"`
+	Passcode           string `json:"passcode"`
 	PasscodeInPassword bool   `json:"passcodeInPassword"`
 }
 
 func (c Config) ConnectionString() (dsn string, err error) {
 	sc := gosnowflake.Config{
-		Authenticator:      gosnowflake.AuthTypeSnowflake,
 		User:               c.User,
 		Password:           c.Password,
 		Account:            c.Account,
@@ -67,8 +67,14 @@ func (c Config) ConnectionString() (dsn string, err error) {
 		PasscodeInPassword: c.PasscodeInPassword,
 	}
 
-	if !c.PasscodeInPassword && c.Passcode != "" {
-		sc.Passcode = c.Passcode
+	if c.EnableMFACaching {
+		sc.Authenticator = gosnowflake.AuthTypeUsernamePasswordMFA
+	} else {
+		sc.Authenticator = gosnowflake.AuthTypeSnowflake
+	}
+
+	if c.Passcode != "" {
+		sc.Password = c.Passcode
 	}
 
 	if c.UseKeyPairAuth {
