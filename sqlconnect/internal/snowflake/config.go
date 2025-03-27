@@ -74,7 +74,8 @@ func (c Config) ConnectionString() (dsn string, err error) {
 	}
 
 	if c.Passcode != "" {
-		sc.Password = c.Passcode
+		sc.Authenticator = gosnowflake.AuthTypeUsernamePasswordMFA
+		sc.Passcode = c.Passcode
 	}
 
 	if c.UseKeyPairAuth {
