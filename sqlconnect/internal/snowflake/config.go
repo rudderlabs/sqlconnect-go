@@ -65,17 +65,13 @@ func (c Config) ConnectionString() (dsn string, err error) {
 		LoginTimeout:       c.LoginTimeout,
 		Params:             make(map[string]*string),
 		PasscodeInPassword: c.PasscodeInPassword,
+		Passcode:           c.Passcode,
 	}
 
 	if c.EnableMFACaching {
 		sc.Authenticator = gosnowflake.AuthTypeUsernamePasswordMFA
 	} else {
 		sc.Authenticator = gosnowflake.AuthTypeSnowflake
-	}
-
-	if c.Passcode != "" {
-		sc.Authenticator = gosnowflake.AuthTypeUsernamePasswordMFA
-		sc.Passcode = c.Passcode
 	}
 
 	if c.UseKeyPairAuth {
