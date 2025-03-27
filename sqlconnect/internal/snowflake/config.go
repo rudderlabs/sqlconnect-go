@@ -50,6 +50,7 @@ type Config struct {
 
 func (c Config) ConnectionString() (dsn string, err error) {
 	sc := gosnowflake.Config{
+		Authenticator:      gosnowflake.AuthTypeSnowflake,
 		User:               c.User,
 		Password:           c.Password,
 		Account:            c.Account,
@@ -68,12 +69,6 @@ func (c Config) ConnectionString() (dsn string, err error) {
 		Passcode:           c.Passcode,
 	}
 
-	if c.EnableMFACaching {
-		sc.Authenticator = gosnowflake.AuthTypeUsernamePasswordMFA
-	} else {
-		sc.Authenticator = gosnowflake.AuthTypeSnowflake
-	}
-
 	if c.UseKeyPairAuth {
 		sc.Authenticator = gosnowflake.AuthTypeJwt
 		privateKey, err := c.ParsePrivateKey()
@@ -84,6 +79,10 @@ func (c Config) ConnectionString() (dsn string, err error) {
 	} else if c.UseOAuth {
 		sc.Authenticator = gosnowflake.AuthTypeOAuth
 		sc.Token = c.OAuthToken
+	}
+
+	if c.EnableMFACaching {
+		sc.Authenticator = gosnowflake.AuthTypeUsernamePasswordMFA
 	}
 
 	if c.KeepSessionAlive {
