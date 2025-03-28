@@ -79,9 +79,7 @@ func (c Config) ConnectionString() (dsn string, err error) {
 	} else if c.UseOAuth {
 		sc.Authenticator = gosnowflake.AuthTypeOAuth
 		sc.Token = c.OAuthToken
-	}
-
-	if c.EnableMFACaching {
+	} else if c.EnableMFACaching {
 		sc.Authenticator = gosnowflake.AuthTypeUsernamePasswordMFA
 	}
 
