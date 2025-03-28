@@ -42,7 +42,7 @@ install-tools:
 	go install mvdan.cc/gofumpt@latest
 	go install gotest.tools/gotestsum@v1.8.2
 	go install golang.org/x/tools/cmd/goimports@latest
-	bash ./internal/scripts/install-golangci-lint.sh v1.61.0
+	bash ./internal/scripts/install-golangci-lint.sh v1.64.7
 
 .PHONY: lint
 lint: fmt ## Run linters on all go files
