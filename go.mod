@@ -1,14 +1,13 @@
 module github.com/rudderlabs/sqlconnect-go
 
 go 1.24.1
-
 replace github.com/gocql/gocql => github.com/scylladb/gocql v1.14.4
 
 require (
 	cloud.google.com/go v0.118.1
 	cloud.google.com/go/bigquery v1.66.2
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
-	github.com/aws/aws-sdk-go-v2 v1.36.2
+	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.7
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.60
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.31.12
