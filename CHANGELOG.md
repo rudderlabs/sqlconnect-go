@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.18.1...v1.19.0) (2025-03-28)
+
+
+### Features
+
+* support for MFA cache on Snowflake ([#298](https://github.com/rudderlabs/sqlconnect-go/issues/298)) ([d045fd2](https://github.com/rudderlabs/sqlconnect-go/commit/d045fd2a97c6d22543f914e0008c297f6184836e))
+
 ## [1.18.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.18.0...v1.18.1) (2025-03-21)
 
 
