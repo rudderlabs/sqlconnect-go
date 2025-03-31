@@ -1,7 +1,6 @@
 module github.com/rudderlabs/sqlconnect-go
 
 go 1.24.1
-
 replace github.com/gocql/gocql => github.com/scylladb/gocql v1.14.4
 
 require (
@@ -30,7 +29,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
-	github.com/trinodb/trino-go-client v0.321.0
+	github.com/trinodb/trino-go-client v0.322.0
 	github.com/youmark/pkcs8 v0.0.0-20240424034433-3c2c7870ae76
 	golang.org/x/crypto v0.33.0
 	golang.org/x/sync v0.11.0
