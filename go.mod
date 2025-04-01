@@ -1,6 +1,7 @@
 module github.com/rudderlabs/sqlconnect-go
 
 go 1.24.1
+
 replace github.com/gocql/gocql => github.com/scylladb/gocql v1.14.4
 
 require (
