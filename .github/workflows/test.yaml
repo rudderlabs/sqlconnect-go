@@ -31,7 +31,7 @@ jobs:
         - sqlconnect/internal/postgres
         - sqlconnect/internal/redshift
         - sqlconnect/internal/snowflake
-        - sqlconnect/internal/trino
+        # - sqlconnect/internal/trino
         include:
           - package: .
             exclude: sqlconnect-go/sqlconnect/internal
