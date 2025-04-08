@@ -100,7 +100,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 					if catalog != "" {
 						stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", base.EscapeSqlString(catalog))
 					}
-					return stmt + " ORDER BY ordinal_position ASC", "column_name", "data_type"
+					return stmt + " ORDER BY ordinal_position ASC", "column_name", "full_data_type"
 				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {
 					return fmt.Sprintf("ALTER TABLE %[1]s.%[2]s RENAME TO %[1]s.%[3]s", schema, oldName, newName)
