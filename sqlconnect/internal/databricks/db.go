@@ -99,6 +99,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 					// Check if Unity Catalog is enabled by querying the current catalog
 					var currentCatalog string
 					err := db.QueryRow("SELECT current_catalog()").Scan(&currentCatalog)
+					fmt.Println("currentCatalog", currentCatalog)
 					isUnityCatalog := err == nil && currentCatalog != ""
 
 					if isUnityCatalog {
