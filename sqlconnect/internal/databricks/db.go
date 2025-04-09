@@ -96,11 +96,21 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 					return fmt.Sprintf("SHOW TABLES IN `%[1]s` LIKE '%[2]s'", schema, base.EscapeSqlString(table))
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
-					stmt := fmt.Sprintf("SELECT column_name, full_data_type FROM information_schema.columns WHERE table_schema = '%[1]s' AND table_name = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
-					if catalog != "" {
-						stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", base.EscapeSqlString(catalog))
+					// Check if Unity Catalog is enabled by querying the current catalog
+					var currentCatalog string
+					err := db.QueryRow("SELECT current_catalog()").Scan(&currentCatalog)
+					isUnityCatalog := err == nil && currentCatalog != ""
+
+					if isUnityCatalog {
+						stmt := fmt.Sprintf("SELECT column_name, full_data_type FROM information_schema.columns WHERE table_schema = '%[1]s' AND table_name = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
+						if catalog != "" {
+							stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", base.EscapeSqlString(catalog))
+						}
+						return stmt + " ORDER BY ordinal_position ASC", "column_name", "full_data_type"
 					}
-					return stmt + " ORDER BY ordinal_position ASC", "column_name", "full_data_type"
+
+					// For non-Unity Catalog, use DESCRIBE TABLE
+					return fmt.Sprintf("DESCRIBE TABLE `%[1]s`.`%[2]s`", base.EscapeSqlString(schema), base.EscapeSqlString(table)), "col_name", "data_type"
 				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {
 					return fmt.Sprintf("ALTER TABLE %[1]s.%[2]s RENAME TO %[1]s.%[3]s", schema, oldName, newName)
