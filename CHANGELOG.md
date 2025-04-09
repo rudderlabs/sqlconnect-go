@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.20.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.19.0...v1.20.0) (2025-04-09)
+
+
+### Features
+
+* **bigquery:** bump cloud.google.com/go/bigquery from 1.66.0 to 1.66.2 ([#281](https://github.com/rudderlabs/sqlconnect-go/issues/281)) ([7dd7b0c](https://github.com/rudderlabs/sqlconnect-go/commit/7dd7b0c0653a37ec3b20d8f2927a7931b968579d))
+* **redshift:** bump github.com/aws/aws-sdk-go-v2/service/redshiftdata from 1.31.12 to 1.33.1 ([#308](https://github.com/rudderlabs/sqlconnect-go/issues/308)) ([86f7d3b](https://github.com/rudderlabs/sqlconnect-go/commit/86f7d3bcf794067a35989ff4e69b3790b361311a))
+* **snowflake:** bump github.com/snowflakedb/gosnowflake from 1.12.1 to 1.13.1 ([#293](https://github.com/rudderlabs/sqlconnect-go/issues/293)) ([f1f64ac](https://github.com/rudderlabs/sqlconnect-go/commit/f1f64acda6f40565396bdfe6de6af05a4674e24d))
+* **trino:** bump github.com/trinodb/trino-go-client from 0.321.0 to 0.323.0 ([#309](https://github.com/rudderlabs/sqlconnect-go/issues/309)) ([b4839e5](https://github.com/rudderlabs/sqlconnect-go/commit/b4839e5ae8dd0ba3f4a88adf0d2193dddd0a5ffd))
+
+
+### Miscellaneous
+
+* bump go version to 1.24 ([#301](https://github.com/rudderlabs/sqlconnect-go/issues/301)) ([7c1fb0a](https://github.com/rudderlabs/sqlconnect-go/commit/7c1fb0ae9852eb47670dcb7bb7ee0b9d1412773a))
+* **deps:** bump beatlabs/delete-old-branches-action from 0.0.10 to 0.0.11 ([#297](https://github.com/rudderlabs/sqlconnect-go/issues/297)) ([09c64d1](https://github.com/rudderlabs/sqlconnect-go/commit/09c64d1354bc778bcc02579f6c647a03f45f73c0))
+* **deps:** bump cloud.google.com/go from 0.118.1 to 0.120.0 ([#303](https://github.com/rudderlabs/sqlconnect-go/issues/303)) ([5ad0650](https://github.com/rudderlabs/sqlconnect-go/commit/5ad065029230bdf6ef6d1670957c26f18eb6ed78))
+* **deps:** bump github.com/aws/aws-sdk-go-v2 from 1.36.2 to 1.36.3 ([#292](https://github.com/rudderlabs/sqlconnect-go/issues/292)) ([8a89143](https://github.com/rudderlabs/sqlconnect-go/commit/8a89143a4560d31ed0cf050470dea0a125ec1c62))
+* **deps:** bump github.com/aws/aws-sdk-go-v2/service/sts from 1.33.15 to 1.33.18 ([#310](https://github.com/rudderlabs/sqlconnect-go/issues/310)) ([18fd372](https://github.com/rudderlabs/sqlconnect-go/commit/18fd372646dc28cc49e481063eb6d24bf866f794))
+* **deps:** bump github.com/dlclark/regexp2 from 1.11.4 to 1.11.5 ([#284](https://github.com/rudderlabs/sqlconnect-go/issues/284)) ([71dd661](https://github.com/rudderlabs/sqlconnect-go/commit/71dd661fb50c978abbdf179351d52228651eeb00))
+* **deps:** bump github.com/go-jose/go-jose/v3 from 3.0.3 to 3.0.4 in the go_modules group ([#290](https://github.com/rudderlabs/sqlconnect-go/issues/290)) ([154ffcd](https://github.com/rudderlabs/sqlconnect-go/commit/154ffcd0e92d2aba219f2da80ee652e005426a77))
+* **deps:** bump golang.org/x/crypto from 0.33.0 to 0.36.0 ([#302](https://github.com/rudderlabs/sqlconnect-go/issues/302)) ([77af90e](https://github.com/rudderlabs/sqlconnect-go/commit/77af90e76c85e2b24d51388ae0be980b3b841f50))
+
 ## [1.19.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.18.1...v1.19.0) (2025-03-28)
 
 
