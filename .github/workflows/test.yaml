@@ -74,7 +74,7 @@ jobs:
           path: profile.out
   coverage:
     name: coverage
-    runs-on: 'ubuntu-20.04'
+    runs-on: 'ubuntu-latest'
     needs:
       - tests
     steps:
