@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.20.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.20.0...v1.20.1) (2025-04-30)
+
+
+### Miscellaneous
+
+* **deps:** bump github.com/aws/aws-sdk-go-v2/config from 1.29.7 to 1.29.14 ([#320](https://github.com/rudderlabs/sqlconnect-go/issues/320)) ([5dbd481](https://github.com/rudderlabs/sqlconnect-go/commit/5dbd48132ff3f8653c17f25aa9d149e062052bf3))
+* **deps:** bump github.com/ory/dockertest/v3 from 3.11.0 to 3.12.0 ([#314](https://github.com/rudderlabs/sqlconnect-go/issues/314)) ([cfe2a62](https://github.com/rudderlabs/sqlconnect-go/commit/cfe2a62e7cbb55caf1ea096947c5fecb1a955151))
+* **deps:** bump golang.org/x/crypto from 0.36.0 to 0.37.0 ([#313](https://github.com/rudderlabs/sqlconnect-go/issues/313)) ([6b6527d](https://github.com/rudderlabs/sqlconnect-go/commit/6b6527dfd7e855257a9c14b216fcb4e53082bf61))
+* **deps:** bump the go_modules group with 2 updates ([#317](https://github.com/rudderlabs/sqlconnect-go/issues/317)) ([062e9f6](https://github.com/rudderlabs/sqlconnect-go/commit/062e9f645ed2785794427e0ed56930a846430c65))
+
 ## [1.20.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.19.0...v1.20.0) (2025-04-09)
 
 
