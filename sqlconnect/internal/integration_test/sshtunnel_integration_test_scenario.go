@@ -96,7 +96,7 @@ func newSshServer(t *testing.T, port int) (server *testsshserver, privateKey []b
 	}()
 
 	require.Eventually(t, func() bool {
-		con, err := net.Dial("tcp", server.Server.Addr)
+		con, err := net.Dial("tcp", server.Addr)
 		if err != nil {
 			return false
 		}

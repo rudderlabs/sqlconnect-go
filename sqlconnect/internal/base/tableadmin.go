@@ -157,11 +157,12 @@ func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) 
 	}
 	var otherCol sqlconnect.NilAny
 	for i := 0; i < len(cols); i++ {
-		if i == nameColIdx {
+		switch i {
+		case nameColIdx:
 			scanValues[i] = &column.Name
-		} else if i == typeColIdx {
+		case typeColIdx:
 			scanValues[i] = &column.RawType
-		} else {
+		default:
 			scanValues[i] = &otherCol
 		}
 	}
@@ -189,7 +190,7 @@ func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) 
 // ListColumnsForSqlQuery returns a list of columns for the given sql query
 func (db *DB) ListColumnsForSqlQuery(ctx context.Context, sql string) ([]sqlconnect.ColumnRef, error) {
 	var res []sqlconnect.ColumnRef
-	rows, err := db.DB.QueryContext(ctx, sql) // nolint:rowserrcheck
+	rows, err := db.QueryContext(ctx, sql) // nolint:rowserrcheck
 	if err != nil {
 		return nil, fmt.Errorf("querying list columns for sql query: %w", err)
 	}
