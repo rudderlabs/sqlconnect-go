@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
-	"github.com/trinodb/trino-go-client/trino"
-	_ "github.com/trinodb/trino-go-client/trino" // trino driver
+	"github.com/trinodb/trino-go-client/trino"   //nolint:staticcheck
+	_ "github.com/trinodb/trino-go-client/trino" //nolint:staticcheck trino driver
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
