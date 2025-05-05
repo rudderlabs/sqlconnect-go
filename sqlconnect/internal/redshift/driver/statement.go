@@ -10,11 +10,11 @@ type redshiftStatement struct {
 	query      string
 }
 
-func (_ *redshiftStatement) Close() error {
+func (*redshiftStatement) Close() error {
 	return nil
 }
 
-func (_ *redshiftStatement) NumInput() int {
+func (*redshiftStatement) NumInput() int {
 	return -1
 }
 
@@ -26,10 +26,10 @@ func (s *redshiftStatement) QueryContext(ctx context.Context, args []driver.Name
 	return s.connection.QueryContext(ctx, s.query, args)
 }
 
-func (_ *redshiftStatement) Exec(args []driver.Value) (driver.Result, error) {
+func (*redshiftStatement) Exec(args []driver.Value) (driver.Result, error) {
 	return nil, driver.ErrSkip
 }
 
-func (_ *redshiftStatement) Query(args []driver.Value) (driver.Rows, error) {
+func (*redshiftStatement) Query(args []driver.Value) (driver.Rows, error) {
 	return nil, driver.ErrSkip
 }
