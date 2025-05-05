@@ -26,7 +26,7 @@ require (
 	github.com/rudderlabs/sql-tunnels v0.1.7
 	github.com/samber/lo v1.49.1
 	github.com/sirupsen/logrus v1.9.3
-	github.com/snowflakedb/gosnowflake v1.13.2
+	github.com/snowflakedb/gosnowflake v1.13.3
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
@@ -77,7 +77,7 @@ require (
 	github.com/aws/smithy-go v1.22.2 // indirect
 	github.com/containerd/continuity v0.4.5 // indirect
 	github.com/coreos/go-oidc/v3 v3.5.0 // indirect
-	github.com/danieljoos/wincred v1.1.2 // indirect
+	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
 	github.com/docker/cli v27.4.1+incompatible // indirect
