@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.20.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.20.1...v1.20.2) (2025-05-05)
+
+
+### Miscellaneous
+
+* **deps:** bump cloud.google.com/go/bigquery from 1.66.2 to 1.67.0 ([#312](https://github.com/rudderlabs/sqlconnect-go/issues/312)) ([cc0311b](https://github.com/rudderlabs/sqlconnect-go/commit/cc0311bed771b9817ff42886a3164f702f7c9866))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.46.2 to 0.49.0 ([#321](https://github.com/rudderlabs/sqlconnect-go/issues/321)) ([7b792c5](https://github.com/rudderlabs/sqlconnect-go/commit/7b792c58ba236f77fd406caa119371e7256e2ac9))
+* **deps:** bump github.com/snowflakedb/gosnowflake from 1.13.1 to 1.13.2 ([#319](https://github.com/rudderlabs/sqlconnect-go/issues/319)) ([9a32a38](https://github.com/rudderlabs/sqlconnect-go/commit/9a32a387ae10247c8b348004dd85c4f50a852b43))
+* **deps:** bump github.com/snowflakedb/gosnowflake from 1.13.1 to 1.13.3 in the go_modules group ([#322](https://github.com/rudderlabs/sqlconnect-go/issues/322)) ([a7fc353](https://github.com/rudderlabs/sqlconnect-go/commit/a7fc35387244b9faf9a21607c3cff7bbbc63c9e9))
+* **deps:** bump golangci/golangci-lint-action from 6 to 7 ([#307](https://github.com/rudderlabs/sqlconnect-go/issues/307)) ([5ffd8bb](https://github.com/rudderlabs/sqlconnect-go/commit/5ffd8bb10eec9640088f9b67a7aff6960ddd504e))
+
 ## [1.20.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.20.0...v1.20.1) (2025-04-30)
 
 
