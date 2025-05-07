@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.20.3](https://github.com/rudderlabs/sqlconnect-go/compare/v1.20.2...v1.20.3) (2025-05-07)
+
+
+### Miscellaneous
+
+* **deps:** bump cloud.google.com/go from 0.120.0 to 0.121.0 ([#326](https://github.com/rudderlabs/sqlconnect-go/issues/326)) ([8d0f45b](https://github.com/rudderlabs/sqlconnect-go/commit/8d0f45b2f8f328165bb06b92b5c9d5159b31f7d7))
+* **deps:** bump github.com/samber/lo from 1.49.1 to 1.50.0 ([#327](https://github.com/rudderlabs/sqlconnect-go/issues/327)) ([8a5f218](https://github.com/rudderlabs/sqlconnect-go/commit/8a5f218ff9b376fcf3230d0e3e9dc47ed4057406))
+* **deps:** bump github.com/snowflakedb/gosnowflake from 1.13.3 to 1.14.0 ([#325](https://github.com/rudderlabs/sqlconnect-go/issues/325)) ([cad7ae0](https://github.com/rudderlabs/sqlconnect-go/commit/cad7ae08bd2b08b031fe6a29ef5dd41a972c1f22))
+* **deps:** bump google.golang.org/api from 0.229.0 to 0.231.0 ([#324](https://github.com/rudderlabs/sqlconnect-go/issues/324)) ([8cb65e0](https://github.com/rudderlabs/sqlconnect-go/commit/8cb65e0d83f8234e507be755eedbd8b015b9bd7b))
+
 ## [1.20.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.20.1...v1.20.2) (2025-05-05)
 
 
