@@ -14,7 +14,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.33.1
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.19
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/databricks/databricks-sql-go v1.6.1
+	github.com/databricks/databricks-sql-go v1.7.1
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/gliderlabs/ssh v0.3.8
 	github.com/go-sql-driver/mysql v1.8.1
