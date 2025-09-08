@@ -39,7 +39,7 @@ jobs:
             exclude: sqlconnect-go/sqlconnect/internal/(bigquery|databricks|mysql|postgres|redshift|snowflake|trino)
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: '1.24'
           check-latest: true
@@ -81,7 +81,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: 1.24
           check-latest: true
