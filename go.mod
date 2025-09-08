@@ -30,7 +30,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
-	github.com/trinodb/trino-go-client v0.323.0
+	github.com/trinodb/trino-go-client v0.328.0
 	github.com/youmark/pkcs8 v0.0.0-20240424034433-3c2c7870ae76
 	golang.org/x/crypto v0.41.0
 	golang.org/x/sync v0.16.0
@@ -128,6 +128,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runc v1.3.0 // indirect
 	github.com/phayes/freeport v0.0.0-20220201140144-74d24b5ae9f5 // indirect
+	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
