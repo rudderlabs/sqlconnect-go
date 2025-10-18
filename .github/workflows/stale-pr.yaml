@@ -13,6 +13,11 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
       - uses: actions/stale@v9
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -26,6 +31,11 @@ jobs:
       name: cleanup old branches
       runs-on: ubuntu-latest
       steps:
+        - name: Harden the runner (Audit all outbound calls)
+          uses: step-security/harden-runner@v2
+          with:
+            egress-policy: audit
+
         - name: Checkout repository
           uses: actions/checkout@v5
         - name: Run delete-old-branches-action
