@@ -38,6 +38,11 @@ jobs:
           - package: sqlconnect/internal
             exclude: sqlconnect-go/sqlconnect/internal/(bigquery|databricks|mysql|postgres|redshift|snowflake|trino)
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
@@ -78,6 +83,11 @@ jobs:
     needs:
       - tests
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@v5
       - name: Setup Go
@@ -103,6 +113,11 @@ jobs:
     needs:
       - tests
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
       - uses: re-actors/alls-green@v1.2.2
         with:
           jobs: ${{ toJSON(needs) }}
