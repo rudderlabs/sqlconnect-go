@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.21.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.21.0...v1.21.1) (2025-11-06)
+
+
+### Miscellaneous
+
+* apply security best practices from step security ([#376](https://github.com/rudderlabs/sqlconnect-go/issues/376)) ([ad99ae2](https://github.com/rudderlabs/sqlconnect-go/commit/ad99ae2dd0f63ecfb16797197f542bffd31f38be))
+* apply security best practices from step security ([#383](https://github.com/rudderlabs/sqlconnect-go/issues/383)) ([9d44cc8](https://github.com/rudderlabs/sqlconnect-go/commit/9d44cc813ad34753a9f24bcf8c49c4a42ca77e05))
+
 ## [1.21.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.20.3...v1.21.0) (2025-09-02)
 
 
