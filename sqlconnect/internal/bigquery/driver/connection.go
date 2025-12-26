@@ -5,16 +5,18 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/iterator"
 )
 
 type bigQueryConnection struct {
-	ctx    context.Context
-	client *bigquery.Client
-	closed bool
-	bad    bool
+	ctx         context.Context
+	client      *bigquery.Client
+	closed      bool
+	bad         bool
+	retryConfig *RetryConfig
 }
 
 func (connection *bigQueryConnection) GetContext() context.Context {

@@ -43,7 +43,20 @@ func NewDBWithTokenSource(configJSON json.RawMessage, tokenSource oauth2.TokenSo
 		return nil, errCredentialsWithTokenSource
 	}
 
-	db := sql.OpenDB(driver.NewConnector(config.ProjectID, selectClientOptions(config, tokenSource)...))
+	// Build retry configuration from config.
+	var retryConfig *driver.RetryConfig
+	if config.MaxRetries != nil || config.MaxRetryDuration != nil {
+		retryConfig = &driver.RetryConfig{
+			MaxRetries:       config.MaxRetries,
+			MaxRetryDuration: config.GetMaxRetryDuration(),
+		}
+	}
+
+	db := sql.OpenDB(driver.NewConnectorWithRetry(
+		config.ProjectID,
+		retryConfig,
+		selectClientOptions(config, tokenSource)...,
+	))
 
 	return &DB{
 		DB: base.NewDB(
