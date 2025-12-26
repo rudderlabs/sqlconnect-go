@@ -41,7 +41,15 @@ func (statement *bigQueryStatement) ExecContext(ctx context.Context, args []driv
 		return nil, err
 	}
 
-	rowIterator, err := query.Read(ctx)
+	// Apply retry timeout if configured
+	execCtx := ctx
+	if statement.connection.retryConfig != nil && statement.connection.retryConfig.MaxRetryDuration != nil {
+		var cancel context.CancelFunc
+		execCtx, cancel = context.WithTimeout(ctx, *statement.connection.retryConfig.MaxRetryDuration)
+		defer cancel()
+	}
+
+	rowIterator, err := query.Read(execCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +63,15 @@ func (statement *bigQueryStatement) QueryContext(ctx context.Context, args []dri
 		return nil, err
 	}
 
-	rowIterator, err := query.Read(ctx)
+	// Apply retry timeout if configured
+	execCtx := ctx
+	if statement.connection.retryConfig != nil && statement.connection.retryConfig.MaxRetryDuration != nil {
+		var cancel context.CancelFunc
+		execCtx, cancel = context.WithTimeout(ctx, *statement.connection.retryConfig.MaxRetryDuration)
+		defer cancel()
+	}
+
+	rowIterator, err := query.Read(execCtx)
 	if err != nil {
 		return nil, err
 	}
