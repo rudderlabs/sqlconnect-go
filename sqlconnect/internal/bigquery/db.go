@@ -28,8 +28,18 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		return nil, err
 	}
 
-	db := sql.OpenDB(driver.NewConnector(
+	// Build retry configuration from config
+	var retryConfig *driver.RetryConfig
+	if config.MaxRetries != nil || config.MaxRetryDuration != nil {
+		retryConfig = &driver.RetryConfig{
+			MaxRetries:       config.MaxRetries,
+			MaxRetryDuration: config.GetMaxRetryDuration(),
+		}
+	}
+
+	db := sql.OpenDB(driver.NewConnectorWithRetry(
 		config.ProjectID,
+		retryConfig,
 		option.WithCredentialsJSON([]byte(config.CredentialsJSON))),
 	)
 
