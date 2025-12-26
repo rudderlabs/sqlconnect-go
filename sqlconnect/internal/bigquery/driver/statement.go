@@ -41,20 +41,32 @@ func (statement *bigQueryStatement) ExecContext(ctx context.Context, args []driv
 		return nil, err
 	}
 
-	// Apply retry timeout if configured
+	// Determine execution context and retry options
 	execCtx := ctx
-	if statement.connection.retryConfig != nil && statement.connection.retryConfig.MaxRetryDuration != nil {
+	retryOpts := RetryOptionsFromConfig(statement.connection.retryConfig)
+
+	// Apply max duration as context timeout if configured
+	if retryOpts.MaxDuration > 0 {
 		var cancel context.CancelFunc
-		execCtx, cancel = context.WithTimeout(ctx, *statement.connection.retryConfig.MaxRetryDuration)
+		execCtx, cancel = context.WithTimeout(ctx, retryOpts.MaxDuration)
 		defer cancel()
 	}
 
-	rowIterator, err := query.Read(execCtx)
+	// Execute with application-level retry for rate limit errors
+	var result *bigQueryResult
+	err = ExecuteWithRetry(execCtx, retryOpts, func() error {
+		rowIterator, execErr := query.Read(execCtx)
+		if execErr != nil {
+			return execErr
+		}
+		result = &bigQueryResult{rowIterator}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &bigQueryResult{rowIterator}, nil
+	return result, nil
 }
 
 func (statement *bigQueryStatement) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
@@ -63,22 +75,34 @@ func (statement *bigQueryStatement) QueryContext(ctx context.Context, args []dri
 		return nil, err
 	}
 
-	// Apply retry timeout if configured
+	// Determine execution context and retry options
 	execCtx := ctx
-	if statement.connection.retryConfig != nil && statement.connection.retryConfig.MaxRetryDuration != nil {
+	retryOpts := RetryOptionsFromConfig(statement.connection.retryConfig)
+
+	// Apply max duration as context timeout if configured
+	if retryOpts.MaxDuration > 0 {
 		var cancel context.CancelFunc
-		execCtx, cancel = context.WithTimeout(ctx, *statement.connection.retryConfig.MaxRetryDuration)
+		execCtx, cancel = context.WithTimeout(ctx, retryOpts.MaxDuration)
 		defer cancel()
 	}
 
-	rowIterator, err := query.Read(execCtx)
+	// Execute with application-level retry for rate limit errors
+	var rows *bigQueryRows
+	err = ExecuteWithRetry(execCtx, retryOpts, func() error {
+		rowIterator, execErr := query.Read(execCtx)
+		if execErr != nil {
+			return execErr
+		}
+		rows = &bigQueryRows{
+			source: createSourceFromRowIterator(rowIterator),
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &bigQueryRows{
-		source: createSourceFromRowIterator(rowIterator),
-	}, nil
+	return rows, nil
 }
 
 func (statement bigQueryStatement) Exec(args []driver.Value) (driver.Result, error) {
