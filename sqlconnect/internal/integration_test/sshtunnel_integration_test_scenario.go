@@ -104,5 +104,5 @@ func newSshServer(t *testing.T, port int) (server *testsshserver, privateKey []b
 		return true
 	}, 1*time.Second, 10*time.Millisecond)
 
-	return
+	return server, privateKey
 }
