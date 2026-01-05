@@ -289,8 +289,6 @@ github.com/moby/term v0.5.2/go.mod h1:d3djjFCrjnB+fl8NJux+EJzu0msscUP+f8it8hPkFL
 github.com/mtibben/percent v0.2.1 h1:5gssi8Nqo8QU/r2pynCm+hBQHpkB/uNK7BJCFogWdzs=
 github.com/mtibben/percent v0.2.1/go.mod h1:KG9uO+SZkUp+VkRHsCdYQV3XSZrrSpR3O9ibNBTZrns=
 github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e/go.mod h1:zD1mROLANZcx1PVRCS0qkT7pwLkGfwJo4zjcN/Tysno=
-github.com/nishant-rudderstack/google-cloud-go v0.123.0-rudder.1 h1:IorzIIUYwQVbKh4h9L3+8wH6mIV8Adg7accx5mF3224=
-github.com/nishant-rudderstack/google-cloud-go v0.123.0-rudder.1/go.mod h1:pXDOGjbzcL8B3AZuXGJlAVjfSxulpycM0rFlRyNH9DM=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
@@ -317,6 +315,8 @@ github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7
 github.com/rs/xid v1.4.0/go.mod h1:trrq9SKmegXys3aeAKXMUTdJsYXVwGY3RLcfgqegfbg=
 github.com/rs/zerolog v1.28.0 h1:MirSo27VyNi7RJYP3078AA1+Cyzd2GB66qy3aUHvsWY=
 github.com/rs/zerolog v1.28.0/go.mod h1:NILgTygv/Uej1ra5XxGf82ZFSLk58MFGAUS2o6usyD0=
+github.com/rudderlabs/google-cloud-go v0.123.0-rudder.1 h1:Q66THiNMdyRA6DQZf8XvS9JdIXy+vm5yog+jp6s709s=
+github.com/rudderlabs/google-cloud-go v0.123.0-rudder.1/go.mod h1:pXDOGjbzcL8B3AZuXGJlAVjfSxulpycM0rFlRyNH9DM=
 github.com/rudderlabs/goqu/v10 v10.3.1 h1:rnfX+b4EwBWQ2UQfIGeEW299JBBkK5biEbnf7Kq4/Gg=
 github.com/rudderlabs/goqu/v10 v10.3.1/go.mod h1:LH2vI5gGHBxEQuESqFyk5ZA2anGINc8o25hbidDWOYw=
 github.com/rudderlabs/rudder-go-kit v0.71.0 h1:MVW0Qpx0IuAIL4LUy3jsribwbSabMnvLShvBA9rNFBI=

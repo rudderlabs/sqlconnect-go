@@ -167,4 +167,4 @@ require (
 	gotest.tools/gotestsum v1.8.2 // indirect
 )
 
-replace cloud.google.com/go => github.com/nishant-rudderstack/google-cloud-go v0.123.0-rudder.1
+replace cloud.google.com/go => github.com/rudderlabs/google-cloud-go v0.123.0-rudder.1
