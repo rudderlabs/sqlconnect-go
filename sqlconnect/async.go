@@ -78,7 +78,7 @@ func QueryAsync[T any](ctx context.Context, db QueryDB, mapper RowMapper[T], que
 			s.Send(ValueOrError[T]{Err: fmt.Errorf("iterating rows: %w", err)})
 		}
 	}()
-	return
+	return ch, leave
 }
 
 // ValueOrError represents a value or an error

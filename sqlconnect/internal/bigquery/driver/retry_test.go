@@ -141,7 +141,7 @@ func TestExecuteWithRetry_MaxDurationExceeded(t *testing.T) {
 	}
 
 	opts := DefaultRetryOptions()
-	opts.MaxRetries = 100               // High limit
+	opts.MaxRetries = 100                    // High limit
 	opts.MaxDuration = 50 * time.Millisecond // Short duration
 	opts.InitialBackoff = 20 * time.Millisecond
 	opts.Jitter = false
@@ -279,4 +279,6 @@ func TestExecuteWithRetry_HTTP5xxRetry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2, callCount, "should retry 503 errors")
 }
+
+
 
