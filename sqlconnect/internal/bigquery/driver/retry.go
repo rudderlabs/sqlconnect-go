@@ -12,7 +12,7 @@ const (
 	DefaultInitialBackoff = 1 * time.Second
 	DefaultMaxBackoff     = 32 * time.Second
 	DefaultMultiplier     = 2.0
-	DefaultMaxRetries     = 10 // Unlike google-cloud-go which has unlimited retries
+	DefaultMaxRetries     = 0 // 0 = unlimited, matching google-cloud-go's default behavior
 )
 
 // RetryOptions configures the retry behavior for BigQuery operations.
