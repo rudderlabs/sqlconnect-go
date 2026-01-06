@@ -167,3 +167,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/gotestsum v1.8.2 // indirect
 )
+
+// TODO: bump these to the rebased rudderlabs/google-cloud-go tags once
+// rudderlabs/google-cloud-go#48 is merged and new -rudder.N tags are cut.
+replace cloud.google.com/go => github.com/rudderlabs/google-cloud-go v0.123.0-rudder.4
+
+replace cloud.google.com/go/bigquery => github.com/rudderlabs/google-cloud-go/bigquery v1.69.0-rudder.3
