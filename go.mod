@@ -5,7 +5,7 @@ go 1.24.2
 replace github.com/gocql/gocql => github.com/scylladb/gocql v1.14.4
 
 require (
-	cloud.google.com/go v0.121.0
+	cloud.google.com/go v0.121.6
 	cloud.google.com/go/bigquery v1.69.0
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/aws/aws-sdk-go-v2 v1.36.3
@@ -166,4 +166,6 @@ require (
 	gotest.tools/gotestsum v1.8.2 // indirect
 )
 
-replace cloud.google.com/go => github.com/rudderlabs/google-cloud-go v0.123.0-rudder.1
+replace cloud.google.com/go => github.com/rudderlabs/google-cloud-go v0.123.0-rudder.2
+
+replace cloud.google.com/go/bigquery => github.com/rudderlabs/google-cloud-go/bigquery v1.69.0-rudder.1
