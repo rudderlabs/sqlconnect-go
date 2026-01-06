@@ -235,7 +235,7 @@ func TestDefaultRetryOptions(t *testing.T) {
 	assert.Equal(t, 1*time.Second, opts.InitialBackoff)
 	assert.Equal(t, 32*time.Second, opts.MaxBackoff)
 	assert.Equal(t, 2.0, opts.Multiplier)
-	assert.Equal(t, 10, opts.MaxRetries)
+	assert.Equal(t, 0, opts.MaxRetries)
 	assert.True(t, opts.Jitter)
 	assert.NotNil(t, opts.RetryableFunc)
 }

@@ -34,20 +34,17 @@ type bigQueryConnector struct {
 }
 
 func (c *bigQueryConnector) Connect(ctx context.Context) (driver.Conn, error) {
-	client, err := bigquery.NewClient(ctx, c.projectID, c.opts...)
-	if err != nil {
-		return nil, err
+	// Build client options, including maxRetries if configured
+	opts := c.opts
+	if c.retryConfig != nil && c.retryConfig.MaxRetries != nil {
+		// Use google-cloud-go2's WithMaxRetries to limit internal retry attempts
+		// This ensures google-cloud-go doesn't retry infinitely on rate limit errors
+		opts = append(opts, bigquery.WithMaxRetries(*c.retryConfig.MaxRetries))
 	}
 
-	// Apply retry configuration if provided
-	if c.retryConfig != nil {
-		if c.retryConfig.MaxRetries != nil {
-			// Note: BigQuery client doesn't expose direct retry config via public API
-			// The retry settings are controlled via gax.CallSettings which are internal
-			// This configuration will be passed to the connection and used when
-			// creating queries with QueryConfig
-			// For now, we store it and will apply it at query execution time
-		}
+	client, err := bigquery.NewClient(ctx, c.projectID, opts...)
+	if err != nil {
+		return nil, err
 	}
 
 	return &bigQueryConnection{
