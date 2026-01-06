@@ -209,7 +209,7 @@ func TestRetryOptionsFromConfig(t *testing.T) {
 		opts := RetryOptionsFromConfig(nil)
 		assert.Equal(t, DefaultInitialBackoff, opts.InitialBackoff)
 		assert.Equal(t, DefaultMaxBackoff, opts.MaxBackoff)
-		assert.Equal(t, DefaultMaxRetries, opts.MaxRetries)
+		assert.Equal(t, 0, opts.MaxRetries) // 0 = unlimited, matching google-cloud-go
 	})
 
 	t.Run("config overrides defaults", func(t *testing.T) {
