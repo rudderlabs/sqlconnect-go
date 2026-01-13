@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -24,14 +25,29 @@ func (c *Config) Parse(configJSON json.RawMessage) error {
 	return json.Unmarshal(configJSON, c)
 }
 
+// Validate validates the config fields
+func (c *Config) Validate() error {
+	if c.MaxRetries != nil && *c.MaxRetries < 0 {
+		return fmt.Errorf("maxRetries must be non-negative, got %d", *c.MaxRetries)
+	}
+	if c.MaxRetryDuration != nil {
+		if _, err := time.ParseDuration(*c.MaxRetryDuration); err != nil {
+			return fmt.Errorf("maxRetryDuration is not a valid duration (e.g., \"10m\", \"30s\"): %w", err)
+		}
+	}
+	return nil
+}
+
 // GetMaxRetryDuration parses the MaxRetryDuration string into a time.Duration
-// Returns nil if MaxRetryDuration is not set or invalid
+// Returns nil if MaxRetryDuration is not set
+// Note: Call Validate() first to ensure the duration string is valid
 func (c *Config) GetMaxRetryDuration() *time.Duration {
 	if c.MaxRetryDuration == nil {
 		return nil
 	}
 	duration, err := time.ParseDuration(*c.MaxRetryDuration)
 	if err != nil {
+		// Should not happen if Validate() was called
 		return nil
 	}
 	return &duration

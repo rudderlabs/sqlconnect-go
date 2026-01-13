@@ -28,6 +28,11 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		return nil, err
 	}
 
+	// Validate configuration
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid bigquery config: %w", err)
+	}
+
 	// Build retry configuration from config
 	var retryConfig *driver.RetryConfig
 	if config.MaxRetries != nil || config.MaxRetryDuration != nil {
