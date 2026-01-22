@@ -35,10 +35,11 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 
 	// Build retry configuration from config
 	var retryConfig *driver.RetryConfig
-	if config.MaxRetries != nil || config.MaxRetryDuration != nil {
+	if config.MaxRetries != nil || config.QueryRetryAttempts != nil || config.QueryRetryDuration != nil {
 		retryConfig = &driver.RetryConfig{
-			MaxRetries:       config.MaxRetries,
-			MaxRetryDuration: config.GetMaxRetryDuration(),
+			MaxRetries:         config.MaxRetries,
+			QueryRetryAttempts: config.QueryRetryAttempts,
+			QueryRetryDuration: config.GetQueryRetryDuration(),
 		}
 	}
 

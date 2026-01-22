@@ -313,10 +313,10 @@ github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7
 github.com/rs/xid v1.4.0/go.mod h1:trrq9SKmegXys3aeAKXMUTdJsYXVwGY3RLcfgqegfbg=
 github.com/rs/zerolog v1.28.0 h1:MirSo27VyNi7RJYP3078AA1+Cyzd2GB66qy3aUHvsWY=
 github.com/rs/zerolog v1.28.0/go.mod h1:NILgTygv/Uej1ra5XxGf82ZFSLk58MFGAUS2o6usyD0=
-github.com/rudderlabs/google-cloud-go v0.123.0-rudder.2 h1:vXfoUZUfc+guR4dJNR2G58VhfjSn+PAwWTFlB01D8WA=
-github.com/rudderlabs/google-cloud-go v0.123.0-rudder.2/go.mod h1:xBoMV08QcqUGuPW65Qfm1o9Y4zKZBpGS+7bImXLTAZU=
-github.com/rudderlabs/google-cloud-go/bigquery v1.69.0-rudder.1 h1:xOF7MbmF65WHMgM0vSY2nl70DNQ4xUJOsHY+DHMplKY=
-github.com/rudderlabs/google-cloud-go/bigquery v1.69.0-rudder.1/go.mod h1:T63C8f5vmqbQUxcQI3hiCK2pDOD/C+a52bVga8EemNk=
+github.com/rudderlabs/google-cloud-go v0.123.0-rudder.3 h1:n18CaDmC8u/GKlm/+jLYvn2bPtXsBPK7KgrpfR791Ck=
+github.com/rudderlabs/google-cloud-go v0.123.0-rudder.3/go.mod h1:pXDOGjbzcL8B3AZuXGJlAVjfSxulpycM0rFlRyNH9DM=
+github.com/rudderlabs/google-cloud-go/bigquery v1.69.0-rudder.2 h1:2tZ2Ebqi63oaHLPnwTM3jaBdw6PhToa+pxlbku+ytBk=
+github.com/rudderlabs/google-cloud-go/bigquery v1.69.0-rudder.2/go.mod h1:ZO0XQswr9SesKCPBOzmhLU8GpjyjZB7zjoZovF7tCFY=
 github.com/rudderlabs/goqu/v10 v10.3.1 h1:rnfX+b4EwBWQ2UQfIGeEW299JBBkK5biEbnf7Kq4/Gg=
 github.com/rudderlabs/goqu/v10 v10.3.1/go.mod h1:LH2vI5gGHBxEQuESqFyk5ZA2anGINc8o25hbidDWOYw=
 github.com/rudderlabs/rudder-go-kit v0.71.0 h1:MVW0Qpx0IuAIL4LUy3jsribwbSabMnvLShvBA9rNFBI=
