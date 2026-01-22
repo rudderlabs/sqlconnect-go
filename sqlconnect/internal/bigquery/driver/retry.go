@@ -62,16 +62,18 @@ func DefaultRetryOptions() RetryOptions {
 }
 
 // RetryOptionsFromConfig creates RetryOptions from RetryConfig.
+// Note: This uses the application-level retry config (QueryRetryAttempts, QueryRetryDuration),
+// not the driver-level MaxRetries which is passed to google-cloud-go.
 func RetryOptionsFromConfig(config *RetryConfig) RetryOptions {
 	opts := DefaultRetryOptions()
 	if config == nil {
 		return opts
 	}
-	if config.MaxRetries != nil {
-		opts.MaxRetries = *config.MaxRetries
+	if config.QueryRetryAttempts != nil {
+		opts.MaxRetries = *config.QueryRetryAttempts
 	}
-	if config.MaxRetryDuration != nil {
-		opts.MaxDuration = *config.MaxRetryDuration
+	if config.QueryRetryDuration != nil {
+		opts.MaxDuration = *config.QueryRetryDuration
 	}
 	return opts
 }
@@ -181,6 +183,3 @@ func ExecuteWithRetry(ctx context.Context, opts RetryOptions, fn func() error) e
 func ExecuteWithDefaultRetry(ctx context.Context, fn func() error) error {
 	return ExecuteWithRetry(ctx, DefaultRetryOptions(), fn)
 }
-
-
-

@@ -11,8 +11,12 @@ import (
 
 // RetryConfig contains retry configuration for BigQuery API calls
 type RetryConfig struct {
-	MaxRetries       *int
-	MaxRetryDuration *time.Duration
+	// Driver-level: passed to google-cloud-go via bigquery.WithMaxRetries()
+	MaxRetries *int
+
+	// Application-level: used by sqlconnect-go's ExecuteWithRetry
+	QueryRetryAttempts *int
+	QueryRetryDuration *time.Duration
 }
 
 func NewConnector(projectID string, opts ...option.ClientOption) driver.Connector {

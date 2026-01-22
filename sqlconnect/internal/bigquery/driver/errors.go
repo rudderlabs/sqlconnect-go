@@ -164,6 +164,3 @@ func GetErrorReason(err error) string {
 	}
 	return ""
 }
-
-
-

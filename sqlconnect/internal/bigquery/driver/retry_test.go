@@ -212,12 +212,12 @@ func TestRetryOptionsFromConfig(t *testing.T) {
 		assert.Equal(t, 0, opts.MaxRetries) // 0 = unlimited, matching google-cloud-go
 	})
 
-	t.Run("config overrides defaults", func(t *testing.T) {
-		maxRetries := 5
-		maxDuration := 10 * time.Minute
+	t.Run("config with app-level retry settings", func(t *testing.T) {
+		queryRetryAttempts := 5
+		queryRetryDuration := 10 * time.Minute
 		config := &RetryConfig{
-			MaxRetries:       &maxRetries,
-			MaxRetryDuration: &maxDuration,
+			QueryRetryAttempts: &queryRetryAttempts,
+			QueryRetryDuration: &queryRetryDuration,
 		}
 
 		opts := RetryOptionsFromConfig(config)
@@ -227,6 +227,35 @@ func TestRetryOptionsFromConfig(t *testing.T) {
 		assert.Equal(t, DefaultInitialBackoff, opts.InitialBackoff)
 		assert.Equal(t, DefaultMaxBackoff, opts.MaxBackoff)
 	})
+
+	t.Run("driver-level MaxRetries is not used for app-level retry", func(t *testing.T) {
+		// MaxRetries is for driver-level (google-cloud-go), not app-level
+		driverMaxRetries := 10
+		config := &RetryConfig{
+			MaxRetries: &driverMaxRetries,
+			// QueryRetryAttempts not set
+		}
+
+		opts := RetryOptionsFromConfig(config)
+		// App-level retry should use default (0 = unlimited), not driver-level value
+		assert.Equal(t, 0, opts.MaxRetries)
+	})
+
+	t.Run("config with both driver and app-level settings", func(t *testing.T) {
+		driverMaxRetries := 10
+		queryRetryAttempts := 5
+		queryRetryDuration := 5 * time.Minute
+		config := &RetryConfig{
+			MaxRetries:         &driverMaxRetries,
+			QueryRetryAttempts: &queryRetryAttempts,
+			QueryRetryDuration: &queryRetryDuration,
+		}
+
+		opts := RetryOptionsFromConfig(config)
+		// Should use QueryRetryAttempts for app-level retry
+		assert.Equal(t, 5, opts.MaxRetries)
+		assert.Equal(t, 5*time.Minute, opts.MaxDuration)
+	})
 }
 
 func TestDefaultRetryOptions(t *testing.T) {
@@ -235,7 +264,7 @@ func TestDefaultRetryOptions(t *testing.T) {
 	assert.Equal(t, 1*time.Second, opts.InitialBackoff)
 	assert.Equal(t, 32*time.Second, opts.MaxBackoff)
 	assert.Equal(t, 2.0, opts.Multiplier)
-	assert.Equal(t, 10, opts.MaxRetries)
+	assert.Equal(t, 0, opts.MaxRetries) // 0 = unlimited by default
 	assert.True(t, opts.Jitter)
 	assert.NotNil(t, opts.RetryableFunc)
 }
@@ -279,6 +308,3 @@ func TestExecuteWithRetry_HTTP5xxRetry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2, callCount, "should retry 503 errors")
 }
-
-
-
