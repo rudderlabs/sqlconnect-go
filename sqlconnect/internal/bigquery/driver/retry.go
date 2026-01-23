@@ -3,8 +3,9 @@ package driver
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"time"
+
+	"github.com/cenkalti/backoff/v4"
 )
 
 // Default retry parameters (aligned with google-cloud-go/bigquery defaults)
@@ -83,15 +84,15 @@ func RetryOptionsFromConfig(config *RetryConfig) RetryOptions {
 // automatically retry "invalidQuery" errors, which includes table metadata
 // rate limits.
 //
-// The function implements exponential backoff with optional jitter:
+// Uses cenkalti/backoff for exponential backoff with jitter:
 // - Backoff sequence: 1s → 2s → 4s → 8s → 16s → 32s → 32s → ...
-// - Jitter: randomizes actual delay to 50-100% of calculated backoff
+// - Jitter: randomizes actual delay (default: 0.5 randomization factor)
 //
 // Retry stops when:
 // - Operation succeeds (returns nil)
-// - Non-retryable error occurs (returns that error)
-// - MaxRetries exceeded (returns wrapped error)
-// - MaxDuration exceeded (returns wrapped error)
+// - Non-retryable error occurs (returns that error immediately)
+// - MaxRetries exceeded (returns last error)
+// - MaxDuration exceeded (returns last error)
 // - Context cancelled/deadline exceeded (returns context error)
 func ExecuteWithRetry(ctx context.Context, opts RetryOptions, fn func() error) error {
 	// Validate and set defaults
@@ -108,36 +109,27 @@ func ExecuteWithRetry(ctx context.Context, opts RetryOptions, fn func() error) e
 		opts.RetryableFunc = IsBigQueryRateLimitError
 	}
 
-	var (
-		startTime = time.Now()
-		backoff   = opts.InitialBackoff
-		lastErr   error
-	)
-
-	// MaxRetries = 0 means unlimited (but not recommended)
-	maxAttempts := opts.MaxRetries + 1
-	if opts.MaxRetries == 0 {
-		maxAttempts = int(^uint(0) >> 1) // Max int for "unlimited"
+	// Configure exponential backoff
+	b := backoff.NewExponentialBackOff()
+	b.InitialInterval = opts.InitialBackoff
+	b.MaxInterval = opts.MaxBackoff
+	b.Multiplier = opts.Multiplier
+	b.MaxElapsedTime = opts.MaxDuration
+	if !opts.Jitter {
+		b.RandomizationFactor = 0
 	}
 
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		// Check context before each attempt
-		if err := ctx.Err(); err != nil {
-			if lastErr != nil {
-				return fmt.Errorf("context error after %d attempts: %w (last error: %v)", attempt, err, lastErr)
-			}
-			return err
-		}
+	// Wrap with max retries if specified (0 = unlimited)
+	var retryBackoff backoff.BackOff = b
+	if opts.MaxRetries > 0 {
+		retryBackoff = backoff.WithMaxRetries(b, uint64(opts.MaxRetries))
+	}
 
-		// Check max duration
-		if opts.MaxDuration > 0 && time.Since(startTime) > opts.MaxDuration {
-			if lastErr != nil {
-				return fmt.Errorf("exceeded max retry duration %v after %d attempts: %w", opts.MaxDuration, attempt, lastErr)
-			}
-			return fmt.Errorf("exceeded max retry duration %v", opts.MaxDuration)
-		}
+	// Wrap with context for cancellation support
+	retryBackoff = backoff.WithContext(retryBackoff, ctx)
 
-		// Execute the operation
+	var lastErr error
+	err := backoff.Retry(func() error {
 		err := fn()
 		if err == nil {
 			return nil // Success
@@ -146,37 +138,19 @@ func ExecuteWithRetry(ctx context.Context, opts RetryOptions, fn func() error) e
 
 		// Check if error is retryable
 		if !opts.RetryableFunc(err) {
-			return err // Non-retryable error
+			return backoff.Permanent(err) // Don't retry non-retryable errors
 		}
+		return err // Retryable error, will be retried
+	}, retryBackoff)
 
-		// Don't sleep after the last attempt
-		if attempt == maxAttempts-1 {
-			break
+	if err != nil {
+		// Provide more context in error message
+		if lastErr != nil && err != lastErr {
+			return fmt.Errorf("retry failed: %w (last error: %v)", err, lastErr)
 		}
-
-		// Calculate sleep duration with optional jitter
-		sleepDuration := backoff
-		if opts.Jitter {
-			// Jitter: random value between 50% and 100% of backoff
-			jitterFactor := 0.5 + rand.Float64()*0.5
-			sleepDuration = time.Duration(float64(backoff) * jitterFactor)
-		}
-
-		// Wait before retry
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("context cancelled during retry backoff: %w (last error: %v)", ctx.Err(), lastErr)
-		case <-time.After(sleepDuration):
-		}
-
-		// Increase backoff for next iteration
-		backoff = time.Duration(float64(backoff) * opts.Multiplier)
-		if backoff > opts.MaxBackoff {
-			backoff = opts.MaxBackoff
-		}
+		return err
 	}
-
-	return fmt.Errorf("exceeded max retries (%d) for BigQuery operation: %w", opts.MaxRetries, lastErr)
+	return nil
 }
 
 // ExecuteWithDefaultRetry is a convenience function that uses default retry options.

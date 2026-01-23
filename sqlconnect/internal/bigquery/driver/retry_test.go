@@ -97,7 +97,8 @@ func TestExecuteWithRetry_MaxRetriesExceeded(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Equal(t, 4, callCount, "should attempt MaxRetries+1 times (initial + retries)")
-	assert.Contains(t, err.Error(), "exceeded max retries")
+	// cenkalti/backoff returns the last error when max retries is exceeded
+	assert.Contains(t, err.Error(), "too many table update operations")
 }
 
 func TestExecuteWithRetry_ContextCancelled(t *testing.T) {
@@ -152,7 +153,9 @@ func TestExecuteWithRetry_MaxDurationExceeded(t *testing.T) {
 	})
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "exceeded max retry duration")
+	// cenkalti/backoff returns the last error when max duration is exceeded
+	assert.Contains(t, err.Error(), "too many table update operations")
+	assert.GreaterOrEqual(t, callCount, 1) // At least one attempt was made
 }
 
 func TestExecuteWithRetry_ExponentialBackoff(t *testing.T) {
@@ -308,3 +311,6 @@ func TestExecuteWithRetry_HTTP5xxRetry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 2, callCount, "should retry 503 errors")
 }
+
+
+
