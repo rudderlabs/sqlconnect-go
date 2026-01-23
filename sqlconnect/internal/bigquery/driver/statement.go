@@ -41,21 +41,10 @@ func (statement *bigQueryStatement) ExecContext(ctx context.Context, args []driv
 		return nil, err
 	}
 
-	// Determine execution context and retry options
-	execCtx := ctx
-	retryOpts := RetryOptionsFromConfig(statement.connection.retryConfig)
-
-	// Apply max duration as context timeout if configured
-	if retryOpts.MaxDuration > 0 {
-		var cancel context.CancelFunc
-		execCtx, cancel = context.WithTimeout(ctx, retryOpts.MaxDuration)
-		defer cancel()
-	}
-
 	// Execute with application-level retry for rate limit errors
 	var result *bigQueryResult
-	err = ExecuteWithRetry(execCtx, retryOpts, func() error {
-		rowIterator, execErr := query.Read(execCtx)
+	err = retry(ctx, statement.connection.retryConfig, func() error {
+		rowIterator, execErr := query.Read(ctx)
 		if execErr != nil {
 			return execErr
 		}
@@ -75,21 +64,10 @@ func (statement *bigQueryStatement) QueryContext(ctx context.Context, args []dri
 		return nil, err
 	}
 
-	// Determine execution context and retry options
-	execCtx := ctx
-	retryOpts := RetryOptionsFromConfig(statement.connection.retryConfig)
-
-	// Apply max duration as context timeout if configured
-	if retryOpts.MaxDuration > 0 {
-		var cancel context.CancelFunc
-		execCtx, cancel = context.WithTimeout(ctx, retryOpts.MaxDuration)
-		defer cancel()
-	}
-
 	// Execute with application-level retry for rate limit errors
 	var rows *bigQueryRows
-	err = ExecuteWithRetry(execCtx, retryOpts, func() error {
-		rowIterator, execErr := query.Read(execCtx)
+	err = retry(ctx, statement.connection.retryConfig, func() error {
+		rowIterator, execErr := query.Read(ctx)
 		if execErr != nil {
 			return execErr
 		}
