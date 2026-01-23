@@ -96,7 +96,7 @@ func (c Config) ConnectionString() (dsn string, err error) {
 	if err != nil {
 		err = fmt.Errorf("creating dsn: %v", err)
 	}
-	return
+	return dsn, err
 }
 
 func (c *Config) Parse(configJSON json.RawMessage) error {
