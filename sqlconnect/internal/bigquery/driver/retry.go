@@ -8,152 +8,91 @@ import (
 	"github.com/cenkalti/backoff/v4"
 )
 
-// Default retry parameters (aligned with google-cloud-go/bigquery defaults)
-const (
-	DefaultInitialBackoff = 1 * time.Second
-	DefaultMaxBackoff     = 32 * time.Second
-	DefaultMultiplier     = 2.0
-	DefaultMaxRetries     = 0 // 0 = unlimited, matching google-cloud-go's default behavior
-)
-
-// RetryOptions configures the retry behavior for BigQuery operations.
-type RetryOptions struct {
-	// InitialBackoff is the initial delay before the first retry.
-	// Default: 1 second
-	InitialBackoff time.Duration
-
-	// MaxBackoff is the maximum delay between retries.
-	// Default: 32 seconds
-	MaxBackoff time.Duration
-
+// RetryConfig configures the retry behavior for BigQuery operations.
+// This is the execution-time struct with concrete values.
+type RetryConfig struct {
+	// InitialInterval is the initial delay before the first retry.
+	// Default: 500ms
+	InitialInterval time.Duration
+	// RandomizationFactor adds jitter to prevent thundering herd.
+	// Default: 0.5
+	RandomizationFactor float64
 	// Multiplier is the factor by which backoff increases after each retry.
-	// Default: 2.0
+	// Default: 1.5
 	Multiplier float64
-
+	// MaxInterval is the maximum delay between retries.
+	// Default: 60 seconds
+	MaxInterval time.Duration
 	// MaxRetries is the maximum number of retry attempts.
-	// Default: 10 (set to 0 for unlimited, though not recommended)
-	MaxRetries int
-
-	// MaxDuration limits the total time spent retrying.
-	// If set, retries will stop when this duration is exceeded.
-	// Default: 0 (no limit, relies on MaxRetries and context)
-	MaxDuration time.Duration
-
-	// Jitter adds randomness to backoff to prevent thundering herd.
-	// When true, actual backoff is between 0.5x and 1.0x of calculated backoff.
-	// Default: true
-	Jitter bool
-
-	// RetryableFunc determines if an error should be retried.
-	// Default: IsBigQueryRateLimitError (only retry rate limit errors)
-	// Use IsBigQueryRetryableError for broader retry coverage
-	RetryableFunc func(error) bool
+	// Default: 0 (unlimited)
+	MaxRetries uint
+	// MaxElapsedTime limits the total time spent retrying.
+	// Default: 15 minutes
+	MaxElapsedTime time.Duration
 }
 
-// DefaultRetryOptions returns retry options with sensible defaults.
-func DefaultRetryOptions() RetryOptions {
-	return RetryOptions{
-		InitialBackoff: DefaultInitialBackoff,
-		MaxBackoff:     DefaultMaxBackoff,
-		Multiplier:     DefaultMultiplier,
-		MaxRetries:     DefaultMaxRetries,
-		Jitter:         true,
-		RetryableFunc:  IsBigQueryRateLimitError,
+// DefaultRetryConfig returns retry config with sensible defaults.
+func DefaultRetryConfig() RetryConfig {
+	return RetryConfig{
+		InitialInterval:     500 * time.Millisecond,
+		RandomizationFactor: 0.5,
+		Multiplier:          1.5,
+		MaxInterval:         60 * time.Second,
+		MaxRetries:          0, // unlimited
+		MaxElapsedTime:      15 * time.Minute,
 	}
 }
 
-// RetryOptionsFromConfig creates RetryOptions from RetryConfig.
-// Note: This uses the application-level retry config (QueryRetryAttempts, QueryRetryDuration),
-// not the driver-level MaxRetries which is passed to google-cloud-go.
-func RetryOptionsFromConfig(config *RetryConfig) RetryOptions {
-	opts := DefaultRetryOptions()
-	if config == nil {
-		return opts
-	}
-	if config.QueryRetryAttempts != nil {
-		opts.MaxRetries = *config.QueryRetryAttempts
-	}
-	if config.QueryRetryDuration != nil {
-		opts.MaxDuration = *config.QueryRetryDuration
-	}
-	return opts
-}
-
-// ExecuteWithRetry executes the given function with retry logic for BigQuery
-// rate limit errors. This is necessary because google-cloud-go does NOT
-// automatically retry "invalidQuery" errors, which includes table metadata
-// rate limits.
+// retry executes the given function with retry logic for BigQuery rate limit errors.
+// This is necessary because google-cloud-go does NOT automatically retry "invalidQuery"
+// errors, which includes table metadata rate limits.
 //
-// Uses cenkalti/backoff for exponential backoff with jitter:
-// - Backoff sequence: 1s → 2s → 4s → 8s → 16s → 32s → 32s → ...
-// - Jitter: randomizes actual delay (default: 0.5 randomization factor)
+// If config is nil, the function is executed once without retry.
 //
 // Retry stops when:
 // - Operation succeeds (returns nil)
 // - Non-retryable error occurs (returns that error immediately)
 // - MaxRetries exceeded (returns last error)
-// - MaxDuration exceeded (returns last error)
+// - MaxElapsedTime exceeded (returns last error)
 // - Context cancelled/deadline exceeded (returns context error)
-func ExecuteWithRetry(ctx context.Context, opts RetryOptions, fn func() error) error {
-	// Validate and set defaults
-	if opts.InitialBackoff <= 0 {
-		opts.InitialBackoff = DefaultInitialBackoff
-	}
-	if opts.MaxBackoff <= 0 {
-		opts.MaxBackoff = DefaultMaxBackoff
-	}
-	if opts.Multiplier <= 0 {
-		opts.Multiplier = DefaultMultiplier
-	}
-	if opts.RetryableFunc == nil {
-		opts.RetryableFunc = IsBigQueryRateLimitError
+func retry(ctx context.Context, c *RetryConfig, fn func() error) error {
+	if c == nil {
+		return fn()
 	}
 
-	// Configure exponential backoff
-	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = opts.InitialBackoff
-	b.MaxInterval = opts.MaxBackoff
-	b.Multiplier = opts.Multiplier
-	b.MaxElapsedTime = opts.MaxDuration
-	if !opts.Jitter {
-		b.RandomizationFactor = 0
+	b := &backoff.ExponentialBackOff{
+		InitialInterval:     c.InitialInterval,
+		RandomizationFactor: c.RandomizationFactor,
+		Multiplier:          c.Multiplier,
+		MaxInterval:         c.MaxInterval,
+		MaxElapsedTime:      c.MaxElapsedTime,
+		Clock:               backoff.SystemClock,
 	}
+	b.Reset()
 
-	// Wrap with max retries if specified (0 = unlimited)
 	var retryBackoff backoff.BackOff = b
-	if opts.MaxRetries > 0 {
-		retryBackoff = backoff.WithMaxRetries(b, uint64(opts.MaxRetries))
+	// WithMaxRetries(b, n) stops after n retries (n+1 total attempts)
+	// So MaxRetries=3 means initial attempt + 3 retries = 4 total attempts
+	if c.MaxRetries > 0 {
+		retryBackoff = backoff.WithMaxRetries(b, uint64(c.MaxRetries))
 	}
-
-	// Wrap with context for cancellation support
 	retryBackoff = backoff.WithContext(retryBackoff, ctx)
 
 	var lastErr error
 	err := backoff.Retry(func() error {
 		err := fn()
 		if err == nil {
-			return nil // Success
+			return nil
 		}
 		lastErr = err
-
-		// Check if error is retryable
-		if !opts.RetryableFunc(err) {
-			return backoff.Permanent(err) // Don't retry non-retryable errors
-		}
-		return err // Retryable error, will be retried
-	}, retryBackoff)
-
-	if err != nil {
-		// Provide more context in error message
-		if lastErr != nil && err != lastErr {
-			return fmt.Errorf("retry failed: %w (last error: %v)", err, lastErr)
+		if !IsBigQueryRateLimitError(err) {
+			return backoff.Permanent(err)
 		}
 		return err
-	}
-	return nil
-}
+	}, retryBackoff)
 
-// ExecuteWithDefaultRetry is a convenience function that uses default retry options.
-func ExecuteWithDefaultRetry(ctx context.Context, fn func() error) error {
-	return ExecuteWithRetry(ctx, DefaultRetryOptions(), fn)
+	if err != nil && lastErr != nil && err != lastErr {
+		return fmt.Errorf("retry failed: %w (last error: %v)", err, lastErr)
+	}
+	return err
 }

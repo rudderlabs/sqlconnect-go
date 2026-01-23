@@ -11,11 +11,38 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
-func TestExecuteWithRetry_Success(t *testing.T) {
+func TestRetry_NilConfig_NoRetry(t *testing.T) {
 	ctx := context.Background()
 	callCount := 0
 
-	err := ExecuteWithRetry(ctx, DefaultRetryOptions(), func() error {
+	// With nil config, retry() should execute once without retry
+	err := retry(ctx, nil, func() error {
+		callCount++
+		return nil
+	})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, callCount, "should execute once")
+}
+
+func TestRetry_NilConfig_ReturnsErrorDirectly(t *testing.T) {
+	ctx := context.Background()
+	testErr := errors.New("test error")
+
+	// With nil config, retry() should return the error directly without retry
+	err := retry(ctx, nil, func() error {
+		return testErr
+	})
+
+	assert.Equal(t, testErr, err)
+}
+
+func TestRetry_Success(t *testing.T) {
+	ctx := context.Background()
+	callCount := 0
+	config := DefaultRetryConfig()
+
+	err := retry(ctx, &config, func() error {
 		callCount++
 		return nil
 	})
@@ -24,7 +51,7 @@ func TestExecuteWithRetry_Success(t *testing.T) {
 	assert.Equal(t, 1, callCount, "should succeed on first attempt")
 }
 
-func TestExecuteWithRetry_NonRetryableError(t *testing.T) {
+func TestRetry_NonRetryableError(t *testing.T) {
 	ctx := context.Background()
 	callCount := 0
 	syntaxError := &googleapi.Error{
@@ -34,8 +61,9 @@ func TestExecuteWithRetry_NonRetryableError(t *testing.T) {
 			{Reason: "invalidQuery", Message: "Syntax error at position 10"},
 		},
 	}
+	config := DefaultRetryConfig()
 
-	err := ExecuteWithRetry(ctx, DefaultRetryOptions(), func() error {
+	err := retry(ctx, &config, func() error {
 		callCount++
 		return syntaxError
 	})
@@ -45,7 +73,7 @@ func TestExecuteWithRetry_NonRetryableError(t *testing.T) {
 	assert.True(t, errors.Is(err, syntaxError), "should return the original error")
 }
 
-func TestExecuteWithRetry_RetryableError_EventualSuccess(t *testing.T) {
+func TestRetry_RetryableError_EventualSuccess(t *testing.T) {
 	ctx := context.Background()
 	callCount := 0
 	rateLimitError := &googleapi.Error{
@@ -56,12 +84,16 @@ func TestExecuteWithRetry_RetryableError_EventualSuccess(t *testing.T) {
 		},
 	}
 
-	opts := DefaultRetryOptions()
-	opts.InitialBackoff = 10 * time.Millisecond // Speed up test
-	opts.MaxBackoff = 50 * time.Millisecond
-	opts.Jitter = false
+	config := RetryConfig{
+		InitialInterval:     10 * time.Millisecond,
+		RandomizationFactor: 0, // No jitter for predictable timing
+		Multiplier:          1.5,
+		MaxInterval:         50 * time.Millisecond,
+		MaxRetries:          10,
+		MaxElapsedTime:      5 * time.Second,
+	}
 
-	err := ExecuteWithRetry(ctx, opts, func() error {
+	err := retry(ctx, &config, func() error {
 		callCount++
 		if callCount < 3 {
 			return rateLimitError
@@ -73,7 +105,7 @@ func TestExecuteWithRetry_RetryableError_EventualSuccess(t *testing.T) {
 	assert.Equal(t, 3, callCount, "should retry until success")
 }
 
-func TestExecuteWithRetry_MaxRetriesExceeded(t *testing.T) {
+func TestRetry_MaxRetriesExceeded(t *testing.T) {
 	ctx := context.Background()
 	callCount := 0
 	rateLimitError := &googleapi.Error{
@@ -84,24 +116,26 @@ func TestExecuteWithRetry_MaxRetriesExceeded(t *testing.T) {
 		},
 	}
 
-	opts := DefaultRetryOptions()
-	opts.MaxRetries = 3
-	opts.InitialBackoff = 1 * time.Millisecond // Speed up test
-	opts.MaxBackoff = 5 * time.Millisecond
-	opts.Jitter = false
+	config := RetryConfig{
+		InitialInterval:     1 * time.Millisecond,
+		RandomizationFactor: 0,
+		Multiplier:          1.5,
+		MaxInterval:         5 * time.Millisecond,
+		MaxRetries:          3, // 3 retries = 4 total attempts (initial + 3 retries)
+		MaxElapsedTime:      5 * time.Second,
+	}
 
-	err := ExecuteWithRetry(ctx, opts, func() error {
+	err := retry(ctx, &config, func() error {
 		callCount++
 		return rateLimitError
 	})
 
 	assert.Error(t, err)
 	assert.Equal(t, 4, callCount, "should attempt MaxRetries+1 times (initial + retries)")
-	// cenkalti/backoff returns the last error when max retries is exceeded
 	assert.Contains(t, err.Error(), "too many table update operations")
 }
 
-func TestExecuteWithRetry_ContextCancelled(t *testing.T) {
+func TestRetry_ContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	callCount := 0
 	rateLimitError := &googleapi.Error{
@@ -112,8 +146,14 @@ func TestExecuteWithRetry_ContextCancelled(t *testing.T) {
 		},
 	}
 
-	opts := DefaultRetryOptions()
-	opts.InitialBackoff = 100 * time.Millisecond // Long enough to cancel
+	config := RetryConfig{
+		InitialInterval:     100 * time.Millisecond, // Long enough to cancel
+		RandomizationFactor: 0,
+		Multiplier:          1.5,
+		MaxInterval:         1 * time.Second,
+		MaxRetries:          0, // Unlimited
+		MaxElapsedTime:      0, // No limit
+	}
 
 	// Cancel after a short delay
 	go func() {
@@ -121,7 +161,7 @@ func TestExecuteWithRetry_ContextCancelled(t *testing.T) {
 		cancel()
 	}()
 
-	err := ExecuteWithRetry(ctx, opts, func() error {
+	err := retry(ctx, &config, func() error {
 		callCount++
 		return rateLimitError
 	})
@@ -130,7 +170,7 @@ func TestExecuteWithRetry_ContextCancelled(t *testing.T) {
 	assert.Contains(t, err.Error(), "context")
 }
 
-func TestExecuteWithRetry_MaxDurationExceeded(t *testing.T) {
+func TestRetry_MaxElapsedTimeExceeded(t *testing.T) {
 	ctx := context.Background()
 	callCount := 0
 	rateLimitError := &googleapi.Error{
@@ -141,24 +181,26 @@ func TestExecuteWithRetry_MaxDurationExceeded(t *testing.T) {
 		},
 	}
 
-	opts := DefaultRetryOptions()
-	opts.MaxRetries = 100                    // High limit
-	opts.MaxDuration = 50 * time.Millisecond // Short duration
-	opts.InitialBackoff = 20 * time.Millisecond
-	opts.Jitter = false
+	config := RetryConfig{
+		InitialInterval:     20 * time.Millisecond,
+		RandomizationFactor: 0,
+		Multiplier:          1.5,
+		MaxInterval:         100 * time.Millisecond,
+		MaxRetries:          100, // High limit
+		MaxElapsedTime:      50 * time.Millisecond,
+	}
 
-	err := ExecuteWithRetry(ctx, opts, func() error {
+	err := retry(ctx, &config, func() error {
 		callCount++
 		return rateLimitError
 	})
 
 	assert.Error(t, err)
-	// cenkalti/backoff returns the last error when max duration is exceeded
 	assert.Contains(t, err.Error(), "too many table update operations")
 	assert.GreaterOrEqual(t, callCount, 1) // At least one attempt was made
 }
 
-func TestExecuteWithRetry_ExponentialBackoff(t *testing.T) {
+func TestRetry_ExponentialBackoff(t *testing.T) {
 	ctx := context.Background()
 	callCount := 0
 	timestamps := []time.Time{}
@@ -170,16 +212,16 @@ func TestExecuteWithRetry_ExponentialBackoff(t *testing.T) {
 		},
 	}
 
-	opts := RetryOptions{
-		InitialBackoff: 20 * time.Millisecond,
-		MaxBackoff:     100 * time.Millisecond,
-		Multiplier:     2.0,
-		MaxRetries:     3,
-		Jitter:         false, // Disable jitter for predictable timing
-		RetryableFunc:  IsBigQueryRateLimitError,
+	config := RetryConfig{
+		InitialInterval:     20 * time.Millisecond,
+		RandomizationFactor: 0, // Disable jitter for predictable timing
+		Multiplier:          2.0,
+		MaxInterval:         100 * time.Millisecond,
+		MaxRetries:          3,
+		MaxElapsedTime:      5 * time.Second,
 	}
 
-	_ = ExecuteWithRetry(ctx, opts, func() error {
+	_ = retry(ctx, &config, func() error {
 		callCount++
 		timestamps = append(timestamps, time.Now())
 		return rateLimitError
@@ -207,110 +249,13 @@ func TestExecuteWithRetry_ExponentialBackoff(t *testing.T) {
 	}
 }
 
-func TestRetryOptionsFromConfig(t *testing.T) {
-	t.Run("nil config uses defaults", func(t *testing.T) {
-		opts := RetryOptionsFromConfig(nil)
-		assert.Equal(t, DefaultInitialBackoff, opts.InitialBackoff)
-		assert.Equal(t, DefaultMaxBackoff, opts.MaxBackoff)
-		assert.Equal(t, 0, opts.MaxRetries) // 0 = unlimited, matching google-cloud-go
-	})
+func TestDefaultRetryConfig(t *testing.T) {
+	config := DefaultRetryConfig()
 
-	t.Run("config with app-level retry settings", func(t *testing.T) {
-		queryRetryAttempts := 5
-		queryRetryDuration := 10 * time.Minute
-		config := &RetryConfig{
-			QueryRetryAttempts: &queryRetryAttempts,
-			QueryRetryDuration: &queryRetryDuration,
-		}
-
-		opts := RetryOptionsFromConfig(config)
-		assert.Equal(t, 5, opts.MaxRetries)
-		assert.Equal(t, 10*time.Minute, opts.MaxDuration)
-		// Other fields should still have defaults
-		assert.Equal(t, DefaultInitialBackoff, opts.InitialBackoff)
-		assert.Equal(t, DefaultMaxBackoff, opts.MaxBackoff)
-	})
-
-	t.Run("driver-level MaxRetries is not used for app-level retry", func(t *testing.T) {
-		// MaxRetries is for driver-level (google-cloud-go), not app-level
-		driverMaxRetries := 10
-		config := &RetryConfig{
-			MaxRetries: &driverMaxRetries,
-			// QueryRetryAttempts not set
-		}
-
-		opts := RetryOptionsFromConfig(config)
-		// App-level retry should use default (0 = unlimited), not driver-level value
-		assert.Equal(t, 0, opts.MaxRetries)
-	})
-
-	t.Run("config with both driver and app-level settings", func(t *testing.T) {
-		driverMaxRetries := 10
-		queryRetryAttempts := 5
-		queryRetryDuration := 5 * time.Minute
-		config := &RetryConfig{
-			MaxRetries:         &driverMaxRetries,
-			QueryRetryAttempts: &queryRetryAttempts,
-			QueryRetryDuration: &queryRetryDuration,
-		}
-
-		opts := RetryOptionsFromConfig(config)
-		// Should use QueryRetryAttempts for app-level retry
-		assert.Equal(t, 5, opts.MaxRetries)
-		assert.Equal(t, 5*time.Minute, opts.MaxDuration)
-	})
+	assert.Equal(t, 500*time.Millisecond, config.InitialInterval)
+	assert.Equal(t, 0.5, config.RandomizationFactor)
+	assert.Equal(t, 1.5, config.Multiplier)
+	assert.Equal(t, 60*time.Second, config.MaxInterval)
+	assert.Equal(t, uint(0), config.MaxRetries) // 0 = unlimited
+	assert.Equal(t, 15*time.Minute, config.MaxElapsedTime)
 }
-
-func TestDefaultRetryOptions(t *testing.T) {
-	opts := DefaultRetryOptions()
-
-	assert.Equal(t, 1*time.Second, opts.InitialBackoff)
-	assert.Equal(t, 32*time.Second, opts.MaxBackoff)
-	assert.Equal(t, 2.0, opts.Multiplier)
-	assert.Equal(t, 0, opts.MaxRetries) // 0 = unlimited by default
-	assert.True(t, opts.Jitter)
-	assert.NotNil(t, opts.RetryableFunc)
-}
-
-func TestExecuteWithDefaultRetry(t *testing.T) {
-	ctx := context.Background()
-	callCount := 0
-
-	err := ExecuteWithDefaultRetry(ctx, func() error {
-		callCount++
-		return nil
-	})
-
-	assert.NoError(t, err)
-	assert.Equal(t, 1, callCount)
-}
-
-func TestExecuteWithRetry_HTTP5xxRetry(t *testing.T) {
-	ctx := context.Background()
-	callCount := 0
-	serverError := &googleapi.Error{
-		Code:    503,
-		Message: "Service Unavailable",
-	}
-
-	opts := DefaultRetryOptions()
-	opts.InitialBackoff = 10 * time.Millisecond
-	opts.MaxBackoff = 50 * time.Millisecond
-	opts.Jitter = false
-	// Use the broader retryable check that includes 5xx
-	opts.RetryableFunc = IsBigQueryRetryableError
-
-	err := ExecuteWithRetry(ctx, opts, func() error {
-		callCount++
-		if callCount < 2 {
-			return serverError
-		}
-		return nil
-	})
-
-	assert.NoError(t, err)
-	assert.Equal(t, 2, callCount, "should retry 503 errors")
-}
-
-
-

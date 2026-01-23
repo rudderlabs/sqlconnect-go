@@ -33,19 +33,18 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		return nil, fmt.Errorf("invalid bigquery config: %w", err)
 	}
 
-	// Build retry configuration from config
-	var retryConfig *driver.RetryConfig
-	if config.MaxRetries != nil || config.QueryRetryAttempts != nil || config.QueryRetryDuration != nil {
-		retryConfig = &driver.RetryConfig{
-			MaxRetries:         config.MaxRetries,
-			QueryRetryAttempts: config.QueryRetryAttempts,
-			QueryRetryDuration: config.GetQueryRetryDuration(),
+	// Build connector configuration
+	var connConfig *driver.ConnectorConfig
+	if config.MaxRetries != nil || config.RetryConfig != nil {
+		connConfig = &driver.ConnectorConfig{
+			DriverMaxRetries: config.MaxRetries,
+			RetryConfig:      config.RetryConfig.ToDriverRetryConfig(),
 		}
 	}
 
-	db := sql.OpenDB(driver.NewConnectorWithRetry(
+	db := sql.OpenDB(driver.NewConnectorWithConfig(
 		config.ProjectID,
-		retryConfig,
+		connConfig,
 		// TODO: switching to WithAuthCredentialsJSON requires auth type handling
 		option.WithCredentialsJSON([]byte(config.CredentialsJSON))), // nolint: staticcheck
 	)
