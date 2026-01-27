@@ -5,7 +5,7 @@ go 1.25.5
 replace github.com/gocql/gocql => github.com/scylladb/gocql v1.14.4
 
 require (
-	cloud.google.com/go v0.121.6
+	cloud.google.com/go v0.123.0
 	cloud.google.com/go/bigquery v1.69.0
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/aws/aws-sdk-go-v2 v1.37.0
