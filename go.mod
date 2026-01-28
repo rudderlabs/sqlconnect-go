@@ -14,10 +14,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.38.4
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.6
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/databricks/databricks-sql-go v1.6.1
+	github.com/databricks/databricks-sql-go v1.8.0
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/gliderlabs/ssh v0.3.8
-	github.com/go-sql-driver/mysql v1.8.1
+	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/ory/dockertest/v3 v3.12.0
