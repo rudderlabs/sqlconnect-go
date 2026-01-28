@@ -38,10 +38,12 @@ func (b bigQueryDriver) Open(uri string) (driver.Conn, error) {
 		opts = append(opts, option.WithoutAuthentication())
 	}
 	if config.credentialFile != "" {
-		opts = append(opts, option.WithCredentialsFile(config.credentialFile))
+		// TODO: switching to WithAuthCredentialsFile requires auth type handling
+		opts = append(opts, option.WithCredentialsFile(config.credentialFile)) // nolint: staticcheck
 	}
 	if config.credentialsJSON != "" {
-		opts = append(opts, option.WithCredentialsJSON([]byte(config.credentialsJSON)))
+		// TODO: switching to WithAuthCredentialsJSON requires auth type handling
+		opts = append(opts, option.WithCredentialsJSON([]byte(config.credentialsJSON))) // nolint: staticcheck
 	}
 
 	client, err := bigquery.NewClient(ctx, config.projectID, opts...)
