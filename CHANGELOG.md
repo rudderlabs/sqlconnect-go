@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.22.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.21.0...v1.22.0) (2026-01-28)
+
+
+### Features
+
+* **bigquery:** bump cloud.google.com/go/bigquery from 1.69.0 to 1.72.0 ([#413](https://github.com/rudderlabs/sqlconnect-go/issues/413)) ([4e94499](https://github.com/rudderlabs/sqlconnect-go/commit/4e94499e67c7540a87c0e2a97601c411b14bce87))
+* **redshift:** bump github.com/aws/aws-sdk-go-v2/service/redshiftdata from 1.33.1 to 1.38.4 ([#416](https://github.com/rudderlabs/sqlconnect-go/issues/416)) ([fa18efd](https://github.com/rudderlabs/sqlconnect-go/commit/fa18efd899b1858a67d4b06c77430221ce1469c0))
+
+
+### Miscellaneous
+
+* apply security best practices from step security ([#376](https://github.com/rudderlabs/sqlconnect-go/issues/376)) ([ad99ae2](https://github.com/rudderlabs/sqlconnect-go/commit/ad99ae2dd0f63ecfb16797197f542bffd31f38be))
+* apply security best practices from step security ([#383](https://github.com/rudderlabs/sqlconnect-go/issues/383)) ([9d44cc8](https://github.com/rudderlabs/sqlconnect-go/commit/9d44cc813ad34753a9f24bcf8c49c4a42ca77e05))
+* **deps:** bump actions/checkout from 5.0.0 to 6.0.2 ([#407](https://github.com/rudderlabs/sqlconnect-go/issues/407)) ([8fb80b4](https://github.com/rudderlabs/sqlconnect-go/commit/8fb80b4a480300a5452b087113bff47f000366f9))
+* **deps:** bump actions/labeler from 5.0.0 to 6.0.1 ([#409](https://github.com/rudderlabs/sqlconnect-go/issues/409)) ([4ac165e](https://github.com/rudderlabs/sqlconnect-go/commit/4ac165ee53166727fa6b657aa0aa881882c023ae))
+* **deps:** bump actions/setup-go from 5.5.0 to 6.2.0 ([#411](https://github.com/rudderlabs/sqlconnect-go/issues/411)) ([ae3fb7f](https://github.com/rudderlabs/sqlconnect-go/commit/ae3fb7fdd72337d7cd4f4a3627f0d9097fcad001))
+* **deps:** bump cloud.google.com/go from 0.121.4 to 0.123.0 ([#414](https://github.com/rudderlabs/sqlconnect-go/issues/414)) ([defb76e](https://github.com/rudderlabs/sqlconnect-go/commit/defb76eb95c051bbce0015ee9f7354bdf3598e13))
+* **deps:** bump codecov/codecov-action from 5.5.1 to 5.5.2 ([#408](https://github.com/rudderlabs/sqlconnect-go/issues/408)) ([82c54b6](https://github.com/rudderlabs/sqlconnect-go/commit/82c54b62bd52bb7916718dc6c07405795712b471))
+* **deps:** bump github.com/aws/aws-sdk-go-v2/config from 1.30.1 to 1.32.7 ([#415](https://github.com/rudderlabs/sqlconnect-go/issues/415)) ([90bc897](https://github.com/rudderlabs/sqlconnect-go/commit/90bc89736c6b9e3d90e35757d56b432f577fd4db))
+* **deps:** bump rudder-go-kit from 0.61.1 to 0.71.0 ([#406](https://github.com/rudderlabs/sqlconnect-go/issues/406)) ([1208fc2](https://github.com/rudderlabs/sqlconnect-go/commit/1208fc2635f1be098750d5ead8f4f096a9c75c51))
+* **deps:** bump step-security/harden-runner from 2.13.2 to 2.14.1 ([#410](https://github.com/rudderlabs/sqlconnect-go/issues/410)) ([670d7c8](https://github.com/rudderlabs/sqlconnect-go/commit/670d7c897dd53642135fe981b9da12cc42e2592d))
+
 ## [1.21.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.20.3...v1.21.0) (2025-09-02)
 
 
