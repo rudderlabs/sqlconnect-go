@@ -34,7 +34,7 @@ func TestBigqueryDriver(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(configJSON), &c))
 
 	t.Run("OpenDB", func(t *testing.T) {
-		db := sql.OpenDB(driver.NewConnector(c.ProjectID, option.WithCredentialsJSON([]byte(c.CredentialsJSON))))
+		db := sql.OpenDB(driver.NewConnector(c.ProjectID, option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(c.CredentialsJSON)))) //
 		t.Cleanup(func() {
 			require.NoError(t, db.Close(), "it should be able to close the database connection")
 		})
