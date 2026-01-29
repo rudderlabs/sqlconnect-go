@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.22.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.22.0...v1.22.1) (2026-01-29)
+
+
+### Miscellaneous
+
+* **SEC-58:** migrate release-please from PAT to GitHub App token ([#418](https://github.com/rudderlabs/sqlconnect-go/issues/418)) ([c7c1612](https://github.com/rudderlabs/sqlconnect-go/commit/c7c16129b1f968119f8529cea546518036715b20))
+
 ## [1.22.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.21.0...v1.22.0) (2026-01-28)
 
 
