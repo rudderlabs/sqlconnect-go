@@ -166,3 +166,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/gotestsum v1.8.2 // indirect
 )
+
+replace cloud.google.com/go => github.com/rudderlabs/google-cloud-go v0.123.0-rudder.4
+
+replace cloud.google.com/go/bigquery => github.com/rudderlabs/google-cloud-go/bigquery v1.69.0-rudder.3
