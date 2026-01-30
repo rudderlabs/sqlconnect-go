@@ -7,6 +7,12 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
+// NewDialect returns a Databricks dialect for identifier handling without requiring a DB connection.
+// This is useful for SQL generation where you need proper identifier quoting and normalization.
+func NewDialect() sqlconnect.Dialect {
+	return dialect{base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())}
+}
+
 type dialect struct {
 	*base.GoquDialect
 }
