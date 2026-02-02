@@ -28,8 +28,23 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		return nil, err
 	}
 
-	db := sql.OpenDB(driver.NewConnector(
+	// Validate configuration
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid bigquery config: %w", err)
+	}
+
+	// Build connector configuration
+	var connConfig *driver.ConnectorConfig
+	if config.MaxRetries != nil || config.RetryConfig != nil {
+		connConfig = &driver.ConnectorConfig{
+			DriverMaxRetries: config.MaxRetries,
+			RetryConfig:      config.RetryConfig.ToDriverRetryConfig(),
+		}
+	}
+
+	db := sql.OpenDB(driver.NewConnectorWithConfig(
 		config.ProjectID,
+		connConfig,
 		// TODO: switching to WithAuthCredentialsJSON requires auth type handling
 		option.WithCredentialsJSON([]byte(config.CredentialsJSON))), // nolint: staticcheck
 	)

@@ -1,13 +1,9 @@
 cel.dev/expr v0.24.0 h1:56OvJKSH3hDGL0ml5uSxZmz3/3Pq4tJ+fb1unVLAFcY=
 cel.dev/expr v0.24.0/go.mod h1:hLPLo1W4QUmuYdA72RBX06QTs6MXw941piREPl3Yfiw=
-cloud.google.com/go v0.123.0 h1:2NAUJwPR47q+E35uaJeYoNhuNEM9kM8SjgRgdeOJUSE=
-cloud.google.com/go v0.123.0/go.mod h1:xBoMV08QcqUGuPW65Qfm1o9Y4zKZBpGS+7bImXLTAZU=
 cloud.google.com/go/auth v0.18.1 h1:IwTEx92GFUo2pJ6Qea0EU3zYvKnTAeRCODxfA/G5UWs=
 cloud.google.com/go/auth v0.18.1/go.mod h1:GfTYoS9G3CWpRA3Va9doKN9mjPGRS+v41jmZAhBzbrA=
 cloud.google.com/go/auth/oauth2adapt v0.2.8 h1:keo8NaayQZ6wimpNSmW5OPc283g65QNIiLpZnkHRbnc=
 cloud.google.com/go/auth/oauth2adapt v0.2.8/go.mod h1:XQ9y31RkqZCcwJWNSx2Xvric3RrU88hAYYbjDWYDL+c=
-cloud.google.com/go/bigquery v1.72.0 h1:D/yLju+3Ens2IXx7ou1DJ62juBm+/coBInn4VVOg5Cw=
-cloud.google.com/go/bigquery v1.72.0/go.mod h1:GUbRtmeCckOE85endLherHD9RsujY+gS7i++c1CqssQ=
 cloud.google.com/go/compute/metadata v0.2.0/go.mod h1:zFmK7XCadkQkj6TtorcaGlCW1hT1fIilQDwofLpJ20k=
 cloud.google.com/go/compute/metadata v0.9.0 h1:pDUj4QMoPejqq20dK0Pg2N4yG9zIkYGdBtwLoEkH9Zs=
 cloud.google.com/go/compute/metadata v0.9.0/go.mod h1:E0bWwX5wTnLPedCKqk3pJmVgCBSM6qQI1yTBdEb3C10=
@@ -317,6 +313,10 @@ github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7
 github.com/rs/xid v1.4.0/go.mod h1:trrq9SKmegXys3aeAKXMUTdJsYXVwGY3RLcfgqegfbg=
 github.com/rs/zerolog v1.28.0 h1:MirSo27VyNi7RJYP3078AA1+Cyzd2GB66qy3aUHvsWY=
 github.com/rs/zerolog v1.28.0/go.mod h1:NILgTygv/Uej1ra5XxGf82ZFSLk58MFGAUS2o6usyD0=
+github.com/rudderlabs/google-cloud-go v0.123.0-rudder.4 h1:yptyz55uiLC//MOxKDnoczXiSQBMOl/5hvfiffpn8Cg=
+github.com/rudderlabs/google-cloud-go v0.123.0-rudder.4/go.mod h1:pXDOGjbzcL8B3AZuXGJlAVjfSxulpycM0rFlRyNH9DM=
+github.com/rudderlabs/google-cloud-go/bigquery v1.69.0-rudder.3 h1:y2rYOBVuN6B6RPsIWqD6nh8fkIiG53oxMYpCwvsNEww=
+github.com/rudderlabs/google-cloud-go/bigquery v1.69.0-rudder.3/go.mod h1:ZO0XQswr9SesKCPBOzmhLU8GpjyjZB7zjoZovF7tCFY=
 github.com/rudderlabs/goqu/v10 v10.3.1 h1:rnfX+b4EwBWQ2UQfIGeEW299JBBkK5biEbnf7Kq4/Gg=
 github.com/rudderlabs/goqu/v10 v10.3.1/go.mod h1:LH2vI5gGHBxEQuESqFyk5ZA2anGINc8o25hbidDWOYw=
 github.com/rudderlabs/rudder-go-kit v0.71.0 h1:MVW0Qpx0IuAIL4LUy3jsribwbSabMnvLShvBA9rNFBI=
