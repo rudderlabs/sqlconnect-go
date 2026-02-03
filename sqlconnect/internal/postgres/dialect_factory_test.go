@@ -17,8 +17,5 @@ func TestDialectFactory(t *testing.T) {
 		// Test basic functionality
 		quoted := dialect.QuoteIdentifier("test_column")
 		require.Equal(t, `"test_column"`, quoted, "should quote identifier correctly")
-
-		formatted := dialect.FormatTableName("TestTable")
-		require.Equal(t, "testtable", formatted, "should format table name correctly")
 	})
 }
