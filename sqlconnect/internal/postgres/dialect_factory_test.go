@@ -3,8 +3,9 @@ package postgres
 import (
 	"testing"
 
-	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
 func TestDialectFactory(t *testing.T) {

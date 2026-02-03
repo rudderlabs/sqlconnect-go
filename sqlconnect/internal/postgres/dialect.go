@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"encoding/json"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
@@ -12,7 +13,7 @@ func init() {
 	})
 }
 
-// NewDialect creates a new base.Dialect using the provided GoquDialect. 
+// NewDialect creates a new base.Dialect using the provided GoquDialect.
 func NewDialect() sqlconnect.Dialect {
 	return base.Dialect{GoquDialect: base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())}
 }
