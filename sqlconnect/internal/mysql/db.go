@@ -55,6 +55,10 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				cmds.CurrentCatalog = func() string {
 					return "SELECT DATABASE()"
 				}
+				cmds.ListCatalogs = func() (string, string) {
+					return `SELECT schema_name FROM information_schema.schemata
+							WHERE schema_name NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')`, "schema_name"
+				}
 				cmds.DropSchema = func(schema base.QuotedIdentifier) string { // mysql does not support CASCADE
 					return fmt.Sprintf("DROP SCHEMA %[1]s", schema)
 				}

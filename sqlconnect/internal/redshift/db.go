@@ -59,6 +59,10 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 				cmds.CurrentCatalog = func() string {
 					return "SELECT current_database()"
 				}
+				cmds.ListCatalogs = func() (string, string) {
+					return `SELECT database_name FROM svv_redshift_databases
+							WHERE database_name NOT IN ('padb_harvest', 'dev')`, "database_name"
+				}
 				cmds.ListSchemas = func() (string, string) {
 					return "SELECT schema_name FROM svv_all_schemas", "schema_name"
 				}
