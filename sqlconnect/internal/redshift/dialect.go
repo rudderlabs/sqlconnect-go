@@ -1,6 +1,7 @@
 package redshift
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -62,4 +63,17 @@ func (d dialect) NormaliseIdentifier(identifier string) string {
 func (d dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, error) {
 	identifier = d.NormaliseIdentifier(identifier)
 	return base.ParseRelationRef(identifier, '"', strings.ToLower)
+}
+
+func init() {
+	sqlconnect.RegisterDialectFactory(DatabaseType, func(optionsJSON json.RawMessage) (sqlconnect.Dialect, error) {
+		if optionsJSON == nil {
+			return NewDialect(), nil
+		}
+		var config DialectConfig
+		if err := config.Parse(optionsJSON); err != nil {
+			return nil, err
+		}
+		return NewDialectWithOptions(config.EnableCaseSensitiveIdentifier), nil
+	})
 }

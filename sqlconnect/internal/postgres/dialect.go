@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"encoding/json"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
@@ -55,4 +57,10 @@ func toLower(s string) string {
 		result[i] = c
 	}
 	return string(result)
+}
+
+func init() {
+	sqlconnect.RegisterDialectFactory(DatabaseType, func(optionsJSON json.RawMessage) (sqlconnect.Dialect, error) {
+		return NewDialect(), nil
+	})
 }

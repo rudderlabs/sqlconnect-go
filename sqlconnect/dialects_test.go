@@ -1,4 +1,4 @@
-package dialects_test
+package sqlconnect_test
 
 import (
 	"testing"
@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
-	"github.com/rudderlabs/sqlconnect-go/sqlconnect/dialects"
+	_ "github.com/rudderlabs/sqlconnect-go/sqlconnect/config"
 )
 
-func TestNewDialect(t *testing.T) {
+func TestDialectNewDialect(t *testing.T) {
 	tests := []struct {
 		name          string
 		warehouseType string
@@ -27,7 +27,7 @@ func TestNewDialect(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dialect, err := dialects.NewDialect(tt.warehouseType)
+			dialect, err := sqlconnect.NewDialect(tt.warehouseType, nil)
 			if tt.wantErr {
 				require.Error(t, err)
 				require.Nil(t, dialect)
@@ -80,7 +80,7 @@ func TestDialectNormaliseIdentifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.warehouseType+"_"+tt.identifier, func(t *testing.T) {
-			dialect, err := dialects.NewDialect(tt.warehouseType)
+			dialect, err := sqlconnect.NewDialect(tt.warehouseType, nil)
 			require.NoError(t, err)
 
 			result := dialect.NormaliseIdentifier(tt.identifier)
@@ -126,7 +126,7 @@ func TestDialectQuoteIdentifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.warehouseType+"_"+tt.identifier, func(t *testing.T) {
-			dialect, err := dialects.NewDialect(tt.warehouseType)
+			dialect, err := sqlconnect.NewDialect(tt.warehouseType, nil)
 			require.NoError(t, err)
 
 			result := dialect.QuoteIdentifier(tt.identifier)
@@ -172,7 +172,7 @@ func TestDialectQuoteTable(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.warehouseType+"_"+tt.table.String(), func(t *testing.T) {
-			dialect, err := dialects.NewDialect(tt.warehouseType)
+			dialect, err := sqlconnect.NewDialect(tt.warehouseType, nil)
 			require.NoError(t, err)
 
 			result := dialect.QuoteTable(tt.table)
@@ -208,7 +208,7 @@ func TestDialectParseRelationRef(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.warehouseType+"_"+tt.identifier, func(t *testing.T) {
-			dialect, err := dialects.NewDialect(tt.warehouseType)
+			dialect, err := sqlconnect.NewDialect(tt.warehouseType, nil)
 			require.NoError(t, err)
 
 			result, err := dialect.ParseRelationRef(tt.identifier)
@@ -225,7 +225,7 @@ func TestDialectQueryCondition(t *testing.T) {
 
 	for _, wh := range warehouses {
 		t.Run(wh, func(t *testing.T) {
-			dialect, err := dialects.NewDialect(wh)
+			dialect, err := sqlconnect.NewDialect(wh, nil)
 			require.NoError(t, err)
 
 			// Test eq operator
@@ -255,7 +255,7 @@ func TestDialectExpressions(t *testing.T) {
 
 	for _, wh := range warehouses {
 		t.Run(wh, func(t *testing.T) {
-			dialect, err := dialects.NewDialect(wh)
+			dialect, err := sqlconnect.NewDialect(wh, nil)
 			require.NoError(t, err)
 
 			expressions := dialect.Expressions()
@@ -282,9 +282,10 @@ func TestDialectExpressions(t *testing.T) {
 	}
 }
 
-func TestNewRedshiftDialectWithOptions(t *testing.T) {
+func TestRedshiftDialectWithOptions(t *testing.T) {
 	t.Run("case insensitive (default)", func(t *testing.T) {
-		dialect := dialects.NewRedshiftDialectWithOptions(false)
+		dialect, err := sqlconnect.NewDialect("redshift", nil)
+		require.NoError(t, err)
 		require.NotNil(t, dialect)
 
 		// With case insensitive, all identifiers are lowercased
@@ -296,7 +297,8 @@ func TestNewRedshiftDialectWithOptions(t *testing.T) {
 	})
 
 	t.Run("case sensitive", func(t *testing.T) {
-		dialect := dialects.NewRedshiftDialectWithOptions(true)
+		dialect, err := sqlconnect.NewDialect("redshift", []byte(`{"enableCaseSensitiveIdentifier": true}`))
+		require.NoError(t, err)
 		require.NotNil(t, dialect)
 
 		// With case sensitive, quoted identifiers preserve case
@@ -308,7 +310,8 @@ func TestNewRedshiftDialectWithOptions(t *testing.T) {
 	})
 
 	t.Run("quoting works", func(t *testing.T) {
-		dialect := dialects.NewRedshiftDialectWithOptions(false)
+		dialect, err := sqlconnect.NewDialect("redshift", nil)
+		require.NoError(t, err)
 
 		quoted := dialect.QuoteIdentifier("user_id")
 		require.Equal(t, `"user_id"`, quoted)

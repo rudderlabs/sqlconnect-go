@@ -1,6 +1,7 @@
 package trino
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -47,4 +48,10 @@ func (d dialect) NormaliseIdentifier(identifier string) string {
 // The result is a RelationRef with case-sensitive fields, i.e. it can be safely quoted (see [QuoteTable] and, for instance, used for matching against the database's information schema.
 func (d dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, error) {
 	return base.ParseRelationRef(strings.ToLower(identifier), '"', strings.ToLower)
+}
+
+func init() {
+	sqlconnect.RegisterDialectFactory(DatabaseType, func(optionsJSON json.RawMessage) (sqlconnect.Dialect, error) {
+		return NewDialect(), nil
+	})
 }

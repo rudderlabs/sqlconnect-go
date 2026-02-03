@@ -1,6 +1,7 @@
 package bigquery
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 
@@ -66,4 +67,10 @@ func escapeSpecial(identifier string) string {
 	identifier = strings.ReplaceAll(identifier, "'", "\\'")
 	identifier = strings.ReplaceAll(identifier, "\"", "\\\"")
 	return identifier
+}
+
+func init() {
+	sqlconnect.RegisterDialectFactory(DatabaseType, func(optionsJSON json.RawMessage) (sqlconnect.Dialect, error) {
+		return NewDialect(), nil
+	})
 }
