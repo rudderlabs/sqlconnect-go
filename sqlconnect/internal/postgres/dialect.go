@@ -6,17 +6,13 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
-
 func init() {
-	// Register dialect factory - uses base dialect implementation
 	sqlconnect.RegisterDialectFactory(DatabaseType, func(optionsJSON json.RawMessage) (sqlconnect.Dialect, error) {
-		return NewDialect(base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())), nil
+		return NewDialect(), nil
 	})
 }
 
-// NewDialect creates a new dialect using the provided GoquDialect.
-// This is the standard dialect implementation suitable for PostgreSQL and similar databases.
-func NewDialect(goquDialect *base.GoquDialect) sqlconnect.Dialect {
-	return &base.Dialect{GoquDialect: goquDialect}
+// NewDialect creates a new base.Dialect using the provided GoquDialect. 
+func NewDialect() sqlconnect.Dialect {
+	return base.Dialect{GoquDialect: base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())}
 }
-
