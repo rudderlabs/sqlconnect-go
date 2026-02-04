@@ -19,7 +19,7 @@ require (
 	github.com/gliderlabs/ssh v0.3.8
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/uuid v1.6.0
-	github.com/lib/pq v1.10.9
+	github.com/lib/pq v1.11.1
 	github.com/ory/dockertest/v3 v3.12.0
 	github.com/rudderlabs/goqu/v10 v10.3.1
 	github.com/rudderlabs/rudder-go-kit v0.71.0
