@@ -7,12 +7,13 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
-type dialect struct {
+// Dialect is the standard dialect implementation suitable for PostgreSQL and similar databases.
+type Dialect struct {
 	*GoquDialect
 }
 
 // QuoteTable quotes a table name
-func (d dialect) QuoteTable(table sqlconnect.RelationRef) string {
+func (d Dialect) QuoteTable(table sqlconnect.RelationRef) string {
 	if table.Schema != "" {
 		return d.QuoteIdentifier(table.Schema) + "." + d.QuoteIdentifier(table.Name)
 	}
@@ -20,23 +21,23 @@ func (d dialect) QuoteTable(table sqlconnect.RelationRef) string {
 }
 
 // QuoteIdentifier quotes an identifier, e.g. a column name
-func (d dialect) QuoteIdentifier(name string) string {
+func (d Dialect) QuoteIdentifier(name string) string {
 	return fmt.Sprintf(`"%s"`, strings.ReplaceAll(name, `"`, `""`))
 }
 
 // FormatTableName formats a table name, typically by lower or upper casing it, depending on the database
-func (d dialect) FormatTableName(name string) string {
+func (d Dialect) FormatTableName(name string) string {
 	return strings.ToLower(name)
 }
 
 // NormaliseIdentifier normalises identifier parts that are unquoted, typically by lower or upper casing them, depending on the database
-func (d dialect) NormaliseIdentifier(identifier string) string {
+func (d Dialect) NormaliseIdentifier(identifier string) string {
 	return NormaliseIdentifier(identifier, '"', strings.ToLower)
 }
 
 // ParseRelationRef parses a string into a RelationRef after normalising the identifier and stripping out surrounding quotes.
 // The result is a RelationRef with case-sensitive fields, i.e. it can be safely quoted (see [QuoteTable] and, for instance, used for matching against the database's information schema.
-func (d dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, error) {
+func (d Dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, error) {
 	return ParseRelationRef(identifier, '"', strings.ToLower)
 }
 

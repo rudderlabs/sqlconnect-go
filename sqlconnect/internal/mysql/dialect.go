@@ -1,11 +1,17 @@
 package mysql
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
+
+// newDialect returns a MySQL dialect
+func newDialect() sqlconnect.Dialect {
+	return dialect{base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())}
+}
 
 type dialect struct {
 	*base.GoquDialect
@@ -40,4 +46,10 @@ func (d dialect) NormaliseIdentifier(identifier string) string {
 // The result is a RelationRef with case-sensitive fields, i.e. it can be safely quoted (see [QuoteTable] and, for instance, used for matching against the database's information schema.
 func (d dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, error) {
 	return base.ParseRelationRef(identifier, '`', identityFn)
+}
+
+func init() {
+	sqlconnect.RegisterDialectFactory(DatabaseType, func(_ json.RawMessage) (sqlconnect.Dialect, error) {
+		return newDialect(), nil
+	})
 }

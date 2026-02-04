@@ -1,12 +1,21 @@
 package redshift
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
+
+// newDialect returns a Redshift dialect
+func newDialect(config DialectConfig) sqlconnect.Dialect {
+	return dialect{
+		GoquDialect:   base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions()),
+		caseSensitive: config.EnableCaseSensitiveIdentifier,
+	}
+}
 
 type dialect struct {
 	*base.GoquDialect
@@ -46,4 +55,16 @@ func (d dialect) NormaliseIdentifier(identifier string) string {
 func (d dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, error) {
 	identifier = d.NormaliseIdentifier(identifier)
 	return base.ParseRelationRef(identifier, '"', strings.ToLower)
+}
+
+func init() {
+	sqlconnect.RegisterDialectFactory(DatabaseType, func(optionsJSON json.RawMessage) (sqlconnect.Dialect, error) {
+		var config DialectConfig
+		if optionsJSON != nil {
+			if err := config.Parse(optionsJSON); err != nil {
+				return nil, err
+			}
+		}
+		return newDialect(config), nil
+	})
 }
