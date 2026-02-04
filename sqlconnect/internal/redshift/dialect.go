@@ -9,19 +9,11 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
-// NewDialect returns a Redshift dialect for identifier handling without requiring a DB connection.
-// This is useful for SQL generation where you need proper identifier quoting and normalization.
-// By default, case sensitivity is disabled (caseSensitive=false), which matches the default Redshift behavior.
-func NewDialect() sqlconnect.Dialect {
-	return NewDialectWithOptions(false)
-}
-
-// NewDialectWithOptions returns a Redshift dialect with configurable case sensitivity.
-// Set caseSensitive to true if the Redshift cluster has enable_case_sensitive_identifier=on.
-func NewDialectWithOptions(caseSensitive bool) sqlconnect.Dialect {
+// newDialect returns a Redshift dialect
+func newDialect(config DialectConfig) sqlconnect.Dialect {
 	return dialect{
 		GoquDialect:   base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions()),
-		caseSensitive: caseSensitive,
+		caseSensitive: config.EnableCaseSensitiveIdentifier,
 	}
 }
 
@@ -67,13 +59,12 @@ func (d dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, er
 
 func init() {
 	sqlconnect.RegisterDialectFactory(DatabaseType, func(optionsJSON json.RawMessage) (sqlconnect.Dialect, error) {
-		if optionsJSON == nil {
-			return NewDialect(), nil
-		}
 		var config DialectConfig
-		if err := config.Parse(optionsJSON); err != nil {
-			return nil, err
+		if optionsJSON != nil {
+			if err := config.Parse(optionsJSON); err != nil {
+				return nil, err
+			}
 		}
-		return NewDialectWithOptions(config.EnableCaseSensitiveIdentifier), nil
+		return newDialect(config), nil
 	})
 }

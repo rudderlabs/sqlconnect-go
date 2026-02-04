@@ -8,12 +8,12 @@ import (
 )
 
 func init() {
-	sqlconnect.RegisterDialectFactory(DatabaseType, func(optionsJSON json.RawMessage) (sqlconnect.Dialect, error) {
-		return NewDialect(), nil
+	sqlconnect.RegisterDialectFactory(DatabaseType, func(_ json.RawMessage) (sqlconnect.Dialect, error) {
+		return newDialect(), nil
 	})
 }
 
-// NewDialect creates a new base.Dialect using the provided GoquDialect.
-func NewDialect() sqlconnect.Dialect {
+// newDialect creates a new postgres dialect
+func newDialect() sqlconnect.Dialect {
 	return base.Dialect{GoquDialect: base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())}
 }

@@ -45,7 +45,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		DB: base.NewDB(
 			db,
 			tunnelCloser,
-			base.WithDialect(NewDialect()),
+			base.WithDialect(newDialect()),
 			base.WithColumnTypeMapper(columnTypeMapper),
 			base.WithJsonRowMapper(jsonRowMapper),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {

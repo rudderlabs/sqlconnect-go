@@ -63,7 +63,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				}
 				return cmds
 			}),
-			base.WithDialect(NewDialect()),
+			base.WithDialect(newDialect()),
 		),
 	}, nil
 }

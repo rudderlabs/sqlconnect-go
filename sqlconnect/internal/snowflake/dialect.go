@@ -8,9 +8,8 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
-// NewDialect returns a Snowflake dialect for identifier handling without requiring a DB connection.
-// This is useful for SQL generation where you need proper identifier quoting and normalization.
-func NewDialect() sqlconnect.Dialect {
+// newDialect returns a Snowflake dialect
+func newDialect() sqlconnect.Dialect {
 	return dialect{base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())}
 }
 
@@ -48,7 +47,7 @@ func (d dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, er
 }
 
 func init() {
-	sqlconnect.RegisterDialectFactory(DatabaseType, func(optionsJSON json.RawMessage) (sqlconnect.Dialect, error) {
-		return NewDialect(), nil
+	sqlconnect.RegisterDialectFactory(DatabaseType, func(_ json.RawMessage) (sqlconnect.Dialect, error) {
+		return newDialect(), nil
 	})
 }

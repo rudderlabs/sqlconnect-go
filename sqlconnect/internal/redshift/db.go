@@ -52,7 +52,7 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 		DB: base.NewDB(
 			db,
 			tunnelCloser,
-			base.WithDialect(NewDialectWithOptions(caseSensitive == "on")),
+			base.WithDialect(newDialect(DialectConfig{EnableCaseSensitiveIdentifier: caseSensitive == "on"})),
 			base.WithColumnTypeMappings(getColumnTypeMappings(useLegacyMappings)),
 			base.WithJsonRowMapper(getJonRowMapper(useLegacyMappings)),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
