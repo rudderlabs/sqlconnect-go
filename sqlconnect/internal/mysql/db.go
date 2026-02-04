@@ -67,7 +67,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				}
 				return cmds
 			}),
-			base.WithDialect(dialect{base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())}),
+			base.WithDialect(newDialect()),
 		),
 	}, nil
 }

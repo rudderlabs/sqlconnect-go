@@ -1,12 +1,18 @@
 package bigquery
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
+
+// newDialect returns a BigQuery dialect
+func newDialect() sqlconnect.Dialect {
+	return dialect{base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())}
+}
 
 type dialect struct {
 	*base.GoquDialect
@@ -60,4 +66,10 @@ func escapeSpecial(identifier string) string {
 	identifier = strings.ReplaceAll(identifier, "'", "\\'")
 	identifier = strings.ReplaceAll(identifier, "\"", "\\\"")
 	return identifier
+}
+
+func init() {
+	sqlconnect.RegisterDialectFactory(DatabaseType, func(_ json.RawMessage) (sqlconnect.Dialect, error) {
+		return newDialect(), nil
+	})
 }

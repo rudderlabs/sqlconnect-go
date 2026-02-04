@@ -1,12 +1,19 @@
 package trino
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
+
+// newDialect returns a Trino dialect for identifier handling without requiring a DB connection.
+// This is useful for SQL generation where you need proper identifier quoting and normalization.
+func newDialect() sqlconnect.Dialect {
+	return dialect{base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())}
+}
 
 type dialect struct {
 	*base.GoquDialect
@@ -41,4 +48,10 @@ func (d dialect) NormaliseIdentifier(identifier string) string {
 // The result is a RelationRef with case-sensitive fields, i.e. it can be safely quoted (see [QuoteTable] and, for instance, used for matching against the database's information schema.
 func (d dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, error) {
 	return base.ParseRelationRef(strings.ToLower(identifier), '"', strings.ToLower)
+}
+
+func init() {
+	sqlconnect.RegisterDialectFactory(DatabaseType, func(_ json.RawMessage) (sqlconnect.Dialect, error) {
+		return newDialect(), nil
+	})
 }

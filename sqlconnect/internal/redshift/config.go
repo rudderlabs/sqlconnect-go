@@ -57,3 +57,13 @@ func (c *Config) Parse(input json.RawMessage) error {
 	}
 	return nil
 }
+
+// DialectConfig is the configuration for a redshift dialect
+type DialectConfig struct {
+	EnableCaseSensitiveIdentifier bool `json:"enableCaseSensitiveIdentifier"`
+}
+
+// Parse parses the given JSON into the config
+func (dc *DialectConfig) Parse(configJSON json.RawMessage) error {
+	return json.Unmarshal(configJSON, dc)
+}

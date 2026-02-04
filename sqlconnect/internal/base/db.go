@@ -13,7 +13,7 @@ import (
 func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 	d := &DB{
 		DB:           db,
-		Dialect:      dialect{},
+		Dialect:      Dialect{},
 		tunnelCloser: tunnelCloser,
 		columnTypeMapper: func(c ColumnType) string {
 			return c.DatabaseTypeName()

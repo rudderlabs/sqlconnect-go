@@ -47,7 +47,7 @@ func WithDialect(dialect sqlconnect.Dialect) Option {
 // WithGoquDialect sets the goqu dialect for the client
 func WithGoquDialect(gqd *GoquDialect) Option {
 	return func(db *DB) {
-		db.Dialect = &dialect{gqd}
+		db.Dialect = &Dialect{gqd}
 	}
 }
 

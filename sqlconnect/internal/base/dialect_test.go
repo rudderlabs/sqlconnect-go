@@ -9,7 +9,7 @@ import (
 )
 
 func TestDialect(t *testing.T) {
-	var d dialect
+	var d Dialect
 	t.Run("format table", func(t *testing.T) {
 		formatted := d.FormatTableName("TaBle")
 		require.Equal(t, "table", formatted, "table name should be lowercased")
