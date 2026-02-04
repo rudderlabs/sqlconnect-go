@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.23.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.22.0...v1.23.0) (2026-02-04)
+
+
+### Features
+
+* dialect can be used independently without needing db connection ([#420](https://github.com/rudderlabs/sqlconnect-go/issues/420)) ([63ffdb1](https://github.com/rudderlabs/sqlconnect-go/commit/63ffdb1a3dd46dd4c7df7efb6a16279d18cb289d))
+* **snowflake:** bump github.com/snowflakedb/gosnowflake from 1.14.0 to 1.18.1 ([#425](https://github.com/rudderlabs/sqlconnect-go/issues/425)) ([ae20534](https://github.com/rudderlabs/sqlconnect-go/commit/ae2053451e5fa425c78b5f6b769bec51839b114f))
+
+
+### Miscellaneous
+
+* **deps:** bump actions/create-github-app-token from 2.1.4 to 2.2.1 ([#421](https://github.com/rudderlabs/sqlconnect-go/issues/421)) ([cd3b5c8](https://github.com/rudderlabs/sqlconnect-go/commit/cd3b5c853d5d49cb9b099dc628dc50cbb9a3d844))
+* **deps:** bump github.com/lib/pq from 1.10.9 to 1.11.1 ([#422](https://github.com/rudderlabs/sqlconnect-go/issues/422)) ([64cea18](https://github.com/rudderlabs/sqlconnect-go/commit/64cea18b6fafca53773e39f02b51f74698dd0e96))
+* **deps:** bump github.com/samber/lo from 1.51.0 to 1.52.0 ([#423](https://github.com/rudderlabs/sqlconnect-go/issues/423)) ([62c7a34](https://github.com/rudderlabs/sqlconnect-go/commit/62c7a34f5f0ca2f75e9c7a3e9ad4221731c7fccc))
+* **deps:** bump github.com/sirupsen/logrus from 1.9.3 to 1.9.4 ([#426](https://github.com/rudderlabs/sqlconnect-go/issues/426)) ([cdf44d6](https://github.com/rudderlabs/sqlconnect-go/commit/cdf44d66b1d3591aa1431d2b6c28031b7da084db))
+* **deps:** bump google.golang.org/api from 0.263.0 to 0.264.0 ([#424](https://github.com/rudderlabs/sqlconnect-go/issues/424)) ([f5301e8](https://github.com/rudderlabs/sqlconnect-go/commit/f5301e86eb3f7a419496c0c6e6d0139d46c4a5c8))
+* **SEC-58:** migrate release-please from PAT to GitHub App token ([#418](https://github.com/rudderlabs/sqlconnect-go/issues/418)) ([c7c1612](https://github.com/rudderlabs/sqlconnect-go/commit/c7c16129b1f968119f8529cea546518036715b20))
+
 ## [1.22.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.21.0...v1.22.0) (2026-01-28)
 
 
