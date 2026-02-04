@@ -45,6 +45,9 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				cmds.CurrentCatalog = func() string {
 					return "SELECT current_database()"
 				}
+				cmds.ListCatalogs = func() (string, string) {
+					return "SHOW TERSE DATABASES", "name"
+				}
 				cmds.ListSchemas = func() (string, string) { return "SHOW TERSE SCHEMAS", "name" }
 				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SHOW TERSE SCHEMAS LIKE '%[1]s'", base.EscapeSqlString(schema))

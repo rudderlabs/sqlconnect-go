@@ -54,6 +54,10 @@ type CatalogAdmin interface {
 	// CurrentCatalog returns the current catalog.
 	// If this operation is not supported by the warehouse [ErrNotSupported] will be returned.
 	CurrentCatalog(ctx context.Context) (string, error)
+	// ListCatalogs returns all available catalogs linked to the credentials.
+	// Returns an empty list if no catalogs are accessible or if catalogs are not supported.
+	// System catalogs are filtered out.
+	ListCatalogs(ctx context.Context) ([]CatalogRef, error)
 }
 
 type SchemaAdmin interface {

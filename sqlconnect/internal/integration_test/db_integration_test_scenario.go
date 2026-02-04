@@ -78,6 +78,21 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			require.NoError(t, err, "it should be able to get the current catalog")
 			require.NotEmpty(t, currentCatalog, "it should return a non-empty current catalog")
 		})
+
+		t.Run("list catalogs", func(t *testing.T) {
+			catalogs, err := db.ListCatalogs(ctx)
+			require.NoError(t, err)
+			require.NotNil(t, catalogs)
+
+			// Should at least contain the current catalog (if one exists)
+			if currentCatalog != "" {
+				catalogNames := lo.Map(catalogs, func(c sqlconnect.CatalogRef, _ int) string {
+					return c.Name
+				})
+				require.Contains(t, catalogNames, currentCatalog,
+					"list of catalogs should contain the current catalog")
+			}
+		})
 	})
 
 	t.Run("schema admin", func(t *testing.T) {

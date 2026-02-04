@@ -47,6 +47,14 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 			base.WithGoquDialect(base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())),
 			base.WithColumnTypeMappings(getColumnTypeMappings(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
+			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
+				cmds.ListCatalogs = func() (string, string) {
+					return `SELECT datname FROM pg_database
+							WHERE datistemplate = false
+							AND datname NOT IN ('postgres', 'template0', 'template1')`, "datname"
+				}
+				return cmds
+			}),
 		),
 	}, nil
 }
