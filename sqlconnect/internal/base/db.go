@@ -26,6 +26,8 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 				return "SELECT current_catalog"
 			},
 			ListCatalogs: func() (string, string) {
+				// Filter template databases (template0, template1) but include the postgres database
+				// datistemplate = false excludes template databases
 				return "SELECT datname FROM pg_database WHERE datistemplate = false", "datname"
 			},
 			CreateSchema: func(schema QuotedIdentifier) string {

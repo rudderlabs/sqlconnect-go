@@ -60,8 +60,11 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 					return "SELECT current_database()"
 				}
 				cmds.ListCatalogs = func() (string, string) {
+					// svv_redshift_databases already filters template0, template1, padb_harvest, and awsdatacatalog
+					// We explicitly filter padb_harvest for clarity and as a safety measure
+					// The 'dev' database is the default user database and should be included
 					return `SELECT database_name FROM svv_redshift_databases
-							WHERE database_name NOT IN ('padb_harvest', 'dev')`, "database_name"
+							WHERE database_name <> 'padb_harvest'`, "database_name"
 				}
 				cmds.ListSchemas = func() (string, string) {
 					return "SELECT schema_name FROM svv_all_schemas", "schema_name"
