@@ -80,6 +80,11 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 
 		t.Run("list catalogs", func(t *testing.T) {
+			t.Run("with context cancelled", func(t *testing.T) {
+				_, err := db.ListCatalogs(cancelledCtx)
+				require.Error(t, err, "it should not be able to list catalogs with a cancelled context")
+			})
+
 			catalogs, err := db.ListCatalogs(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, catalogs)
@@ -92,6 +97,25 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				require.Contains(t, catalogNames, currentCatalog,
 					"list of catalogs should contain the current catalog")
 			}
+
+			t.Run("catalog refs have valid names", func(t *testing.T) {
+				for _, catalog := range catalogs {
+					require.NotEmpty(t, catalog.Name, "catalog name should not be empty")
+					require.Equal(t, catalog.Name, catalog.String(), "String() should return the name")
+				}
+			})
+
+			t.Run("should not contain system catalogs", func(t *testing.T) {
+				// Check that system catalogs are filtered out
+				systemCatalogs := []string{"template0", "template1", "padb_harvest", "awsdatacatalog"}
+				catalogNames := lo.Map(catalogs, func(c sqlconnect.CatalogRef, _ int) string {
+					return c.Name
+				})
+				for _, sysCatalog := range systemCatalogs {
+					require.NotContains(t, catalogNames, sysCatalog,
+						"list should not contain system catalog: %s", sysCatalog)
+				}
+			})
 		})
 	})
 
