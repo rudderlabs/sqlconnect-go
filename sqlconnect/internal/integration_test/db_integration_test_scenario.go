@@ -86,6 +86,9 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 
 			catalogs, err := db.ListCatalogs(ctx)
+			if errors.Is(err, sqlconnect.ErrNotSupported) {
+				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
+			}
 			require.NoError(t, err)
 			require.NotNil(t, catalogs)
 
