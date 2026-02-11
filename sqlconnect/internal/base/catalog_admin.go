@@ -11,12 +11,12 @@ import (
 )
 
 // CurrentCatalog returns the current catalog
-func (db *DB) CurrentCatalog(ctx context.Context) (string, error) {
-	var catalog string
-	if err := db.QueryRowContext(ctx, db.sqlCommands.CurrentCatalog()).Scan(&catalog); err != nil {
-		return "", fmt.Errorf("getting current catalog: %w", err)
+func (db *DB) CurrentCatalog(ctx context.Context) (sqlconnect.CatalogRef, error) {
+	var catalogName string
+	if err := db.QueryRowContext(ctx, db.sqlCommands.CurrentCatalog()).Scan(&catalogName); err != nil {
+		return sqlconnect.CatalogRef{}, fmt.Errorf("getting current catalog: %w", err)
 	}
-	return catalog, nil
+	return sqlconnect.CatalogRef{Name: catalogName}, nil
 }
 
 // ListCatalogs returns a list of catalogs

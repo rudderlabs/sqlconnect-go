@@ -8,15 +8,15 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
-func (db *DB) CurrentCatalog(ctx context.Context) (string, error) {
-	var catalog string
+func (db *DB) CurrentCatalog(ctx context.Context) (sqlconnect.CatalogRef, error) {
+	var catalogName string
 	if err := db.WithBigqueryClient(ctx, func(c *bigquery.Client) error {
-		catalog = c.Project()
+		catalogName = c.Project()
 		return nil
 	}); err != nil {
-		return "", err
+		return sqlconnect.CatalogRef{}, err
 	}
-	return catalog, nil
+	return sqlconnect.CatalogRef{Name: catalogName}, nil
 }
 
 // ListCatalogs returns the current GCP project

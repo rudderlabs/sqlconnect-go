@@ -17,7 +17,7 @@ func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) 
 		if err != nil {
 			return nil, fmt.Errorf("getting current catalog: %w", err)
 		}
-		if relation.Catalog != currentCatalog {
+		if relation.Catalog != currentCatalog.Name {
 			return nil, fmt.Errorf("catalog %s not found", relation.Catalog)
 		}
 	}

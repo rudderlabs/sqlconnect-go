@@ -63,7 +63,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 	})
 
-	var currentCatalog string
+	var currentCatalog sqlconnect.CatalogRef
 	t.Run("catalog admin", func(t *testing.T) {
 		t.Run("current catalog", func(t *testing.T) {
 			t.Run("with context cancelled", func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
 			}
 			require.NoError(t, err, "it should be able to get the current catalog")
-			require.NotEmpty(t, currentCatalog, "it should return a non-empty current catalog")
+			require.NotEmpty(t, currentCatalog.Name, "it should return a non-empty current catalog")
 		})
 
 		t.Run("list catalogs", func(t *testing.T) {
@@ -90,11 +90,11 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			require.NotNil(t, catalogs)
 
 			// Should at least contain the current catalog (if one exists)
-			if currentCatalog != "" {
+			if currentCatalog.Name != "" {
 				catalogNames := lo.Map(catalogs, func(c sqlconnect.CatalogRef, _ int) string {
 					return c.Name
 				})
-				require.Contains(t, catalogNames, currentCatalog,
+				require.Contains(t, catalogNames, currentCatalog.Name,
 					"list of catalogs should contain the current catalog")
 			}
 
@@ -612,7 +612,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 
 			t.Run("with catalog", func(t *testing.T) {
 				tableWithCatalog := table
-				tableWithCatalog.Catalog = currentCatalog
+				tableWithCatalog.Catalog = currentCatalog.Name
 				columns, err := db.ListColumns(ctx, tableWithCatalog)
 				require.NoErrorf(t, err, "it should be able to list columns for %s", tableWithCatalog)
 				columns = lo.Map(columns, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
@@ -687,7 +687,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 
 				t.Run("with catalog", func(t *testing.T) {
 					tableWithCatalog := table
-					tableWithCatalog.Catalog = currentCatalog
+					tableWithCatalog.Catalog = currentCatalog.Name
 					columns, err := db.ListColumns(ctx, tableWithCatalog)
 					require.NoErrorf(t, err, "it should be able to list columns for %s", tableWithCatalog)
 					columns = lo.Map(columns, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
@@ -1023,7 +1023,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				})
 				t.Run("with catalog", func(t *testing.T) {
 					table := table
-					table.Catalog = currentCatalog
+					table.Catalog = currentCatalog.Name
 					actualCols, err := legacyDB.ListColumns(ctx, table)
 					require.NoError(t, err, "it should be able to list columns")
 					actualCols = lo.Map(actualCols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
