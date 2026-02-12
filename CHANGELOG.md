@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.24.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.23.0...v1.24.0) (2026-02-12)
+
+
+### Features
+
+* add ListCatalogs method to CatalogAdmin interface ([#427](https://github.com/rudderlabs/sqlconnect-go/issues/427)) ([2899478](https://github.com/rudderlabs/sqlconnect-go/commit/28994780685d570e992d5b890c1107424e346aba))
+* **databricks:** bump github.com/databricks/databricks-sql-go from 1.8.0 to 1.9.0 ([#431](https://github.com/rudderlabs/sqlconnect-go/issues/431)) ([e6df6b6](https://github.com/rudderlabs/sqlconnect-go/commit/e6df6b6a0a3eb82371d809a1a7fa9af1ec60ea5e))
+
+
+### Miscellaneous
+
+* **deps:** bump cloud.google.com/go/bigquery from 1.72.0 to 1.73.1 ([#429](https://github.com/rudderlabs/sqlconnect-go/issues/429)) ([9c1603f](https://github.com/rudderlabs/sqlconnect-go/commit/9c1603f219beaaa750aab9386606e4d7e24e3516))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.71.0 to 0.71.1 ([#432](https://github.com/rudderlabs/sqlconnect-go/issues/432)) ([82b3c0d](https://github.com/rudderlabs/sqlconnect-go/commit/82b3c0d58f17afa36a1fccc11d4725ff6e8ef2bd))
+* **deps:** bump step-security/harden-runner from 2.14.1 to 2.14.2 ([#428](https://github.com/rudderlabs/sqlconnect-go/issues/428)) ([a3487e3](https://github.com/rudderlabs/sqlconnect-go/commit/a3487e34d30024db8999f7be9a74e36a4911c739))
+
 ## [1.23.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.22.0...v1.23.0) (2026-02-04)
 
 
