@@ -53,7 +53,10 @@ type sqlDB interface {
 type CatalogAdmin interface {
 	// CurrentCatalog returns the current catalog.
 	// If this operation is not supported by the warehouse [ErrNotSupported] will be returned.
-	CurrentCatalog(ctx context.Context) (string, error)
+	CurrentCatalog(ctx context.Context) (CatalogRef, error)
+	// ListCatalogs returns all available catalogs linked to the credentials. System catalogs are filtered out.
+	// If this operation is not supported by the warehouse [ErrNotSupported] will be returned.
+	ListCatalogs(ctx context.Context) ([]CatalogRef, error)
 }
 
 type SchemaAdmin interface {

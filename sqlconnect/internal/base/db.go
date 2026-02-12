@@ -25,6 +25,11 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 			CurrentCatalog: func() string {
 				return "SELECT current_catalog"
 			},
+			ListCatalogs: func() (string, string) {
+				// Filter template databases (template0, template1) but include the postgres database
+				// datistemplate = false excludes template databases
+				return "SELECT datname FROM pg_database WHERE datistemplate = false", "datname"
+			},
 			CreateSchema: func(schema QuotedIdentifier) string {
 				return fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %[1]s", schema)
 			},
@@ -121,6 +126,8 @@ type (
 	SQLCommands        struct {
 		// Provides the SQL command to get the current catalog
 		CurrentCatalog func() string
+		// Provides the SQL command to list all catalogs/databases
+		ListCatalogs func() (sql, columnName string)
 		// Provides the SQL command to create a schema
 		CreateSchema func(schema QuotedIdentifier) string
 		// Provides the SQL command to list all schemas

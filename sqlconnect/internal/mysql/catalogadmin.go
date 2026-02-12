@@ -7,6 +7,11 @@ import (
 )
 
 // CurrentCatalog returns an error because it is not supported by MySQL
-func (db *DB) CurrentCatalog(ctx context.Context) (string, error) {
-	return "", sqlconnect.ErrNotSupported
+func (db *DB) CurrentCatalog(ctx context.Context) (sqlconnect.CatalogRef, error) {
+	return sqlconnect.CatalogRef{}, sqlconnect.ErrNotSupported
+}
+
+// ListCatalogs returns an error because it is not supported by MySQL
+func (db *DB) ListCatalogs(ctx context.Context) ([]sqlconnect.CatalogRef, error) {
+	return nil, sqlconnect.ErrNotSupported
 }

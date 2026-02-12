@@ -49,6 +49,9 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 			base.WithColumnTypeMapper(columnTypeMapper),
 			base.WithJsonRowMapper(jsonRowMapper),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
+				cmds.ListCatalogs = func() (string, string) {
+					return "SHOW CATALOGS", "Catalog"
+				}
 				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
 						{A: fmt.Sprintf(`SHOW TABLES FROM %[1]s`, schema), B: "tableName"},

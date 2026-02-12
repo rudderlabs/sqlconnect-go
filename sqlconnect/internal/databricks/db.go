@@ -74,6 +74,9 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 				cmds.CurrentCatalog = func() string {
 					return "SELECT current_catalog()"
 				}
+				cmds.ListCatalogs = func() (string, string) {
+					return "SHOW CATALOGS", "catalog"
+				}
 				cmds.ListSchemas = func() (string, string) { return "SHOW SCHEMAS", "schema_name" }
 				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
 					return fmt.Sprintf(`SHOW SCHEMAS LIKE '%s'`, base.EscapeSqlString(schema))

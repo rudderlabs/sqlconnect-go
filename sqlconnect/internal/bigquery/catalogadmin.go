@@ -4,15 +4,30 @@ import (
 	"context"
 
 	"cloud.google.com/go/bigquery"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
-func (db *DB) CurrentCatalog(ctx context.Context) (string, error) {
-	var catalog string
+func (db *DB) CurrentCatalog(ctx context.Context) (sqlconnect.CatalogRef, error) {
+	var catalogName string
 	if err := db.WithBigqueryClient(ctx, func(c *bigquery.Client) error {
-		catalog = c.Project()
+		catalogName = c.Project()
 		return nil
 	}); err != nil {
-		return "", err
+		return sqlconnect.CatalogRef{}, err
 	}
-	return catalog, nil
+	return sqlconnect.CatalogRef{Name: catalogName}, nil
+}
+
+// ListCatalogs returns the current GCP project
+// Note: The BigQuery Go client (cloud.google.com/go/bigquery) is scoped to a single project
+// and does not provide a method to list all accessible projects. Listing all projects would
+// require the Cloud Resource Manager API with additional permissions, which is out of scope
+// for a BigQuery-only connection. See: https://github.com/googleapis/google-cloud-go/issues/10044
+func (db *DB) ListCatalogs(ctx context.Context) ([]sqlconnect.CatalogRef, error) {
+	catalog, err := db.CurrentCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return []sqlconnect.CatalogRef{catalog}, nil
 }
