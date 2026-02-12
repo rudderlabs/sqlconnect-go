@@ -25,13 +25,9 @@ func (db *DB) CurrentCatalog(ctx context.Context) (sqlconnect.CatalogRef, error)
 // require the Cloud Resource Manager API with additional permissions, which is out of scope
 // for a BigQuery-only connection. See: https://github.com/googleapis/google-cloud-go/issues/10044
 func (db *DB) ListCatalogs(ctx context.Context) ([]sqlconnect.CatalogRef, error) {
-	var res []sqlconnect.CatalogRef
-	if err := db.WithBigqueryClient(ctx, func(c *bigquery.Client) error {
-		// Return the current project that this client is connected to
-		res = append(res, sqlconnect.CatalogRef{Name: c.Project()})
-		return nil
-	}); err != nil {
+	catalog, err := db.CurrentCatalog(ctx)
+	if err != nil {
 		return nil, err
 	}
-	return res, nil
+	return []sqlconnect.CatalogRef{catalog}, nil
 }
