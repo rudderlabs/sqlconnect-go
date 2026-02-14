@@ -1,7 +1,6 @@
 package driver_test
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -45,8 +44,7 @@ func TestRedshiftDriver(t *testing.T) {
 			err := json.Unmarshal([]byte(configJSON), &cfg)
 			require.NoError(t, err, "it should be able to unmarshal the config")
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			connector := driver.NewRedshiftConnector(cfg)
 			db := sql.OpenDB(connector)

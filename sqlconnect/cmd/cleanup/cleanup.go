@@ -37,7 +37,6 @@ func main() {
 	g, ctx := errgroup.WithContext(context.Background())
 	g.SetLimit(4)
 	for _, c := range cleanupConfigs {
-		c := c
 		g.Go(func() error {
 			configJSON, ok := os.LookupEnv(c.Env)
 			if !ok {

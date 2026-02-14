@@ -321,8 +321,8 @@ func ParseDSN(dsn string) (*RedshiftConfig, error) {
 		cfg.ClusterIdentifier = strings.TrimSuffix(strings.TrimPrefix(u.Host, "cluster("), ")")
 		return cfg, nil
 	}
-	if strings.HasPrefix(u.Host, "workgroup(") {
-		cfg.WorkgroupName = strings.TrimSuffix(strings.TrimPrefix(u.Host, "workgroup("), ")")
+	if after, ok := strings.CutPrefix(u.Host, "workgroup("); ok {
+		cfg.WorkgroupName = strings.TrimSuffix(after, ")")
 		return cfg, nil
 	}
 	return nil, errors.New("dsn is invalid: workgroup(name)/database or username@cluster(name)/database or secrets_arn")

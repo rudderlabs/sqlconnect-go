@@ -40,7 +40,7 @@ func TestExpressions(t *testing.T) {
 	})
 }
 
-func toSQL(t *testing.T, expression interface{}) string {
+func toSQL(t *testing.T, expression any) string {
 	esg := sqlgen.NewExpressionSQLGenerator(DatabaseType, GoquDialectOptions())
 	sql, _, err := sqlgen.GenerateExpressionSQL(esg, false, expression)
 	require.NoError(t, err)

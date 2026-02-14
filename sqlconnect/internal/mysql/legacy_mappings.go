@@ -85,10 +85,10 @@ func legacyJsonRowMapper(databaseTypeName string, value any) any {
 		switch v := value.(type) {
 		case int, int32, int64, uint32, uint64:
 			// converting to []byte to be backwards compatible
-			return []byte(fmt.Sprintf("%d", v))
+			return fmt.Appendf(nil, "%d", v)
 		case float32, float64:
 			// converting to []byte to be backwards compatible
-			return []byte(fmt.Sprintf("%f", v))
+			return fmt.Appendf(nil, "%f", v)
 		}
 
 	}

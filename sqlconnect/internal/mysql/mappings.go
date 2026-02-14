@@ -57,7 +57,7 @@ func columnTypeMapper(mappings map[string]string) func(base.ColumnType) string {
 	}
 }
 
-func jsonRowMapper(databaseTypeName string, value interface{}) interface{} {
+func jsonRowMapper(databaseTypeName string, value any) any {
 	if value == nil {
 		return nil
 	}
