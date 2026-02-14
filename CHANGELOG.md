@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.24.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.24.0...v1.24.1) (2026-02-14)
+
+
+### Miscellaneous
+
+* upgrade to go 1.26 and include go fix in fmt makefile target ([#434](https://github.com/rudderlabs/sqlconnect-go/issues/434)) ([1d3066d](https://github.com/rudderlabs/sqlconnect-go/commit/1d3066dc25f53414da6cbaef68b40b5303d892e7))
+
 ## [1.24.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.23.0...v1.24.0) (2026-02-12)
 
 
