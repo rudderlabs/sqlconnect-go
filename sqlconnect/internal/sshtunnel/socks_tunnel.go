@@ -50,11 +50,9 @@ func NewSocks5Tunnel(c Config) (Tunnel, error) {
 		return nil, fmt.Errorf("creating listener: %w", err)
 	}
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_ = socksServer.Serve(l)
-	}()
+	})
 	return &socksTunnel{
 		sshClient: sshClient,
 		listener:  l,

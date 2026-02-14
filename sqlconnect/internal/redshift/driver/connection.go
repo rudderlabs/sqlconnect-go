@@ -336,9 +336,6 @@ func (c *redshiftConnection) wait(ctx context.Context, id *string) (output *reds
 		if describeOutput() {
 			return output, err
 		}
-		polling = polling * 2
-		if polling > c.cfg.GetMaxPolling() {
-			polling = c.cfg.GetMaxPolling()
-		}
+		polling = min(polling*2, c.cfg.GetMaxPolling())
 	}
 }

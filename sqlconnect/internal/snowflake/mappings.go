@@ -80,7 +80,7 @@ func columnTypeMapper(columnType base.ColumnType) string {
 }
 
 // check https://godoc.org/github.com/snowflakedb/gosnowflake#hdr-Supported_Data_Types for handling snowflake data types
-func jsonRowMapper(databaseTypeName string, value interface{}) interface{} {
+func jsonRowMapper(databaseTypeName string, value any) any {
 	if value == nil {
 		return nil
 	}

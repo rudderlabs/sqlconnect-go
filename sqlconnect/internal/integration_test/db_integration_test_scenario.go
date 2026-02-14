@@ -1106,13 +1106,11 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				time.Sleep(10 * time.Millisecond)
 				var wg sync.WaitGroup
 				var iterations int
-				wg.Add(1)
-				go func() {
+				wg.Go(func() {
 					for range ch {
 						iterations++
 					}
-					wg.Done()
-				}()
+				})
 				wg.Wait()
 				require.Equal(t, 0, iterations, "it shouldn't iterate after leaving the channel")
 			})
