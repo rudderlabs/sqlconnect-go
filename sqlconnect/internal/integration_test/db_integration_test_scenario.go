@@ -600,8 +600,12 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
 			}
 			require.NoError(t, err, "it should be able to list tables in catalog")
-			require.Contains(t, tables, table, "it should contain the created table")
-			require.Contains(t, tables, view, "it should contain the created view")
+			tableWithCatalog := table
+			tableWithCatalog.Catalog = currentCatalog.Name
+			viewWithCatalog := view
+			viewWithCatalog.Catalog = currentCatalog.Name
+			require.Contains(t, tables, tableWithCatalog, "it should contain the created table")
+			require.Contains(t, tables, viewWithCatalog, "it should contain the created view")
 		})
 
 		t.Run("list tables with prefix", func(t *testing.T) {
