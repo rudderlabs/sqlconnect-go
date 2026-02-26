@@ -17,6 +17,7 @@ import (
 
 	kithelper "github.com/rudderlabs/rudder-go-kit/testhelper"
 	tunnelhelper "github.com/rudderlabs/sql-tunnels/tunnel/testhelper"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 )

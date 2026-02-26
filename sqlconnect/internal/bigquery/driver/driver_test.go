@@ -16,6 +16,7 @@ import (
 	"google.golang.org/api/option"
 
 	"github.com/rudderlabs/rudder-go-kit/testhelper/rand"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/bigquery/driver"
 )
 
