@@ -55,3 +55,17 @@ func (db *DB) ListSchemas(ctx context.Context) ([]sqlconnect.SchemaRef, error) {
 	}
 	return schemas, nil
 }
+
+// ListSchemasInCatalog returns schemas for the given catalog (GCP project).
+// Since the BigQuery client is scoped to a single project, only the current project is supported.
+// Requesting a different catalog returns [sqlconnect.ErrNotSupported].
+func (db *DB) ListSchemasInCatalog(ctx context.Context, catalog sqlconnect.CatalogRef) ([]sqlconnect.SchemaRef, error) {
+	currentCatalog, err := db.CurrentCatalog(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if catalog.Name != currentCatalog.Name {
+		return nil, sqlconnect.ErrNotSupported
+	}
+	return db.ListSchemas(ctx)
+}

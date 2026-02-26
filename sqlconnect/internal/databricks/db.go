@@ -78,6 +78,9 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 					return "SHOW CATALOGS", "catalog"
 				}
 				cmds.ListSchemas = func() (string, string) { return "SHOW SCHEMAS", "schema_name" }
+				cmds.ListSchemasInCatalog = func(catalog base.UnquotedIdentifier) (string, string) {
+					return fmt.Sprintf("SHOW SCHEMAS IN `%[1]s`", catalog), "schema_name"
+				}
 				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
 					return fmt.Sprintf(`SHOW SCHEMAS LIKE '%s'`, base.EscapeSqlString(schema))
 				}
@@ -88,6 +91,11 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
 					return []lo.Tuple2[string, string]{
 						{A: fmt.Sprintf("SHOW TABLES IN `%s`", base.EscapeSqlString(schema)), B: "tableName"},
+					}
+				}
+				cmds.ListTablesInCatalog = func(catalog, schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
+					return []lo.Tuple2[string, string]{
+						{A: fmt.Sprintf("SHOW TABLES IN `%[1]s`.`%[2]s`", base.EscapeSqlString(catalog), base.EscapeSqlString(schema)), B: "tableName"},
 					}
 				}
 				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {

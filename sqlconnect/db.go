@@ -64,6 +64,8 @@ type SchemaAdmin interface {
 	CreateSchema(ctx context.Context, schema SchemaRef) error
 	// GetSchemas returns a list of schemas
 	ListSchemas(ctx context.Context) ([]SchemaRef, error)
+	// ListSchemasInCatalog returns a list of schemas in the given catalog.
+	ListSchemasInCatalog(ctx context.Context, catalog CatalogRef) ([]SchemaRef, error)
 	// SchemaExists returns true if the schema exists
 	SchemaExists(ctx context.Context, schemaRef SchemaRef) (bool, error)
 	// DropSchema drops a schema
@@ -77,6 +79,8 @@ type TableAdmin interface {
 	ListTables(ctx context.Context, schema SchemaRef) ([]RelationRef, error)
 	// ListTablesWithPrefix returns a list of tables in the given schema that have the given prefix
 	ListTablesWithPrefix(ctx context.Context, schema SchemaRef, prefix string) ([]RelationRef, error)
+	// ListTablesInCatalog returns a list of tables in the given schema within the given catalog.
+	ListTablesInCatalog(ctx context.Context, catalog CatalogRef, schema SchemaRef) ([]RelationRef, error)
 	// TableExists returns true if the table exists
 	TableExists(ctx context.Context, relation RelationRef) (bool, error)
 	// ListColumns returns a list of columns for the given table
