@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mysqlresource "github.com/rudderlabs/rudder-go-kit/testhelper/docker/resource/mysql"
+
 	integrationtest "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/integration_test"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/mysql"
 )

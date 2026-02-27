@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/goqu/v10"
 	"github.com/rudderlabs/goqu/v10/exp"
 	"github.com/rudderlabs/goqu/v10/sqlgen"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
