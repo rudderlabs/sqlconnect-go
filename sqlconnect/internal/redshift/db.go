@@ -11,11 +11,10 @@ import (
 	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 
-	redshiftdriver "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift/driver"
-
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/postgres"
+	redshiftdriver "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift/driver"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 )
 

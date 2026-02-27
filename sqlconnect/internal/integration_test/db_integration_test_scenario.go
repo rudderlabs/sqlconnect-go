@@ -19,6 +19,7 @@ import (
 	"github.com/tidwall/sjson"
 
 	"github.com/rudderlabs/rudder-go-kit/testhelper/rand"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/op"
 	sqlconnectutil "github.com/rudderlabs/sqlconnect-go/sqlconnect/util"
