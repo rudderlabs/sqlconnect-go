@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.24.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.24.1...v1.24.2) (2026-02-27)
+
+
+### Miscellaneous
+
+* **deps:** bump actions/stale from 9.1.0 to 10.2.0 ([#442](https://github.com/rudderlabs/sqlconnect-go/issues/442)) ([b0b45f8](https://github.com/rudderlabs/sqlconnect-go/commit/b0b45f81778e7a5bb597997099826d3f91dd43eb))
+* **deps:** bump github.com/rudderlabs/rudder-go-kit from 0.72.0 to 0.72.3 ([#436](https://github.com/rudderlabs/sqlconnect-go/issues/436)) ([0bbd4c8](https://github.com/rudderlabs/sqlconnect-go/commit/0bbd4c8093f19a84524d9ba6dc39d5ed27c35993))
+* **deps:** bump google.golang.org/api from 0.265.0 to 0.266.0 ([#437](https://github.com/rudderlabs/sqlconnect-go/issues/437)) ([0730a20](https://github.com/rudderlabs/sqlconnect-go/commit/0730a20e4c568ee6c3d9ce00315facefc3b39793))
+* replace goimports with gci ([#446](https://github.com/rudderlabs/sqlconnect-go/issues/446)) ([1dfb5a7](https://github.com/rudderlabs/sqlconnect-go/commit/1dfb5a76ddfff79a8d4f652f5a2879d83b912ea5))
+
 ## [1.24.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.24.0...v1.24.1) (2026-02-14)
 
 
