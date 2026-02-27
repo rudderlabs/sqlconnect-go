@@ -49,6 +49,9 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 					return "SHOW TERSE DATABASES", "name"
 				}
 				cmds.ListSchemas = func() (string, string) { return "SHOW TERSE SCHEMAS", "name" }
+				cmds.ListSchemasInCatalog = func(catalog base.UnquotedIdentifier) (string, string) {
+					return fmt.Sprintf(`SHOW TERSE SCHEMAS IN DATABASE "%[1]s"`, catalog), "name"
+				}
 				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SHOW TERSE SCHEMAS LIKE '%[1]s'", base.EscapeSqlString(schema))
 				}
@@ -56,6 +59,12 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 					return []lo.Tuple2[string, string]{
 						{A: fmt.Sprintf(`SHOW TERSE TABLES IN SCHEMA "%[1]s"`, schema), B: "name"},
 						{A: fmt.Sprintf(`SHOW TERSE VIEWS IN SCHEMA "%[1]s"`, schema), B: "name"},
+					}
+				}
+				cmds.ListTablesInCatalog = func(catalog, schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
+					return []lo.Tuple2[string, string]{
+						{A: fmt.Sprintf(`SHOW TERSE TABLES IN SCHEMA "%[1]s"."%[2]s"`, catalog, schema), B: "name"},
+						{A: fmt.Sprintf(`SHOW TERSE VIEWS IN SCHEMA "%[1]s"."%[2]s"`, catalog, schema), B: "name"},
 					}
 				}
 				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {

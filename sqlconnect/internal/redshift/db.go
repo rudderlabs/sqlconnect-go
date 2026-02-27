@@ -68,12 +68,20 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 				cmds.ListSchemas = func() (string, string) {
 					return "SELECT schema_name FROM svv_all_schemas", "schema_name"
 				}
+				cmds.ListSchemasInCatalog = func(catalog base.UnquotedIdentifier) (string, string) {
+					return fmt.Sprintf("SELECT schema_name FROM svv_all_schemas WHERE database_name = '%[1]s'", base.EscapeSqlString(catalog)), "schema_name"
+				}
 				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SELECT schema_name FROM svv_all_schemas WHERE schema_name = '%[1]s'", base.EscapeSqlString(schema))
 				}
 				cmds.ListTables = func(schema base.UnquotedIdentifier) (sqlAndColumnNamePairs []lo.Tuple2[string, string]) {
 					return []lo.Tuple2[string, string]{
 						{A: fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name = '%[1]s'", base.EscapeSqlString(schema)), B: "table_name"},
+					}
+				}
+				cmds.ListTablesInCatalog = func(catalog, schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
+					return []lo.Tuple2[string, string]{
+						{A: fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE database_name = '%[1]s' AND schema_name = '%[2]s'", base.EscapeSqlString(catalog), base.EscapeSqlString(schema)), B: "table_name"},
 					}
 				}
 				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {

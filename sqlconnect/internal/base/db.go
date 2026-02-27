@@ -36,6 +36,9 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 			ListSchemas: func() (string, string) {
 				return "SELECT schema_name FROM information_schema.schemata", "schema_name"
 			},
+			ListSchemasInCatalog: func(catalog UnquotedIdentifier) (string, string) {
+				return fmt.Sprintf("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = '%[1]s'", EscapeSqlString(catalog)), "schema_name"
+			},
 			SchemaExists: func(schema UnquotedIdentifier) string {
 				return fmt.Sprintf("SELECT schema_name FROM information_schema.schemata where schema_name = '%[1]s'", EscapeSqlString(schema))
 			},
@@ -46,6 +49,11 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 			ListTables: func(schema UnquotedIdentifier) []lo.Tuple2[string, string] {
 				return []lo.Tuple2[string, string]{
 					{A: fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema = '%[1]s'", EscapeSqlString(schema)), B: "table_name"},
+				}
+			},
+			ListTablesInCatalog: func(catalog, schema UnquotedIdentifier) []lo.Tuple2[string, string] {
+				return []lo.Tuple2[string, string]{
+					{A: fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_catalog = '%[1]s' AND table_schema = '%[2]s'", EscapeSqlString(catalog), EscapeSqlString(schema)), B: "table_name"},
 				}
 			},
 			ListTablesWithPrefix: func(schema UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
@@ -132,6 +140,8 @@ type (
 		CreateSchema func(schema QuotedIdentifier) string
 		// Provides the SQL command to list all schemas
 		ListSchemas func() (sql, columnName string)
+		// Provides the SQL command to list all schemas in a specific catalog
+		ListSchemasInCatalog func(catalog UnquotedIdentifier) (sql, columnName string)
 		// Provides the SQL command to check if a schema exists
 		SchemaExists func(schema UnquotedIdentifier) string
 		// Provides the SQL command to drop a schema
@@ -140,6 +150,8 @@ type (
 		CreateTestTable func(table QuotedIdentifier) string
 		// Provides the SQL command(s) to list all tables in a schema along with the column name that contains the table name in the result set
 		ListTables func(schema UnquotedIdentifier) (sqlAndColumnNamePairs []lo.Tuple2[string, string])
+		// Provides the SQL command(s) to list all tables in a schema within a specific catalog along with the column name that contains the table name in the result set
+		ListTablesInCatalog func(catalog, schema UnquotedIdentifier) (sqlAndColumnNamePairs []lo.Tuple2[string, string])
 		// Provides the SQL command(s) to list all tables in a schema with a prefix along with the column name that contains the table name in the result set
 		ListTablesWithPrefix func(schema UnquotedIdentifier, prefix string) []lo.Tuple2[string, string]
 		// Provides the SQL command to check if a table exists

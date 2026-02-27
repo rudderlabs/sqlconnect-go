@@ -167,6 +167,20 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 
+		t.Run("list in catalog", func(t *testing.T) {
+			t.Run("with context cancelled", func(t *testing.T) {
+				_, err := db.ListSchemasInCatalog(cancelledCtx, currentCatalog)
+				require.Error(t, err, "it should not be able to list schemas in catalog with a cancelled context")
+			})
+
+			schemas, err := db.ListSchemasInCatalog(ctx, currentCatalog)
+			if errors.Is(err, sqlconnect.ErrNotSupported) {
+				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
+			}
+			require.NoError(t, err, "it should be able to list schemas in catalog")
+			require.Contains(t, schemas, schema, "it should contain the created schema")
+		})
+
 		t.Run("drop", func(t *testing.T) {
 			t.Run("with context cancelled", func(t *testing.T) {
 				err := db.DropSchema(cancelledCtx, schema)
@@ -574,6 +588,25 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			require.NoError(t, err, "it should be able to list tables")
 			require.Contains(t, tables, view, "it should contain the created view")
 			require.Contains(t, tables, table, "it should contain the table as well")
+		})
+
+		t.Run("list tables in catalog", func(t *testing.T) {
+			t.Run("with context cancelled", func(t *testing.T) {
+				_, err := db.ListTablesInCatalog(cancelledCtx, currentCatalog, schema)
+				require.Error(t, err, "it should not be able to list tables in catalog with a cancelled context")
+			})
+
+			tables, err := db.ListTablesInCatalog(ctx, currentCatalog, schema)
+			if errors.Is(err, sqlconnect.ErrNotSupported) {
+				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
+			}
+			require.NoError(t, err, "it should be able to list tables in catalog")
+			tableWithCatalog := table
+			tableWithCatalog.Catalog = currentCatalog.Name
+			viewWithCatalog := view
+			viewWithCatalog.Catalog = currentCatalog.Name
+			require.Contains(t, tables, tableWithCatalog, "it should contain the created table")
+			require.Contains(t, tables, viewWithCatalog, "it should contain the created view")
 		})
 
 		t.Run("list tables with prefix", func(t *testing.T) {

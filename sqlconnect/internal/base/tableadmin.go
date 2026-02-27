@@ -18,18 +18,36 @@ func (db *DB) CreateTestTable(ctx context.Context, table sqlconnect.RelationRef)
 
 // ListTables returns a list of tables in the given schema
 func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef) ([]sqlconnect.RelationRef, error) {
+	return db.listTablesFromQueries(ctx, db.sqlCommands.ListTables(UnquotedIdentifier(schema.Name)), func(name string) sqlconnect.RelationRef {
+		return sqlconnect.NewRelationRef(name, sqlconnect.WithSchema(schema.Name))
+	})
+}
+
+// ListTablesInCatalog returns a list of tables in the given schema within the given catalog
+func (db *DB) ListTablesInCatalog(ctx context.Context, catalog sqlconnect.CatalogRef, schema sqlconnect.SchemaRef) ([]sqlconnect.RelationRef, error) {
+	if db.sqlCommands.ListTablesInCatalog == nil {
+		return nil, sqlconnect.ErrNotSupported
+	}
+	return db.listTablesFromQueries(ctx, db.sqlCommands.ListTablesInCatalog(UnquotedIdentifier(catalog.Name), UnquotedIdentifier(schema.Name)), func(name string) sqlconnect.RelationRef {
+		return sqlconnect.NewRelationRef(name, sqlconnect.WithSchema(schema.Name), sqlconnect.WithCatalog(catalog.Name))
+	})
+}
+
+// listTablesFromQueries executes the given SQL statements and scans the results into a list of RelationRefs,
+// using makeRef to construct each RelationRef from the scanned table name.
+func (db *DB) listTablesFromQueries(ctx context.Context, tuples []lo.Tuple2[string, string], makeRef func(name string) sqlconnect.RelationRef) ([]sqlconnect.RelationRef, error) {
 	var res []sqlconnect.RelationRef
-	for _, tuple := range db.sqlCommands.ListTables(UnquotedIdentifier(schema.Name)) {
+	for _, tuple := range tuples {
 		stmt := tuple.A
 		colName := tuple.B
 		rows, err := db.QueryContext(ctx, stmt)
 		if err != nil {
-			return nil, fmt.Errorf("querying list tables for schema %s: %w", schema, err)
+			return nil, fmt.Errorf("querying list tables: %w", err)
 		}
 		defer func() { _ = rows.Close() }()
 		cols, err := rows.Columns()
 		if err != nil {
-			return nil, fmt.Errorf("getting columns in list tables for schema %s: %w", schema, err)
+			return nil, fmt.Errorf("getting columns in list tables: %w", err)
 		}
 		cols = lo.Map(cols, func(col string, _ int) string { return strings.ToLower(col) })
 		var name string
@@ -55,13 +73,12 @@ func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef) ([]sq
 			if err != nil {
 				return nil, fmt.Errorf("scanning list tables: %w", err)
 			}
-			res = append(res, sqlconnect.NewRelationRef(name, sqlconnect.WithSchema(schema.Name)))
+			res = append(res, makeRef(name))
 		}
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("iterating list tables: %w", err)
 		}
 	}
-
 	return res, nil
 }
 
