@@ -1,6 +1,7 @@
 package databricks
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -70,6 +71,9 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 			base.WithDialect(newDialect()),
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
+			base.WithCatalogValidator(func(_ context.Context, _ string) error {
+				return nil // databricks supports cross-catalog operations
+			}),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
 				cmds.CurrentCatalog = func() string {
 					return "SELECT current_catalog()"

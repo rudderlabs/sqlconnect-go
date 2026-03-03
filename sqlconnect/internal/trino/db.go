@@ -48,6 +48,9 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 			base.WithDialect(newDialect()),
 			base.WithColumnTypeMapper(columnTypeMapper),
 			base.WithJsonRowMapper(jsonRowMapper),
+			base.WithCatalogValidator(func(_ context.Context, _ string) error {
+				return nil // trino supports cross-catalog operations
+			}),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
 				cmds.ListCatalogs = func() (string, string) {
 					return "SHOW CATALOGS", "Catalog"
