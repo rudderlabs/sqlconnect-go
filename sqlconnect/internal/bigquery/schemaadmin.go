@@ -15,7 +15,7 @@ import (
 // SchemaExists uses the bigquery client instead of [INFORMATION_SCHEMA.SCHEMATA] due to absence of a region qualifier
 // https://cloud.google.com/bigquery/docs/information-schema-datasets-schemata#scope_and_syntax
 func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef) (bool, error) {
-	if err := db.DB.ValidateCatalog(ctx, schemaRef.Catalog); err != nil {
+	if err := db.ValidateCatalog(ctx, schemaRef.Catalog); err != nil {
 		return false, err
 	}
 	var exists bool
@@ -47,7 +47,7 @@ func (db *DB) ListSchemas(ctx context.Context, catalog ...sqlconnect.CatalogRef)
 	if len(catalog) > 0 {
 		catalogName = catalog[0].Name
 	}
-	if err := db.DB.ValidateCatalog(ctx, catalogName); err != nil {
+	if err := db.ValidateCatalog(ctx, catalogName); err != nil {
 		return nil, err
 	}
 	var schemas []sqlconnect.SchemaRef
