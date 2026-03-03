@@ -1,9 +1,11 @@
 package base
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/samber/lo"
 
@@ -33,36 +35,44 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 			CreateSchema: func(schema QuotedIdentifier) string {
 				return fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %[1]s", schema)
 			},
-			ListSchemas: func() (string, string) {
-				return "SELECT schema_name FROM information_schema.schemata", "schema_name"
+			ListSchemas: func(catalog UnquotedIdentifier) (string, string) {
+				stmt := "SELECT schema_name FROM information_schema.schemata"
+				if catalog != "" {
+					stmt += fmt.Sprintf(" WHERE catalog_name = '%[1]s'", EscapeSqlString(catalog))
+				}
+				return stmt, "schema_name"
 			},
-			ListSchemasInCatalog: func(catalog UnquotedIdentifier) (string, string) {
-				return fmt.Sprintf("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = '%[1]s'", EscapeSqlString(catalog)), "schema_name"
+			SchemaExists: func(schema, catalog UnquotedIdentifier) string {
+				stmt := fmt.Sprintf("SELECT schema_name FROM information_schema.schemata where schema_name = '%[1]s'", EscapeSqlString(schema))
+				if catalog != "" {
+					stmt += fmt.Sprintf(" AND catalog_name = '%[1]s'", EscapeSqlString(catalog))
+				}
+				return stmt
 			},
-			SchemaExists: func(schema UnquotedIdentifier) string {
-				return fmt.Sprintf("SELECT schema_name FROM information_schema.schemata where schema_name = '%[1]s'", EscapeSqlString(schema))
+			DropSchema: func(schema QuotedIdentifier, _ UnquotedIdentifier) string {
+				return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema)
 			},
-			DropSchema: func(schema QuotedIdentifier) string { return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema) },
 			CreateTestTable: func(table QuotedIdentifier) string {
 				return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %[1]s (c1 INT, c2 VARCHAR(255))", table)
 			},
-			ListTables: func(schema UnquotedIdentifier) []lo.Tuple2[string, string] {
+			ListTables: func(schema, catalog UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+				stmt := fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema = '%[1]s'", EscapeSqlString(schema))
+				if catalog != "" {
+					stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", EscapeSqlString(catalog))
+				}
+				if prefix != "" {
+					stmt += fmt.Sprintf(" AND table_name LIKE '%[1]s'", prefix+"%%")
+				}
 				return []lo.Tuple2[string, string]{
-					{A: fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema = '%[1]s'", EscapeSqlString(schema)), B: "table_name"},
+					{A: stmt, B: "table_name"},
 				}
 			},
-			ListTablesInCatalog: func(catalog, schema UnquotedIdentifier) []lo.Tuple2[string, string] {
-				return []lo.Tuple2[string, string]{
-					{A: fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_catalog = '%[1]s' AND table_schema = '%[2]s'", EscapeSqlString(catalog), EscapeSqlString(schema)), B: "table_name"},
+			TableExists: func(schema, table, catalog UnquotedIdentifier) string {
+				stmt := fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='%[1]s' and table_name = '%[2]s'", EscapeSqlString(schema), EscapeSqlString(table))
+				if catalog != "" {
+					stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", EscapeSqlString(catalog))
 				}
-			},
-			ListTablesWithPrefix: func(schema UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
-				return []lo.Tuple2[string, string]{
-					{A: fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='%[1]s' AND table_name LIKE '%[2]s'", EscapeSqlString(schema), prefix+"%"), B: "table_name"},
-				}
-			},
-			TableExists: func(schema, table UnquotedIdentifier) string {
-				return fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='%[1]s' and table_name = '%[2]s'", EscapeSqlString(schema), EscapeSqlString(table))
+				return stmt
 			},
 			ListColumns: func(catalog, schema, table UnquotedIdentifier) (string, string, string) {
 				stmt := fmt.Sprintf("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '%[1]s' AND table_name = '%[2]s'", EscapeSqlString(schema), EscapeSqlString(table))
@@ -138,24 +148,18 @@ type (
 		ListCatalogs func() (sql, columnName string)
 		// Provides the SQL command to create a schema
 		CreateSchema func(schema QuotedIdentifier) string
-		// Provides the SQL command to list all schemas
-		ListSchemas func() (sql, columnName string)
-		// Provides the SQL command to list all schemas in a specific catalog
-		ListSchemasInCatalog func(catalog UnquotedIdentifier) (sql, columnName string)
-		// Provides the SQL command to check if a schema exists
-		SchemaExists func(schema UnquotedIdentifier) string
-		// Provides the SQL command to drop a schema
-		DropSchema func(schema QuotedIdentifier) string
+		// Provides the SQL command to list schemas, optionally filtered by catalog
+		ListSchemas func(catalog UnquotedIdentifier) (sql, columnName string)
+		// Provides the SQL command to check if a schema exists, optionally within a catalog
+		SchemaExists func(schema, catalog UnquotedIdentifier) string
+		// Provides the SQL command to drop a schema, optionally within a catalog
+		DropSchema func(schema QuotedIdentifier, catalog UnquotedIdentifier) string
 		// Provides the SQL command to create a test table
 		CreateTestTable func(table QuotedIdentifier) string
-		// Provides the SQL command(s) to list all tables in a schema along with the column name that contains the table name in the result set
-		ListTables func(schema UnquotedIdentifier) (sqlAndColumnNamePairs []lo.Tuple2[string, string])
-		// Provides the SQL command(s) to list all tables in a schema within a specific catalog along with the column name that contains the table name in the result set
-		ListTablesInCatalog func(catalog, schema UnquotedIdentifier) (sqlAndColumnNamePairs []lo.Tuple2[string, string])
-		// Provides the SQL command(s) to list all tables in a schema with a prefix along with the column name that contains the table name in the result set
-		ListTablesWithPrefix func(schema UnquotedIdentifier, prefix string) []lo.Tuple2[string, string]
-		// Provides the SQL command to check if a table exists
-		TableExists func(schema, table UnquotedIdentifier) string
+		// Provides the SQL command(s) to list tables in a schema, optionally filtered by catalog and/or prefix
+		ListTables func(schema, catalog UnquotedIdentifier, prefix string) (sqlAndColumnNamePairs []lo.Tuple2[string, string])
+		// Provides the SQL command to check if a table exists, optionally within a catalog
+		TableExists func(schema, table, catalog UnquotedIdentifier) string
 		// Provides the SQL command to list all columns in a table along with the column names in the result set that point to the name and type
 		ListColumns func(catalog, schema, table UnquotedIdentifier) (sql, nameCol, typeCol string)
 		// Provides the SQL command to count the rows in a table
@@ -170,3 +174,21 @@ type (
 		MoveTable func(schema, oldName, newName QuotedIdentifier) string
 	}
 )
+
+// ValidateCatalog checks if the given catalog matches the current catalog.
+// Returns nil if catalog is empty (no validation needed) or matches the current catalog.
+// Returns [sqlconnect.ErrNotSupported] if the catalog differs from the current catalog,
+// since the base implementation uses information_schema which is scoped to the current database.
+func (db *DB) ValidateCatalog(ctx context.Context, catalog string) error {
+	if catalog == "" {
+		return nil
+	}
+	currentCatalog, err := db.CurrentCatalog(ctx)
+	if err != nil {
+		return fmt.Errorf("validating catalog: %w", err)
+	}
+	if !strings.EqualFold(currentCatalog.Name, catalog) {
+		return sqlconnect.ErrNotSupported
+	}
+	return nil
+}

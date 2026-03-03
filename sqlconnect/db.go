@@ -62,26 +62,22 @@ type CatalogAdmin interface {
 type SchemaAdmin interface {
 	// CreateSchema creates a schema
 	CreateSchema(ctx context.Context, schema SchemaRef) error
-	// GetSchemas returns a list of schemas
-	ListSchemas(ctx context.Context) ([]SchemaRef, error)
-	// ListSchemasInCatalog returns a list of schemas in the given catalog.
-	ListSchemasInCatalog(ctx context.Context, catalog CatalogRef) ([]SchemaRef, error)
-	// SchemaExists returns true if the schema exists
+	// ListSchemas returns a list of schemas, optionally filtered by a single catalog.
+	// At most one catalog can be provided; passing more than one returns an error.
+	ListSchemas(ctx context.Context, catalog ...CatalogRef) ([]SchemaRef, error)
+	// SchemaExists returns true if the schema exists. If SchemaRef.Catalog is set, the check is scoped to that catalog.
 	SchemaExists(ctx context.Context, schemaRef SchemaRef) (bool, error)
-	// DropSchema drops a schema
+	// DropSchema drops a schema. If SchemaRef.Catalog is set, the operation is scoped to that catalog.
 	DropSchema(ctx context.Context, schema SchemaRef) error
 }
 
 type TableAdmin interface {
 	// CreateTestTable creates a test table
 	CreateTestTable(ctx context.Context, relation RelationRef) error
-	// ListTables returns a list of tables in the given schema
-	ListTables(ctx context.Context, schema SchemaRef) ([]RelationRef, error)
-	// ListTablesWithPrefix returns a list of tables in the given schema that have the given prefix
-	ListTablesWithPrefix(ctx context.Context, schema SchemaRef, prefix string) ([]RelationRef, error)
-	// ListTablesInCatalog returns a list of tables in the given schema within the given catalog.
-	ListTablesInCatalog(ctx context.Context, catalog CatalogRef, schema SchemaRef) ([]RelationRef, error)
-	// TableExists returns true if the table exists
+	// ListTables returns a list of tables in the given schema, optionally filtered by prefix.
+	// If SchemaRef.Catalog is set, the listing is scoped to that catalog.
+	ListTables(ctx context.Context, schema SchemaRef, opts ...ListTableOption) ([]RelationRef, error)
+	// TableExists returns true if the table exists. If RelationRef.Catalog is set, the check is scoped to that catalog.
 	TableExists(ctx context.Context, relation RelationRef) (bool, error)
 	// ListColumns returns a list of columns for the given table
 	ListColumns(ctx context.Context, relation RelationRef) ([]ColumnRef, error)

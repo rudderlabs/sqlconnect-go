@@ -169,11 +169,11 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 
 		t.Run("list in catalog", func(t *testing.T) {
 			t.Run("with context cancelled", func(t *testing.T) {
-				_, err := db.ListSchemasInCatalog(cancelledCtx, currentCatalog)
+				_, err := db.ListSchemas(cancelledCtx, currentCatalog)
 				require.Error(t, err, "it should not be able to list schemas in catalog with a cancelled context")
 			})
 
-			schemas, err := db.ListSchemasInCatalog(ctx, currentCatalog)
+			schemas, err := db.ListSchemas(ctx, currentCatalog)
 			if errors.Is(err, sqlconnect.ErrNotSupported) {
 				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
 			}
@@ -591,12 +591,13 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 
 		t.Run("list tables in catalog", func(t *testing.T) {
+			schemaInCatalog := sqlconnect.SchemaRef{Name: schema.Name, Catalog: currentCatalog.Name}
 			t.Run("with context cancelled", func(t *testing.T) {
-				_, err := db.ListTablesInCatalog(cancelledCtx, currentCatalog, schema)
+				_, err := db.ListTables(cancelledCtx, schemaInCatalog)
 				require.Error(t, err, "it should not be able to list tables in catalog with a cancelled context")
 			})
 
-			tables, err := db.ListTablesInCatalog(ctx, currentCatalog, schema)
+			tables, err := db.ListTables(ctx, schemaInCatalog)
 			if errors.Is(err, sqlconnect.ErrNotSupported) {
 				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
 			}
@@ -611,11 +612,11 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 
 		t.Run("list tables with prefix", func(t *testing.T) {
 			t.Run("with context cancelled", func(t *testing.T) {
-				_, err := db.ListTablesWithPrefix(cancelledCtx, schema, formatfn("test"))
+				_, err := db.ListTables(cancelledCtx, schema, sqlconnect.WithPrefix(formatfn("test")))
 				require.Error(t, err, "it should not be able to list tables with a prefix with a cancelled context")
 			})
 
-			tables, err := db.ListTablesWithPrefix(ctx, schema, formatfn("test"))
+			tables, err := db.ListTables(ctx, schema, sqlconnect.WithPrefix(formatfn("test")))
 			require.NoError(t, err, "it should be able to list tables with a prefix")
 			require.Contains(t, tables, table, "it should contain the created table")
 		})
