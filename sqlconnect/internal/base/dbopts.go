@@ -1,6 +1,7 @@
 package base
 
 import (
+	"context"
 	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
@@ -55,5 +56,14 @@ func WithGoquDialect(gqd *GoquDialect) Option {
 func WithSQLCommandsOverride(override func(defaultCommands SQLCommands) SQLCommands) Option {
 	return func(db *DB) {
 		db.sqlCommands = override(db.sqlCommands)
+	}
+}
+
+// WithCatalogValidator overrides the default catalog validation logic used by [DB.ValidateCatalog].
+// The provided function is called with a non-empty catalog name and should return [sqlconnect.ErrNotSupported]
+// if the catalog doesn't match the current catalog.
+func WithCatalogValidator(validator func(ctx context.Context, catalog string) error) Option {
+	return func(db *DB) {
+		db.catalogValidator = validator
 	}
 }

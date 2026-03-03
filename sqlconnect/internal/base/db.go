@@ -92,6 +92,7 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 			},
 		},
 	}
+	d.catalogValidator = d.defaultCatalogValidator
 	for _, opt := range opts {
 		opt(d)
 	}
@@ -106,6 +107,7 @@ type DB struct {
 	columnTypeMapper func(ColumnType) string // map from database type to rudder type
 	jsonRowMapper    func(databaseTypeName string, value any) any
 	sqlCommands      SQLCommands
+	catalogValidator func(ctx context.Context, catalog string) error // validates that the catalog matches the current catalog
 }
 
 // Close closes the db and the tunnel
@@ -177,12 +179,17 @@ type (
 
 // ValidateCatalog checks if the given catalog matches the current catalog.
 // Returns nil if catalog is empty (no validation needed) or matches the current catalog.
-// Returns [sqlconnect.ErrNotSupported] if the catalog differs from the current catalog,
-// since the base implementation uses information_schema which is scoped to the current database.
+// Returns [sqlconnect.ErrNotSupported] if the catalog differs from the current catalog.
+// The validation logic can be customized via [WithCatalogValidator].
 func (db *DB) ValidateCatalog(ctx context.Context, catalog string) error {
 	if catalog == "" {
 		return nil
 	}
+	return db.catalogValidator(ctx, catalog)
+}
+
+// defaultCatalogValidator validates the catalog by querying [CurrentCatalog] via SQL.
+func (db *DB) defaultCatalogValidator(ctx context.Context, catalog string) error {
 	currentCatalog, err := db.CurrentCatalog(ctx)
 	if err != nil {
 		return fmt.Errorf("validating catalog: %w", err)
