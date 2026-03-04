@@ -70,7 +70,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 			}),
 			base.WithCatalogValidator(func(_ context.Context, catalog string) error {
 				if !strings.EqualFold(config.ProjectID, catalog) {
-					return sqlconnect.ErrNotSupported
+					return sqlconnect.ErrorCrossCatalogOperation
 				}
 				return nil
 			}),

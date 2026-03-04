@@ -12,8 +12,9 @@ import (
 )
 
 var (
-	ErrNotSupported         = errors.New("sqconnect: feature not supported")
-	ErrDropOldTablePostCopy = errors.New("sqlconnect move table: dropping old table after copying its contents to the new table")
+	ErrNotSupported            = errors.New("sqconnect: feature not supported")
+	ErrDropOldTablePostCopy    = errors.New("sqlconnect move table: dropping old table after copying its contents to the new table")
+	ErrorCrossCatalogOperation = errors.New("sqlconnect: cross-catalog operation not supported")
 )
 
 type DB interface {

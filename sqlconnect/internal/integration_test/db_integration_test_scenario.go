@@ -73,7 +73,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 
 			currentCatalog, err = db.CurrentCatalog(ctx)
-			if errors.Is(err, sqlconnect.ErrNotSupported) {
+			if errors.Is(err, sqlconnect.ErrorCrossCatalogOperation) {
 				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
 			}
 			require.NoError(t, err, "it should be able to get the current catalog")
@@ -87,7 +87,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 
 			catalogs, err := db.ListCatalogs(ctx)
-			if errors.Is(err, sqlconnect.ErrNotSupported) {
+			if errors.Is(err, sqlconnect.ErrorCrossCatalogOperation) {
 				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
 			}
 			require.NoError(t, err)
@@ -174,7 +174,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 
 			schemas, err := db.ListSchemas(ctx, currentCatalog)
-			if errors.Is(err, sqlconnect.ErrNotSupported) {
+			if errors.Is(err, sqlconnect.ErrorCrossCatalogOperation) {
 				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
 			}
 			require.NoError(t, err, "it should be able to list schemas in catalog")
@@ -598,7 +598,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 
 			tables, err := db.ListTables(ctx, schemaInCatalog)
-			if errors.Is(err, sqlconnect.ErrNotSupported) {
+			if errors.Is(err, sqlconnect.ErrorCrossCatalogOperation) {
 				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
 			}
 			require.NoError(t, err, "it should be able to list tables in catalog")

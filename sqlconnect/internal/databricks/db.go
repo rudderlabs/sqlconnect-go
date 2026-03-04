@@ -125,6 +125,12 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 					}
 					return fmt.Sprintf("DESCRIBE TABLE `%[1]s`.`%[2]s`.`%[3]s`", catalog, schema, table), "col_name", "data_type"
 				}
+				cmds.DropSchema = func(schema base.QuotedIdentifier, catalog base.UnquotedIdentifier) string {
+					if catalog != "" {
+						return fmt.Sprintf("DROP SCHEMA `%[1]s`.%[2]s CASCADE", catalog, schema)
+					}
+					return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema)
+				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {
 					return fmt.Sprintf("ALTER TABLE %[1]s.%[2]s RENAME TO %[1]s.%[3]s", schema, oldName, newName)
 				}

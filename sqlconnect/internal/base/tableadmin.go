@@ -107,6 +107,9 @@ func (db *DB) TableExists(ctx context.Context, relation sqlconnect.RelationRef) 
 
 // ListColumns returns a list of columns for the given table
 func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) ([]sqlconnect.ColumnRef, error) {
+	if err := db.ValidateCatalog(ctx, relation.Catalog); err != nil {
+		return nil, err
+	}
 	var res []sqlconnect.ColumnRef
 	stmt, nameCol, typeCol := db.sqlCommands.ListColumns(UnquotedIdentifier(relation.Catalog), UnquotedIdentifier(relation.Schema), UnquotedIdentifier(relation.Name))
 	columns, err := db.QueryContext(ctx, stmt)
@@ -187,6 +190,9 @@ func (db *DB) ListColumnsForSqlQuery(ctx context.Context, sql string) ([]sqlconn
 
 // CountTableRows returns the number of rows in the given table
 func (c *DB) CountTableRows(ctx context.Context, relation sqlconnect.RelationRef) (int, error) {
+	if err := c.ValidateCatalog(ctx, relation.Catalog); err != nil {
+		return 0, err
+	}
 	var count int
 	if err := c.QueryRowContext(ctx, c.sqlCommands.CountTableRows(QuotedIdentifier(c.QuoteTable(relation)))).Scan(&count); err != nil {
 		return 0, fmt.Errorf("counting table rows for %s: %w", relation.String(), err)
@@ -196,6 +202,9 @@ func (c *DB) CountTableRows(ctx context.Context, relation sqlconnect.RelationRef
 
 // DropTable drops a table
 func (db *DB) DropTable(ctx context.Context, ref sqlconnect.RelationRef) error {
+	if err := db.ValidateCatalog(ctx, ref.Catalog); err != nil {
+		return err
+	}
 	if _, err := db.ExecContext(ctx, db.sqlCommands.DropTable(QuotedIdentifier(db.QuoteTable(ref)))); err != nil {
 		return fmt.Errorf("dropping table %s: %w", ref.String(), err)
 	}

@@ -180,7 +180,7 @@ type (
 // ValidateCatalog checks if the given catalog matches the current catalog.
 // Returns nil if catalog is empty (no validation needed) or matches the current catalog.
 // Returns [sqlconnect.ErrNotSupported] if the catalog differs from the current catalog.
-// The validation logic can be customized via [WithCatalogValidator].
+// The validation logic can be customized via [WithCatalogValidator] to support cross-catalog operations.
 func (db *DB) ValidateCatalog(ctx context.Context, catalog string) error {
 	if catalog == "" {
 		return nil
@@ -195,7 +195,7 @@ func (db *DB) defaultCatalogValidator(ctx context.Context, catalog string) error
 		return fmt.Errorf("validating catalog: %w", err)
 	}
 	if !strings.EqualFold(currentCatalog.Name, catalog) {
-		return sqlconnect.ErrNotSupported
+		return sqlconnect.ErrorCrossCatalogOperation
 	}
 	return nil
 }
