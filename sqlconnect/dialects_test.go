@@ -144,30 +144,37 @@ func TestDialectQuoteTable(t *testing.T) {
 		// Snowflake
 		{warehouseType: "snowflake", table: sqlconnect.NewRelationRef("users"), expected: `"users"`},
 		{warehouseType: "snowflake", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public")), expected: `"public"."users"`},
+		{warehouseType: "snowflake", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public"), sqlconnect.WithCatalog("mydb")), expected: `"mydb"."public"."users"`},
 
 		// PostgreSQL
 		{warehouseType: "postgres", table: sqlconnect.NewRelationRef("users"), expected: `"users"`},
 		{warehouseType: "postgres", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public")), expected: `"public"."users"`},
+		{warehouseType: "postgres", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public"), sqlconnect.WithCatalog("mydb")), expected: `"mydb"."public"."users"`},
 
-		// BigQuery (schema.table in single backticks)
+		// BigQuery (project.dataset.table in single backticks)
 		{warehouseType: "bigquery", table: sqlconnect.NewRelationRef("users"), expected: "`users`"},
 		{warehouseType: "bigquery", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("dataset")), expected: "`dataset.users`"},
+		{warehouseType: "bigquery", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("dataset"), sqlconnect.WithCatalog("project")), expected: "`project.dataset.users`"},
 
 		// Redshift
 		{warehouseType: "redshift", table: sqlconnect.NewRelationRef("users"), expected: `"users"`},
 		{warehouseType: "redshift", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public")), expected: `"public"."users"`},
+		{warehouseType: "redshift", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public"), sqlconnect.WithCatalog("mydb")), expected: `"mydb"."public"."users"`},
 
 		// Databricks
 		{warehouseType: "databricks", table: sqlconnect.NewRelationRef("users"), expected: "`users`"},
 		{warehouseType: "databricks", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("default")), expected: "`default`.`users`"},
+		{warehouseType: "databricks", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("default"), sqlconnect.WithCatalog("catalog")), expected: "`catalog`.`default`.`users`"},
 
 		// Trino
 		{warehouseType: "trino", table: sqlconnect.NewRelationRef("users"), expected: `"users"`},
 		{warehouseType: "trino", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public")), expected: `"public"."users"`},
+		{warehouseType: "trino", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public"), sqlconnect.WithCatalog("catalog")), expected: `"catalog"."public"."users"`},
 
 		// MySQL
 		{warehouseType: "mysql", table: sqlconnect.NewRelationRef("users"), expected: "`users`"},
 		{warehouseType: "mysql", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("mydb")), expected: "`mydb`.`users`"},
+		{warehouseType: "mysql", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("mydb"), sqlconnect.WithCatalog("catalog")), expected: "`catalog`.`mydb`.`users`"},
 	}
 
 	for _, tt := range tests {

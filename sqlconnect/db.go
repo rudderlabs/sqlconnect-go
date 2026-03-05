@@ -65,11 +65,11 @@ type SchemaAdmin interface {
 	CreateSchema(ctx context.Context, schema SchemaRef) error
 	// ListSchemas returns a list of schemas, optionally filtered by a single catalog.
 	// At most one catalog can be provided; passing more than one returns an error.
-	ListSchemas(ctx context.Context, catalog ...CatalogRef) ([]SchemaRef, error)
+	ListSchemas(ctx context.Context, opts ...FilterOptions) ([]SchemaRef, error)
 	// SchemaExists returns true if the schema exists. If SchemaRef.Catalog is set, the check is scoped to that catalog.
-	SchemaExists(ctx context.Context, schemaRef SchemaRef) (bool, error)
+	SchemaExists(ctx context.Context, schemaRef SchemaRef, opts ...FilterOptions) (bool, error)
 	// DropSchema drops a schema. If SchemaRef.Catalog is set, the operation is scoped to that catalog.
-	DropSchema(ctx context.Context, schema SchemaRef) error
+	DropSchema(ctx context.Context, schema SchemaRef, opts ...FilterOptions) error
 }
 
 type TableAdmin interface {
@@ -77,7 +77,7 @@ type TableAdmin interface {
 	CreateTestTable(ctx context.Context, relation RelationRef) error
 	// ListTables returns a list of tables in the given schema, optionally filtered by prefix.
 	// If SchemaRef.Catalog is set, the listing is scoped to that catalog.
-	ListTables(ctx context.Context, schema SchemaRef, opts ...ListTableOption) ([]RelationRef, error)
+	ListTables(ctx context.Context, schema SchemaRef, opts ...TableListOptions) ([]RelationRef, error)
 	// TableExists returns true if the table exists. If RelationRef.Catalog is set, the check is scoped to that catalog.
 	TableExists(ctx context.Context, relation RelationRef) (bool, error)
 	// ListColumns returns a list of columns for the given table

@@ -19,13 +19,13 @@ func (db *DB) CreateSchema(ctx context.Context, schema sqlconnect.SchemaRef) err
 }
 
 // ListSchemas returns a list of schemas, optionally filtered by a single catalog
-func (db *DB) ListSchemas(ctx context.Context, catalog ...sqlconnect.CatalogRef) ([]sqlconnect.SchemaRef, error) {
-	if len(catalog) > 1 {
-		return nil, fmt.Errorf("listing schemas: at most one catalog can be provided, got %d", len(catalog))
+func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.FilterOptions) ([]sqlconnect.SchemaRef, error) {
+	if len(opts) > 1 {
+		return nil, fmt.Errorf("listing schemas: at most one filter option can be provided, got %d", len(opts))
 	}
 	var catalogName string
-	if len(catalog) > 0 {
-		catalogName = catalog[0].Name
+	if len(opts) > 0 {
+		catalogName = opts[0].Catalog
 	}
 	if err := db.ValidateCatalog(ctx, catalogName); err != nil {
 		return nil, err
@@ -80,11 +80,15 @@ func (db *DB) listSchemasFromQuery(ctx context.Context, stmt, colName string) ([
 }
 
 // SchemaExists returns true if the schema exists
-func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef) (bool, error) {
-	if err := db.ValidateCatalog(ctx, schemaRef.Catalog); err != nil {
+func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, opts ...sqlconnect.FilterOptions) (bool, error) {
+	var catalogName string
+	if len(opts) > 0 {
+		catalogName = opts[0].Catalog
+	}
+	if err := db.ValidateCatalog(ctx, catalogName); err != nil {
 		return false, err
 	}
-	rows, err := db.QueryContext(ctx, db.sqlCommands.SchemaExists(UnquotedIdentifier(schemaRef.Name), UnquotedIdentifier(schemaRef.Catalog)))
+	rows, err := db.QueryContext(ctx, db.sqlCommands.SchemaExists(UnquotedIdentifier(schemaRef.Name), UnquotedIdentifier(catalogName)))
 	if err != nil {
 		return false, fmt.Errorf("querying schema exists: %w", err)
 	}
@@ -97,11 +101,15 @@ func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef) 
 }
 
 // DropSchema drops a schema
-func (db *DB) DropSchema(ctx context.Context, schemaRef sqlconnect.SchemaRef) error {
-	if err := db.ValidateCatalog(ctx, schemaRef.Catalog); err != nil {
+func (db *DB) DropSchema(ctx context.Context, schemaRef sqlconnect.SchemaRef, opts ...sqlconnect.FilterOptions) error {
+	var catalogName string
+	if len(opts) > 0 {
+		catalogName = opts[0].Catalog
+	}
+	if err := db.ValidateCatalog(ctx, catalogName); err != nil {
 		return err
 	}
-	if _, err := db.ExecContext(ctx, db.sqlCommands.DropSchema(QuotedIdentifier(db.QuoteIdentifier(schemaRef.Name)), UnquotedIdentifier(schemaRef.Catalog))); err != nil {
+	if _, err := db.ExecContext(ctx, db.sqlCommands.DropSchema(QuotedIdentifier(db.QuoteIdentifier(schemaRef.Name)), UnquotedIdentifier(catalogName))); err != nil {
 		return fmt.Errorf("dropping schema: %w", err)
 	}
 	return nil

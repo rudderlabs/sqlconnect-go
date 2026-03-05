@@ -14,8 +14,12 @@ import (
 
 // SchemaExists uses the bigquery client instead of [INFORMATION_SCHEMA.SCHEMATA] due to absence of a region qualifier
 // https://cloud.google.com/bigquery/docs/information-schema-datasets-schemata#scope_and_syntax
-func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef) (bool, error) {
-	if err := db.ValidateCatalog(ctx, schemaRef.Catalog); err != nil {
+func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, opts ...sqlconnect.FilterOptions) (bool, error) {
+	var catalogName string
+	if len(opts) > 0 {
+		catalogName = opts[0].Catalog
+	}
+	if err := db.ValidateCatalog(ctx, catalogName); err != nil {
 		return false, err
 	}
 	var exists bool
@@ -39,13 +43,13 @@ func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef) 
 
 // ListSchemas uses the bigquery client instead of [INFORMATION_SCHEMA.SCHEMATA] due to absence of a region qualifier
 // https://cloud.google.com/bigquery/docs/information-schema-datasets-schemata#scope_and_syntax
-func (db *DB) ListSchemas(ctx context.Context, catalog ...sqlconnect.CatalogRef) ([]sqlconnect.SchemaRef, error) {
-	if len(catalog) > 1 {
-		return nil, fmt.Errorf("listing schemas: at most one catalog can be provided, got %d", len(catalog))
+func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.FilterOptions) ([]sqlconnect.SchemaRef, error) {
+	if len(opts) > 1 {
+		return nil, fmt.Errorf("listing schemas: at most one filter option can be provided, got %d", len(opts))
 	}
 	var catalogName string
-	if len(catalog) > 0 {
-		catalogName = catalog[0].Name
+	if len(opts) > 0 {
+		catalogName = opts[0].Catalog
 	}
 	if err := db.ValidateCatalog(ctx, catalogName); err != nil {
 		return nil, err

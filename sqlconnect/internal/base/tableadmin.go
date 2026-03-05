@@ -17,22 +17,27 @@ func (db *DB) CreateTestTable(ctx context.Context, table sqlconnect.RelationRef)
 }
 
 // ListTables returns a list of tables in the given schema, optionally filtered by prefix
-func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef, opts ...sqlconnect.ListTableOption) ([]sqlconnect.RelationRef, error) {
-	if err := db.ValidateCatalog(ctx, schema.Catalog); err != nil {
+func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef, opts ...sqlconnect.TableListOptions) ([]sqlconnect.RelationRef, error) {
+	var catalog string
+	var prefix string
+	if len(opts) > 0 {
+		catalog = opts[0].Catalog
+		prefix = opts[0].Prefix
+	}
+	if err := db.ValidateCatalog(ctx, catalog); err != nil {
 		return nil, err
 	}
-	cfg := sqlconnect.ApplyListTableOptions(opts...)
 	makeRef := func(name string) sqlconnect.RelationRef {
 		refOpts := []sqlconnect.Option{sqlconnect.WithSchema(schema.Name)}
-		if schema.Catalog != "" {
-			refOpts = append(refOpts, sqlconnect.WithCatalog(schema.Catalog))
+		if catalog != "" {
+			refOpts = append(refOpts, sqlconnect.WithCatalog(catalog))
 		}
 		return sqlconnect.NewRelationRef(name, refOpts...)
 	}
 	return db.listTablesFromQueries(ctx, db.sqlCommands.ListTables(
 		UnquotedIdentifier(schema.Name),
-		UnquotedIdentifier(schema.Catalog),
-		cfg.Prefix,
+		UnquotedIdentifier(catalog),
+		prefix,
 	), makeRef)
 }
 

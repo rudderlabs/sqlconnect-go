@@ -6,7 +6,7 @@ import (
 )
 
 func NewRelationRef(name string, options ...Option) RelationRef {
-	var o RelationRefOption
+	var o Options
 	for _, option := range options {
 		option(&o)
 	}
