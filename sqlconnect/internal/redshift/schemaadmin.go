@@ -12,7 +12,7 @@ import (
 
 var schemaDoesNotExistRegex = regexp.MustCompile(`schema "(.*)" does not exist`)
 
-func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.FilterOptions) ([]sqlconnect.SchemaRef, error) {
+func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sqlconnect.SchemaRef, error) {
 	// If the list schemas query is executed while a schema is being deleted, the query will fail with a schema does not exist error.
 	retryableError := func(err error) bool {
 		return schemaDoesNotExistRegex.MatchString(err.Error())

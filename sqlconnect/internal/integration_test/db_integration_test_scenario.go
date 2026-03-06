@@ -168,13 +168,12 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 
 		t.Run("list in catalog", func(t *testing.T) {
-			catalogFilter := sqlconnect.FilterOptions{Catalog: currentCatalog.Name}
 			t.Run("with context cancelled", func(t *testing.T) {
-				_, err := db.ListSchemas(cancelledCtx, catalogFilter)
+				_, err := db.ListSchemas(cancelledCtx, sqlconnect.WithCatalog(currentCatalog.Name))
 				require.Error(t, err, "it should not be able to list schemas in catalog with a cancelled context")
 			})
 
-			schemas, err := db.ListSchemas(ctx, catalogFilter)
+			schemas, err := db.ListSchemas(ctx, sqlconnect.WithCatalog(currentCatalog.Name))
 			if errors.Is(err, sqlconnect.ErrNotSupported) {
 				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
 			}
@@ -592,13 +591,12 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 
 		t.Run("list tables in catalog", func(t *testing.T) {
-			catalogTableOpts := sqlconnect.TableListOptions{Catalog: currentCatalog.Name}
 			t.Run("with context cancelled", func(t *testing.T) {
-				_, err := db.ListTables(cancelledCtx, schema, catalogTableOpts)
+				_, err := db.ListTables(cancelledCtx, schema, sqlconnect.WithCatalog(currentCatalog.Name))
 				require.Error(t, err, "it should not be able to list tables in catalog with a cancelled context")
 			})
 
-			tables, err := db.ListTables(ctx, schema, catalogTableOpts)
+			tables, err := db.ListTables(ctx, schema, sqlconnect.WithCatalog(currentCatalog.Name))
 			if errors.Is(err, sqlconnect.ErrorCrossCatalogOperation) {
 				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
 			}
@@ -616,11 +614,11 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 
 		t.Run("list tables with prefix", func(t *testing.T) {
 			t.Run("with context cancelled", func(t *testing.T) {
-				_, err := db.ListTables(cancelledCtx, schema, sqlconnect.TableListOptions{Prefix: formatfn("test")})
+				_, err := db.ListTables(cancelledCtx, schema, sqlconnect.WithPrefix(formatfn("test")))
 				require.Error(t, err, "it should not be able to list tables with a prefix with a cancelled context")
 			})
 
-			tables, err := db.ListTables(ctx, schema, sqlconnect.TableListOptions{Prefix: formatfn("test")})
+			tables, err := db.ListTables(ctx, schema, sqlconnect.WithPrefix(formatfn("test")))
 			require.NoError(t, err, "it should be able to list tables with a prefix")
 			require.Contains(t, tables, table, "it should contain the created table")
 		})

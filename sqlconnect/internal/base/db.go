@@ -1,11 +1,9 @@
 package base
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/samber/lo"
 
@@ -49,7 +47,7 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 				}
 				return stmt
 			},
-			DropSchema: func(schema QuotedIdentifier, _ UnquotedIdentifier) string {
+			DropSchema: func(schema QuotedIdentifier) string {
 				return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema)
 			},
 			CreateTestTable: func(table QuotedIdentifier) string {
@@ -92,7 +90,6 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 			},
 		},
 	}
-	d.catalogValidator = d.defaultCatalogValidator
 	for _, opt := range opts {
 		opt(d)
 	}
@@ -107,7 +104,6 @@ type DB struct {
 	columnTypeMapper func(ColumnType) string // map from database type to rudder type
 	jsonRowMapper    func(databaseTypeName string, value any) any
 	sqlCommands      SQLCommands
-	catalogValidator func(ctx context.Context, catalog string) error // validates that the catalog matches the current catalog
 }
 
 // Close closes the db and the tunnel
@@ -154,8 +150,8 @@ type (
 		ListSchemas func(catalog UnquotedIdentifier) (sql, columnName string)
 		// Provides the SQL command to check if a schema exists, optionally within a catalog
 		SchemaExists func(schema, catalog UnquotedIdentifier) string
-		// Provides the SQL command to drop a schema, optionally within a catalog
-		DropSchema func(schema QuotedIdentifier, catalog UnquotedIdentifier) string
+		// Provides the SQL command to drop a schema,
+		DropSchema func(schema QuotedIdentifier) string
 		// Provides the SQL command to create a test table
 		CreateTestTable func(table QuotedIdentifier) string
 		// Provides the SQL command(s) to list tables in a schema, optionally filtered by catalog and/or prefix
@@ -176,26 +172,3 @@ type (
 		MoveTable func(schema, oldName, newName QuotedIdentifier) string
 	}
 )
-
-// ValidateCatalog checks if the given catalog matches the current catalog.
-// Returns nil if catalog is empty (no validation needed) or matches the current catalog.
-// Returns [sqlconnect.ErrNotSupported] if the catalog differs from the current catalog.
-// The validation logic can be customized via [WithCatalogValidator] to support cross-catalog operations.
-func (db *DB) ValidateCatalog(ctx context.Context, catalog string) error {
-	if catalog == "" {
-		return nil
-	}
-	return db.catalogValidator(ctx, catalog)
-}
-
-// defaultCatalogValidator validates the catalog by querying [CurrentCatalog] via SQL.
-func (db *DB) defaultCatalogValidator(ctx context.Context, catalog string) error {
-	currentCatalog, err := db.CurrentCatalog(ctx)
-	if err != nil {
-		return fmt.Errorf("validating catalog: %w", err)
-	}
-	if !strings.EqualFold(currentCatalog.Name, catalog) {
-		return sqlconnect.ErrorCrossCatalogOperation
-	}
-	return nil
-}

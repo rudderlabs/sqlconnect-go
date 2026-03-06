@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/samber/lo"
@@ -67,12 +66,6 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				}
 
 				return cmds
-			}),
-			base.WithCatalogValidator(func(_ context.Context, catalog string) error {
-				if !strings.EqualFold(config.ProjectID, catalog) {
-					return sqlconnect.ErrorCrossCatalogOperation
-				}
-				return nil
 			}),
 		),
 	}, nil

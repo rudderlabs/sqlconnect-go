@@ -55,7 +55,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				cmds.CurrentCatalog = func() string {
 					return "SELECT DATABASE()"
 				}
-				cmds.DropSchema = func(schema base.QuotedIdentifier, _ base.UnquotedIdentifier) string { // mysql does not support CASCADE
+				cmds.DropSchema = func(schema base.QuotedIdentifier) string { // mysql does not support CASCADE
 					return fmt.Sprintf("DROP SCHEMA %[1]s", schema)
 				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {

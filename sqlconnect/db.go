@@ -70,21 +70,16 @@ type SchemaAdmin interface {
 	//
 	//	opts, err := NewFilterOptions(WithCatalog("my_catalog"))
 	//	schemas, err := db.ListSchemas(ctx, opts)
-	ListSchemas(ctx context.Context, opts ...FilterOptions) ([]SchemaRef, error)
+	ListSchemas(ctx context.Context, opts ...Option) ([]SchemaRef, error)
 	// SchemaExists returns true if the schema exists. If SchemaRef.Catalog is set, the check is scoped to that catalog.
 	//
 	// Supported options: [FilterOptions.Catalog] to scope the check to a specific catalog.
 	//
 	//	opts, err := NewFilterOptions(WithCatalog("my_catalog"))
 	//	exists, err := db.SchemaExists(ctx, schemaRef, opts)
-	SchemaExists(ctx context.Context, schemaRef SchemaRef, opts ...FilterOptions) (bool, error)
-	// DropSchema drops a schema. If SchemaRef.Catalog is set, the operation is scoped to that catalog.
-	//
-	// Supported options: [FilterOptions.Catalog] to scope the operation to a specific catalog.
-	//
-	//	opts, err := NewFilterOptions(WithCatalog("my_catalog"))
-	//	err = db.DropSchema(ctx, schemaRef, opts)
-	DropSchema(ctx context.Context, schema SchemaRef, opts ...FilterOptions) error
+	SchemaExists(ctx context.Context, schemaRef SchemaRef, opts ...Option) (bool, error)
+	// DropSchema drops a schema.
+	DropSchema(ctx context.Context, schema SchemaRef) error
 }
 
 type TableAdmin interface {
@@ -99,7 +94,7 @@ type TableAdmin interface {
 	//
 	//	opts, err := NewTableListOptions(WithCatalog("my_catalog"), WithPrefix("test"))
 	//	tables, err := db.ListTables(ctx, schema, opts)
-	ListTables(ctx context.Context, schema SchemaRef, opts ...TableListOptions) ([]RelationRef, error)
+	ListTables(ctx context.Context, schema SchemaRef, opts ...Option) ([]RelationRef, error)
 	// TableExists returns true if the table exists. If RelationRef.Catalog is set, the check is scoped to that catalog.
 	TableExists(ctx context.Context, relation RelationRef) (bool, error)
 	// ListColumns returns a list of columns for the given table

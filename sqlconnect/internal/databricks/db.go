@@ -1,7 +1,6 @@
 package databricks
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -71,9 +70,6 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 			base.WithDialect(newDialect()),
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
-			base.WithCatalogValidator(func(_ context.Context, _ string) error {
-				return nil // databricks supports cross-catalog operations
-			}),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
 				cmds.CurrentCatalog = func() string {
 					return "SELECT current_catalog()"
@@ -125,10 +121,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 					}
 					return fmt.Sprintf("DESCRIBE TABLE `%[1]s`.`%[2]s`.`%[3]s`", catalog, schema, table), "col_name", "data_type"
 				}
-				cmds.DropSchema = func(schema base.QuotedIdentifier, catalog base.UnquotedIdentifier) string {
-					if catalog != "" {
-						return fmt.Sprintf("DROP SCHEMA `%[1]s`.%[2]s CASCADE", catalog, schema)
-					}
+				cmds.DropSchema = func(schema base.QuotedIdentifier) string {
 					return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema)
 				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {

@@ -1,7 +1,6 @@
 package snowflake
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -42,9 +41,6 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 			base.WithDialect(newDialect()),
 			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
-			base.WithCatalogValidator(func(_ context.Context, _ string) error {
-				return nil // snowflake supports cross-database operations
-			}),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
 				cmds.CurrentCatalog = func() string {
 					return "SELECT current_database()"
@@ -90,10 +86,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 					}
 					return fmt.Sprintf(`DESCRIBE TABLE "%[1]s"."%[2]s"`, schema, table), "name", "type"
 				}
-				cmds.DropSchema = func(schema base.QuotedIdentifier, catalog base.UnquotedIdentifier) string {
-					if catalog != "" {
-						return fmt.Sprintf(`DROP SCHEMA "%[1]s".%[2]s CASCADE`, catalog, schema)
-					}
+				cmds.DropSchema = func(schema base.QuotedIdentifier) string {
 					return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema)
 				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {

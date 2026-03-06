@@ -3,7 +3,6 @@ package bigquery
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"cloud.google.com/go/bigquery"
 	"google.golang.org/api/googleapi"
@@ -14,13 +13,19 @@ import (
 
 // SchemaExists uses the bigquery client instead of [INFORMATION_SCHEMA.SCHEMATA] due to absence of a region qualifier
 // https://cloud.google.com/bigquery/docs/information-schema-datasets-schemata#scope_and_syntax
-func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, opts ...sqlconnect.FilterOptions) (bool, error) {
-	var catalogName string
-	if len(opts) > 0 {
-		catalogName = opts[0].Catalog
-	}
-	if err := db.ValidateCatalog(ctx, catalogName); err != nil {
+func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, opts ...sqlconnect.Option) (bool, error) {
+	filterCatalogOpts, err := sqlconnect.NewFilterOptions(opts...)
+	if err != nil {
 		return false, err
+	}
+	if filterCatalogOpts.Catalog != "" {
+		currentCatalog, err := db.CurrentCatalog(ctx)
+		if err != nil {
+			return false, err
+		}
+		if currentCatalog.Name != filterCatalogOpts.Catalog {
+			return false, sqlconnect.ErrorCrossCatalogOperation
+		}
 	}
 	var exists bool
 	if err := db.WithBigqueryClient(ctx, func(c *bigquery.Client) error {
@@ -43,17 +48,22 @@ func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, 
 
 // ListSchemas uses the bigquery client instead of [INFORMATION_SCHEMA.SCHEMATA] due to absence of a region qualifier
 // https://cloud.google.com/bigquery/docs/information-schema-datasets-schemata#scope_and_syntax
-func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.FilterOptions) ([]sqlconnect.SchemaRef, error) {
-	if len(opts) > 1 {
-		return nil, fmt.Errorf("listing schemas: at most one filter option can be provided, got %d", len(opts))
-	}
-	var catalogName string
-	if len(opts) > 0 {
-		catalogName = opts[0].Catalog
-	}
-	if err := db.ValidateCatalog(ctx, catalogName); err != nil {
+func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sqlconnect.SchemaRef, error) {
+	filterCatalogOpts, err := sqlconnect.NewFilterOptions(opts...)
+	if err != nil {
 		return nil, err
 	}
+
+	if filterCatalogOpts.Catalog != "" {
+		currentCatalog, err := db.CurrentCatalog(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if currentCatalog.Name != filterCatalogOpts.Catalog {
+			return nil, sqlconnect.ErrorCrossCatalogOperation
+		}
+	}
+
 	var schemas []sqlconnect.SchemaRef
 	if err := db.WithBigqueryClient(ctx, func(c *bigquery.Client) error {
 		datasets := c.Datasets(ctx)

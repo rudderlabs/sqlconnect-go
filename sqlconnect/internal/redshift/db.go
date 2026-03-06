@@ -54,9 +54,6 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 			base.WithDialect(newDialect(DialectConfig{EnableCaseSensitiveIdentifier: caseSensitive == "on"})),
 			base.WithColumnTypeMappings(getColumnTypeMappings(useLegacyMappings)),
 			base.WithJsonRowMapper(getJonRowMapper(useLegacyMappings)),
-			base.WithCatalogValidator(func(_ context.Context, _ string) error {
-				return nil // snowflake supports cross-database operations
-			}),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
 				cmds.CurrentCatalog = func() string {
 					return "SELECT current_database()"
