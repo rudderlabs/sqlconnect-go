@@ -65,10 +65,25 @@ type SchemaAdmin interface {
 	CreateSchema(ctx context.Context, schema SchemaRef) error
 	// ListSchemas returns a list of schemas, optionally filtered by a single catalog.
 	// At most one catalog can be provided; passing more than one returns an error.
+	//
+	// Supported options: [FilterOptions.Catalog] to scope the listing to a specific catalog.
+	//
+	//	opts, err := NewFilterOptions(WithCatalog("my_catalog"))
+	//	schemas, err := db.ListSchemas(ctx, opts)
 	ListSchemas(ctx context.Context, opts ...FilterOptions) ([]SchemaRef, error)
 	// SchemaExists returns true if the schema exists. If SchemaRef.Catalog is set, the check is scoped to that catalog.
+	//
+	// Supported options: [FilterOptions.Catalog] to scope the check to a specific catalog.
+	//
+	//	opts, err := NewFilterOptions(WithCatalog("my_catalog"))
+	//	exists, err := db.SchemaExists(ctx, schemaRef, opts)
 	SchemaExists(ctx context.Context, schemaRef SchemaRef, opts ...FilterOptions) (bool, error)
 	// DropSchema drops a schema. If SchemaRef.Catalog is set, the operation is scoped to that catalog.
+	//
+	// Supported options: [FilterOptions.Catalog] to scope the operation to a specific catalog.
+	//
+	//	opts, err := NewFilterOptions(WithCatalog("my_catalog"))
+	//	err = db.DropSchema(ctx, schemaRef, opts)
 	DropSchema(ctx context.Context, schema SchemaRef, opts ...FilterOptions) error
 }
 
@@ -77,6 +92,13 @@ type TableAdmin interface {
 	CreateTestTable(ctx context.Context, relation RelationRef) error
 	// ListTables returns a list of tables in the given schema, optionally filtered by prefix.
 	// If SchemaRef.Catalog is set, the listing is scoped to that catalog.
+	//
+	// Supported options:
+	//   - [TableListOptions.Catalog]: scope the listing to a specific catalog.
+	//   - [TableListOptions.Prefix]: filter tables by name prefix.
+	//
+	//	opts, err := NewTableListOptions(WithCatalog("my_catalog"), WithPrefix("test"))
+	//	tables, err := db.ListTables(ctx, schema, opts)
 	ListTables(ctx context.Context, schema SchemaRef, opts ...TableListOptions) ([]RelationRef, error)
 	// TableExists returns true if the table exists. If RelationRef.Catalog is set, the check is scoped to that catalog.
 	TableExists(ctx context.Context, relation RelationRef) (bool, error)
