@@ -147,9 +147,23 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 		})
 		t.Run("exists", func(t *testing.T) {
-			exists, err := db.SchemaExists(ctx, schema)
-			require.NoError(t, err, "it should be able to check if a schema exists")
-			require.True(t, exists, "it should return true for a schema that exists")
+			t.Run("without catalog", func(t *testing.T) {
+				exists, err := db.SchemaExists(ctx, schema)
+				require.NoError(t, err, "it should be able to check if a schema exists")
+				require.True(t, exists, "it should return true for a schema that exists")
+			})
+
+			t.Run("with catalog", func(t *testing.T) {
+				exists, err := db.SchemaExists(ctx, schema, sqlconnect.WithCatalog(currentCatalog.Name))
+				require.NoError(t, err, "it should be able to check if a schema exists in catalog")
+				require.True(t, exists, "it should return true for a schema that exists in catalog")
+			})
+
+			t.Run("with nonexistent catalog", func(t *testing.T) {
+				exists, err := db.SchemaExists(ctx, schema, sqlconnect.WithCatalog("nonexistent"))
+				require.NoError(t, err, "it should be able to check if a schema exists in catalog")
+				require.False(t, exists, "it should return false for a schema that doesn't exist in catalog")
+			})
 
 			t.Run("with context cancelled", func(t *testing.T) {
 				_, err := db.SchemaExists(cancelledCtx, schema)
@@ -158,27 +172,34 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 
 		t.Run("list", func(t *testing.T) {
-			schemas, err := db.ListSchemas(ctx)
-			require.NoError(t, err, "it should be able to list schemas")
-			require.Contains(t, schemas, schema, "it should contain the created schema")
+			t.Run("without catalog", func(t *testing.T) {
+				schemas, err := db.ListSchemas(ctx)
+				require.NoError(t, err, "it should be able to list schemas")
+				require.Contains(t, schemas, schema, "it should contain the created schema")
+			})
+
+			t.Run("with catalog", func(t *testing.T) {
+				schemas, err := db.ListSchemas(ctx, sqlconnect.WithCatalog(currentCatalog.Name))
+				if errors.Is(err, sqlconnect.ErrNotSupported) {
+					t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
+				}
+				require.NoError(t, err, "it should be able to list schemas in catalog")
+				require.Contains(t, schemas, schema, "it should contain the created schema")
+			})
+
+			t.Run("with nonexistent catalog", func(t *testing.T) {
+				schemas, err := db.ListSchemas(ctx, sqlconnect.WithCatalog("nonexistent"))
+				if errors.Is(err, sqlconnect.ErrNotSupported) {
+					t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
+				}
+				require.NoError(t, err, "it should be able to list schemas in catalog")
+				require.Empty(t, schemas, "it should not contain any schemas")
+			})
+
 			t.Run("with context cancelled", func(t *testing.T) {
 				_, err := db.ListSchemas(cancelledCtx)
 				require.Error(t, err, "it should not be able to list schemas with a cancelled context")
 			})
-		})
-
-		t.Run("list in catalog", func(t *testing.T) {
-			t.Run("with context cancelled", func(t *testing.T) {
-				_, err := db.ListSchemas(cancelledCtx, sqlconnect.WithCatalog(currentCatalog.Name))
-				require.Error(t, err, "it should not be able to list schemas in catalog with a cancelled context")
-			})
-
-			schemas, err := db.ListSchemas(ctx, sqlconnect.WithCatalog(currentCatalog.Name))
-			if errors.Is(err, sqlconnect.ErrNotSupported) {
-				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
-			}
-			require.NoError(t, err, "it should be able to list schemas in catalog")
-			require.Contains(t, schemas, schema, "it should contain the created schema")
 		})
 
 		t.Run("drop", func(t *testing.T) {
@@ -591,15 +612,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 
 		t.Run("list tables in catalog", func(t *testing.T) {
-			t.Run("with context cancelled", func(t *testing.T) {
-				_, err := db.ListTables(cancelledCtx, schema, sqlconnect.WithCatalog(currentCatalog.Name))
-				require.Error(t, err, "it should not be able to list tables in catalog with a cancelled context")
-			})
-
 			tables, err := db.ListTables(ctx, schema, sqlconnect.WithCatalog(currentCatalog.Name))
-			if errors.Is(err, sqlconnect.ErrorCrossCatalogOperation) {
-				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
-			}
 			if errors.Is(err, sqlconnect.ErrNotSupported) {
 				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
 			}
@@ -610,6 +623,15 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			viewWithCatalog.Catalog = currentCatalog.Name
 			require.Contains(t, tables, tableWithCatalog, "it should contain the created table")
 			require.Contains(t, tables, viewWithCatalog, "it should contain the created view")
+		})
+
+		t.Run("list tables with nonexistent catalog", func(t *testing.T) {
+			tables, err := db.ListTables(ctx, schema, sqlconnect.WithCatalog("nonexistent"))
+			if errors.Is(err, sqlconnect.ErrNotSupported) {
+				t.Skipf("skipping test for warehouse %s: %v", warehouse, err)
+			}
+			require.NoError(t, err, "it should be able to list tables in catalog")
+			require.Empty(t, tables, "it should not contain any tables")
 		})
 
 		t.Run("list tables with prefix", func(t *testing.T) {

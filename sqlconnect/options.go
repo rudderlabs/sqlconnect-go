@@ -54,10 +54,6 @@ func NewTableListOptions(opts ...Option) (TableListOptions, error) {
 		return TableListOptions{}, fmt.Errorf("schema is not supported for table listing: %s", o.Schema)
 	}
 
-	if o.Schema != "" {
-		return TableListOptions{}, fmt.Errorf("schema is not supported for table listing: %s", o.Schema)
-	}
-
 	return TableListOptions{
 		Catalog: o.Catalog,
 		Prefix:  o.Prefix,
