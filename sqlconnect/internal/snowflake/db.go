@@ -48,22 +48,36 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				cmds.ListCatalogs = func() (string, string) {
 					return "SHOW TERSE DATABASES", "name"
 				}
-				cmds.ListSchemas = func() (string, string) { return "SHOW TERSE SCHEMAS", "name" }
-				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
+				cmds.ListSchemas = func(catalog base.UnquotedIdentifier) (string, string) {
+					if catalog != "" {
+						return fmt.Sprintf(`SHOW TERSE SCHEMAS IN DATABASE "%[1]s"`, catalog), "name"
+					}
+					return "SHOW TERSE SCHEMAS", "name"
+				}
+				cmds.SchemaExists = func(schema, catalog base.UnquotedIdentifier) string {
+					if catalog != "" {
+						return fmt.Sprintf(`SHOW TERSE SCHEMAS LIKE '%[1]s' IN DATABASE "%[2]s"`, base.EscapeSqlString(schema), catalog)
+					}
 					return fmt.Sprintf("SHOW TERSE SCHEMAS LIKE '%[1]s'", base.EscapeSqlString(schema))
 				}
-				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
+				cmds.ListTables = func(schema, catalog base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+					var schemaQualifier string
+					if catalog != "" {
+						schemaQualifier = fmt.Sprintf(`"%[1]s"."%[2]s"`, catalog, schema)
+					} else {
+						schemaQualifier = fmt.Sprintf(`"%[1]s"`, schema)
+					}
+					if prefix != "" {
+						return []lo.Tuple2[string, string]{
+							{A: fmt.Sprintf(`SHOW TERSE TABLES LIKE '%[1]s' IN SCHEMA %[2]s`, prefix+"%%", schemaQualifier), B: "name"},
+						}
+					}
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf(`SHOW TERSE TABLES IN SCHEMA "%[1]s"`, schema), B: "name"},
-						{A: fmt.Sprintf(`SHOW TERSE VIEWS IN SCHEMA "%[1]s"`, schema), B: "name"},
+						{A: fmt.Sprintf(`SHOW TERSE TABLES IN SCHEMA %[1]s`, schemaQualifier), B: "name"},
+						{A: fmt.Sprintf(`SHOW TERSE VIEWS IN SCHEMA %[1]s`, schemaQualifier), B: "name"},
 					}
 				}
-				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
-					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf(`SHOW TERSE TABLES LIKE '%[2]s' IN SCHEMA "%[1]s"`, schema, prefix+"%"), B: "name"},
-					}
-				}
-				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
+				cmds.TableExists = func(schema, table, _ base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%[1]s' AND TABLE_NAME = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
@@ -71,6 +85,9 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 						return fmt.Sprintf(`DESCRIBE TABLE "%[1]s"."%[2]s"."%[3]s"`, catalog, schema, table), "name", "type"
 					}
 					return fmt.Sprintf(`DESCRIBE TABLE "%[1]s"."%[2]s"`, schema, table), "name", "type"
+				}
+				cmds.DropSchema = func(schema base.QuotedIdentifier) string {
+					return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema)
 				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {
 					return fmt.Sprintf(`ALTER TABLE %[1]s.%[2]s RENAME TO %[1]s.%[3]s`, schema, oldName, newName)

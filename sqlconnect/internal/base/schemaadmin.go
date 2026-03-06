@@ -18,10 +18,18 @@ func (db *DB) CreateSchema(ctx context.Context, schema sqlconnect.SchemaRef) err
 	return nil
 }
 
-// ListSchemas returns a list of schemas
-func (db *DB) ListSchemas(ctx context.Context) ([]sqlconnect.SchemaRef, error) {
-	var res []sqlconnect.SchemaRef
-	stmt, colName := db.sqlCommands.ListSchemas()
+// ListSchemas returns a list of schemas, optionally filtered by a single catalog
+func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sqlconnect.SchemaRef, error) {
+	filterCatalogOpts, err := sqlconnect.NewFilterOptions(opts...)
+	if err != nil {
+		return nil, err
+	}
+	stmt, colName := db.sqlCommands.ListSchemas(UnquotedIdentifier(filterCatalogOpts.Catalog))
+	return db.listSchemasFromQuery(ctx, stmt, colName)
+}
+
+// listSchemasFromQuery executes the given SQL statement and scans the results into a list of SchemaRefs
+func (db *DB) listSchemasFromQuery(ctx context.Context, stmt, colName string) ([]sqlconnect.SchemaRef, error) {
 	rows, err := db.QueryContext(ctx, stmt)
 	if err != nil {
 		return nil, fmt.Errorf("querying list schemas: %w", err)
@@ -51,6 +59,7 @@ func (db *DB) ListSchemas(ctx context.Context) ([]sqlconnect.SchemaRef, error) {
 			}
 		}
 	}
+	var res []sqlconnect.SchemaRef
 	for rows.Next() {
 		err = rows.Scan(scanValues...)
 		if err != nil {
@@ -65,8 +74,12 @@ func (db *DB) ListSchemas(ctx context.Context) ([]sqlconnect.SchemaRef, error) {
 }
 
 // SchemaExists returns true if the schema exists
-func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef) (bool, error) {
-	rows, err := db.QueryContext(ctx, db.sqlCommands.SchemaExists(UnquotedIdentifier(schemaRef.Name)))
+func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, opts ...sqlconnect.Option) (bool, error) {
+	filterCatalogOpts, err := sqlconnect.NewFilterOptions(opts...)
+	if err != nil {
+		return false, err
+	}
+	rows, err := db.QueryContext(ctx, db.sqlCommands.SchemaExists(UnquotedIdentifier(schemaRef.Name), UnquotedIdentifier(filterCatalogOpts.Catalog)))
 	if err != nil {
 		return false, fmt.Errorf("querying schema exists: %w", err)
 	}

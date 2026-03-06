@@ -25,6 +25,9 @@ var (
 
 // QuoteTable quotes a table name
 func (d dialect) QuoteTable(table sqlconnect.RelationRef) string {
+	if table.Catalog != "" && table.Schema != "" {
+		return d.QuoteIdentifier(table.Catalog + "." + table.Schema + "." + table.Name)
+	}
 	if table.Schema != "" {
 		return d.QuoteIdentifier(table.Schema + "." + table.Name)
 	}

@@ -21,6 +21,9 @@ type dialect struct {
 
 // QuoteTable quotes a table name
 func (d dialect) QuoteTable(table sqlconnect.RelationRef) string {
+	if table.Catalog != "" && table.Schema != "" {
+		return d.QuoteIdentifier(table.Catalog) + "." + d.QuoteIdentifier(table.Schema) + "." + d.QuoteIdentifier(table.Name)
+	}
 	if table.Schema != "" {
 		return d.QuoteIdentifier(table.Schema) + "." + d.QuoteIdentifier(table.Name)
 	}
