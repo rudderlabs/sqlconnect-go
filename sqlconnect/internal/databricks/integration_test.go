@@ -1,6 +1,7 @@
 package databricks_test
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
@@ -13,6 +14,31 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/databricks"
 	integrationtest "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/integration_test"
 )
+
+var extraTests = func(t *testing.T, db sqlconnect.DB) {
+	ctx := context.Background()
+
+	t.Run("schema admin", func(t *testing.T) {
+		t.Run("exists", func(t *testing.T) {
+			t.Run("with nonexistent catalog", func(t *testing.T) {
+				_, err := db.SchemaExists(ctx, sqlconnect.SchemaRef{Name: "test_schema"}, sqlconnect.WithCatalog("nonexistent"))
+				require.Error(t, err, "it should not be able to check if a schema exists in nonexistent catalog")
+			})
+		})
+		t.Run("list", func(t *testing.T) {
+			t.Run("with nonexistent catalog", func(t *testing.T) {
+				_, err := db.ListSchemas(ctx, sqlconnect.WithCatalog("nonexistent"))
+				require.Error(t, err, "it should not be able to list schemas in nonexistent catalog")
+			})
+		})
+	})
+	t.Run("table admin", func(t *testing.T) {
+		t.Run("list tables with nonexistent catalog", func(t *testing.T) {
+			_, err := db.ListTables(ctx, sqlconnect.SchemaRef{Name: "test_schema"}, sqlconnect.WithCatalog("nonexistent"))
+			require.Error(t, err, "it should not be able to list tables in nonexistent catalog")
+		})
+	})
+}
 
 func TestDatabricksDB(t *testing.T) {
 	configJSON, ok := os.LookupEnv("DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS")
@@ -43,6 +69,8 @@ func TestDatabricksDB(t *testing.T) {
 			integrationtest.Options{
 				LegacySupport:                  true,
 				SpecialCharactersInQuotedTable: "`-",
+				SkipNonExistentCatalogTests:    true,
+				ExtraTests:                     extraTests,
 			},
 		)
 	})
@@ -68,6 +96,8 @@ func TestDatabricksDB(t *testing.T) {
 			integrationtest.Options{
 				LegacySupport:                  true,
 				SpecialCharactersInQuotedTable: "_A",
+				ExtraTests:                     extraTests,
+				SkipNonExistentCatalogTests:    true,
 			},
 		)
 	})
@@ -86,6 +116,8 @@ func TestDatabricksDB(t *testing.T) {
 			integrationtest.Options{
 				LegacySupport:                  true,
 				SpecialCharactersInQuotedTable: "_A", // No special characters allowed
+				ExtraTests:                     extraTests,
+				SkipNonExistentCatalogTests:    true,
 			},
 		)
 
@@ -106,6 +138,8 @@ func TestDatabricksDB(t *testing.T) {
 			integrationtest.Options{
 				LegacySupport:                  true,
 				SpecialCharactersInQuotedTable: "_A",
+				ExtraTests:                     extraTests,
+				SkipNonExistentCatalogTests:    true,
 			},
 		)
 	})
