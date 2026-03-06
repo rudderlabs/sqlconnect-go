@@ -47,9 +47,7 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 				}
 				return stmt
 			},
-			DropSchema: func(schema QuotedIdentifier) string {
-				return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema)
-			},
+			DropSchema: func(schema QuotedIdentifier) string { return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema) },
 			CreateTestTable: func(table QuotedIdentifier) string {
 				return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %[1]s (c1 INT, c2 VARCHAR(255))", table)
 			},

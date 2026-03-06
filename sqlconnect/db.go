@@ -63,20 +63,19 @@ type CatalogAdmin interface {
 type SchemaAdmin interface {
 	// CreateSchema creates a schema
 	CreateSchema(ctx context.Context, schema SchemaRef) error
-	// ListSchemas returns a list of schemas, optionally filtered by a single catalog.
-	// At most one catalog can be provided; passing more than one returns an error.
+	// ListSchemas returns a list of schemas.
 	//
-	// Supported options: [FilterOptions.Catalog] to scope the listing to a specific catalog.
+	// Supported options:
+	//   - [WithCatalog]: scope the listing to a specific catalog.
 	//
-	//	opts, err := NewFilterOptions(WithCatalog("my_catalog"))
-	//	schemas, err := db.ListSchemas(ctx, opts)
+	//	schemas, err := db.ListSchemas(ctx, WithCatalog("my_catalog"))
 	ListSchemas(ctx context.Context, opts ...Option) ([]SchemaRef, error)
-	// SchemaExists returns true if the schema exists. If SchemaRef.Catalog is set, the check is scoped to that catalog.
+	// SchemaExists returns true if the schema exists.
 	//
-	// Supported options: [FilterOptions.Catalog] to scope the check to a specific catalog.
+	// Supported options:
+	//   - [WithCatalog]: scope the check to a specific catalog.
 	//
-	//	opts, err := NewFilterOptions(WithCatalog("my_catalog"))
-	//	exists, err := db.SchemaExists(ctx, schemaRef, opts)
+	//	exists, err := db.SchemaExists(ctx, schemaRef, WithCatalog("my_catalog"))
 	SchemaExists(ctx context.Context, schemaRef SchemaRef, opts ...Option) (bool, error)
 	// DropSchema drops a schema.
 	DropSchema(ctx context.Context, schema SchemaRef) error
@@ -85,15 +84,13 @@ type SchemaAdmin interface {
 type TableAdmin interface {
 	// CreateTestTable creates a test table
 	CreateTestTable(ctx context.Context, relation RelationRef) error
-	// ListTables returns a list of tables in the given schema, optionally filtered by prefix.
-	// If SchemaRef.Catalog is set, the listing is scoped to that catalog.
+	// ListTables returns a list of tables in the given schema.
 	//
 	// Supported options:
-	//   - [TableListOptions.Catalog]: scope the listing to a specific catalog.
-	//   - [TableListOptions.Prefix]: filter tables by name prefix.
+	//   - [WithCatalog]: scope the listing to a specific catalog.
+	//   - [WithPrefix]: filter tables by name prefix.
 	//
-	//	opts, err := NewTableListOptions(WithCatalog("my_catalog"), WithPrefix("test"))
-	//	tables, err := db.ListTables(ctx, schema, opts)
+	//	tables, err := db.ListTables(ctx, schema, WithCatalog("my_catalog"), WithPrefix("test"))
 	ListTables(ctx context.Context, schema SchemaRef, opts ...Option) ([]RelationRef, error)
 	// TableExists returns true if the table exists. If RelationRef.Catalog is set, the check is scoped to that catalog.
 	TableExists(ctx context.Context, relation RelationRef) (bool, error)

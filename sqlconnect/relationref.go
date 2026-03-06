@@ -11,6 +11,10 @@ func NewRelationRef(name string, options ...Option) RelationRef {
 		option(&o)
 	}
 
+	if o.Prefix != "" {
+		panic("prefix is not supported for relation reference construction")
+	}
+
 	relationType := TableRelation
 	if o.Type != "" {
 		relationType = o.Type
