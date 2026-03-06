@@ -6,10 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/bigquery"
 	integrationtest "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/integration_test"
-	"github.com/stretchr/testify/require"
 )
 
 func TestBigqueryDB(t *testing.T) {

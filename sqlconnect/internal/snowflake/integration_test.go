@@ -6,10 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	integrationtest "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/integration_test"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/snowflake"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSnowflakeDB(t *testing.T) {
