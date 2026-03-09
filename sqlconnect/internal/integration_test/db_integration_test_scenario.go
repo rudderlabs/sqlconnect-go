@@ -637,6 +637,12 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			tables, err := db.ListTables(ctx, schema, sqlconnect.WithPrefix(formatfn("test")))
 			require.NoError(t, err, "it should be able to list tables with a prefix")
 			require.Contains(t, tables, table, "it should contain the created table")
+
+			t.Run("with non-matching prefix", func(t *testing.T) {
+				tables, err := db.ListTables(ctx, schema, sqlconnect.WithPrefix(formatfn("nonexistent")))
+				require.NoError(t, err, "it should be able to list tables with a non-matching prefix")
+				require.Empty(t, tables, "it should not contain any tables")
+			})
 		})
 
 		t.Run("list columns", func(t *testing.T) {

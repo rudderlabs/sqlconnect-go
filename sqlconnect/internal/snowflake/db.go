@@ -69,7 +69,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 					}
 					if prefix != "" {
 						return []lo.Tuple2[string, string]{
-							{A: fmt.Sprintf(`SHOW TERSE TABLES LIKE '%[1]s' IN SCHEMA %[2]s`, prefix+"%%", schemaQualifier), B: "name"},
+							{A: fmt.Sprintf(`SHOW TERSE TABLES LIKE '%[1]s' IN SCHEMA %[2]s`, prefix+"%", schemaQualifier), B: "name"},
 						}
 					}
 					return []lo.Tuple2[string, string]{

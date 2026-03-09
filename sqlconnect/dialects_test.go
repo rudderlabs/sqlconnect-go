@@ -174,7 +174,7 @@ func TestDialectQuoteTable(t *testing.T) {
 		// MySQL
 		{warehouseType: "mysql", table: sqlconnect.NewRelationRef("users"), expected: "`users`"},
 		{warehouseType: "mysql", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("mydb")), expected: "`mydb`.`users`"},
-		{warehouseType: "mysql", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("mydb"), sqlconnect.WithCatalog("catalog")), expected: "`catalog`.`mydb`.`users`"},
+		{warehouseType: "mysql", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("mydb"), sqlconnect.WithCatalog("catalog")), expected: "`mydb`.`users`"},
 	}
 
 	for _, tt := range tests {

@@ -57,7 +57,7 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 					stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", EscapeSqlString(catalog))
 				}
 				if prefix != "" {
-					stmt += fmt.Sprintf(" AND table_name LIKE '%[1]s'", prefix+"%%")
+					stmt += fmt.Sprintf(" AND table_name LIKE '%[1]s'", prefix+"%")
 				}
 				return []lo.Tuple2[string, string]{
 					{A: stmt, B: "table_name"},

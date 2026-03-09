@@ -85,7 +85,7 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 						stmt += fmt.Sprintf(" AND database_name = '%[1]s'", base.EscapeSqlString(catalog))
 					}
 					if prefix != "" {
-						stmt += fmt.Sprintf(" AND table_name LIKE '%[1]s'", prefix+"%%")
+						stmt += fmt.Sprintf(" AND table_name LIKE '%[1]s'", prefix+"%")
 					}
 					return []lo.Tuple2[string, string]{
 						{A: stmt, B: "table_name"},

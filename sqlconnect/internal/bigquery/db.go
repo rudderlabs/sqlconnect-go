@@ -48,7 +48,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				cmds.ListTables = func(_, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 					stmt := fmt.Sprintf("SELECT table_name FROM `%[1]s`.INFORMATION_SCHEMA.TABLES", schema)
 					if prefix != "" {
-						stmt += fmt.Sprintf(" WHERE table_name LIKE '%[1]s'", prefix+"%%")
+						stmt += fmt.Sprintf(" WHERE table_name LIKE '%[1]s'", prefix+"%")
 					}
 					return []lo.Tuple2[string, string]{
 						{A: stmt, B: "table_name"},
