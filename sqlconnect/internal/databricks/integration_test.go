@@ -86,7 +86,6 @@ func TestDatabricksDB(t *testing.T) {
 			integrationtest.Options{
 				LegacySupport:                  true,
 				SpecialCharactersInQuotedTable: "_A", // No special characters allowed
-
 			},
 		)
 
