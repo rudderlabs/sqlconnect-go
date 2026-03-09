@@ -2,6 +2,7 @@ package snowflake
 
 import (
 	"context"
+	"strings"
 
 	"github.com/samber/lo"
 
@@ -15,7 +16,7 @@ func (db *DB) catalogExists(ctx context.Context, catalog string) (bool, error) {
 		return false, err
 	}
 	return lo.ContainsBy(catalogs, func(c sqlconnect.CatalogRef) bool {
-		return c.Name == catalog
+		return strings.EqualFold(c.Name, catalog)
 	}), nil
 }
 
