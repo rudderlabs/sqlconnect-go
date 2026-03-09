@@ -58,13 +58,13 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 					}
 					return "SHOW SCHEMAS", "Schema"
 				}
-				cmds.SchemaExists = func(schema, catalog base.UnquotedIdentifier) string {
+				cmds.SchemaExists = func(catalog, schema base.UnquotedIdentifier) string {
 					if catalog != "" {
 						return fmt.Sprintf(`SHOW SCHEMAS FROM "%[1]s" LIKE '%[2]s'`, catalog, base.EscapeSqlString(schema))
 					}
 					return fmt.Sprintf(`SHOW SCHEMAS LIKE '%[1]s'`, base.EscapeSqlString(schema))
 				}
-				cmds.ListTables = func(schema, catalog base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+				cmds.ListTables = func(catalog, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 					var qualifier string
 					if catalog != "" {
 						qualifier = fmt.Sprintf(`"%[1]s"."%[2]s"`, catalog, schema)
@@ -80,7 +80,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 						{A: fmt.Sprintf(`SHOW TABLES FROM %[1]s`, qualifier), B: "tableName"},
 					}
 				}
-				cmds.TableExists = func(schema, table, catalog base.UnquotedIdentifier) string {
+				cmds.TableExists = func(catalog, schema, table base.UnquotedIdentifier) string {
 					if catalog != "" {
 						return fmt.Sprintf(`SHOW TABLES FROM "%[1]s"."%[2]s" LIKE '%[3]s'`, catalog, schema, base.EscapeSqlString(table))
 					}

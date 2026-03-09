@@ -29,16 +29,11 @@ func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef, opts 
 		}
 		return sqlconnect.NewRelationRef(name, refOpts...)
 	}
-	return db.listTablesFromQueries(ctx, db.sqlCommands.ListTables(
-		UnquotedIdentifier(schema.Name),
+	tuples := db.sqlCommands.ListTables(
 		UnquotedIdentifier(listOpts.Catalog),
+		UnquotedIdentifier(schema.Name),
 		listOpts.Prefix,
-	), makeRef)
-}
-
-// listTablesFromQueries executes the given SQL statements and scans the results into a list of RelationRefs,
-// using makeRef to construct each RelationRef from the scanned table name.
-func (db *DB) listTablesFromQueries(ctx context.Context, tuples []lo.Tuple2[string, string], makeRef func(name string) sqlconnect.RelationRef) ([]sqlconnect.RelationRef, error) {
+	)
 	var res []sqlconnect.RelationRef
 	for _, tuple := range tuples {
 		stmt := tuple.A
@@ -87,7 +82,7 @@ func (db *DB) listTablesFromQueries(ctx context.Context, tuples []lo.Tuple2[stri
 
 // TableExists returns true if the table exists
 func (db *DB) TableExists(ctx context.Context, relation sqlconnect.RelationRef) (bool, error) {
-	stmt := db.sqlCommands.TableExists(UnquotedIdentifier(relation.Schema), UnquotedIdentifier(relation.Name), UnquotedIdentifier(relation.Catalog))
+	stmt := db.sqlCommands.TableExists(UnquotedIdentifier(relation.Catalog), UnquotedIdentifier(relation.Schema), UnquotedIdentifier(relation.Name))
 	rows, err := db.QueryContext(ctx, stmt)
 	if err != nil {
 		return false, fmt.Errorf("querying table %s exists: %w", relation, err)

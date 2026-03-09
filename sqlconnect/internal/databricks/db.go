@@ -83,7 +83,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 					}
 					return "SHOW SCHEMAS", "schema_name"
 				}
-				cmds.SchemaExists = func(schema, catalog base.UnquotedIdentifier) string {
+				cmds.SchemaExists = func(catalog, schema base.UnquotedIdentifier) string {
 					if catalog != "" {
 						return fmt.Sprintf("SHOW SCHEMAS IN `%[1]s` LIKE '%[2]s'", catalog, base.EscapeSqlString(schema))
 					}
@@ -93,7 +93,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 				cmds.CreateTestTable = func(table base.QuotedIdentifier) string {
 					return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %[1]s (c1 INT, c2 STRING)", table)
 				}
-				cmds.ListTables = func(schema, catalog base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+				cmds.ListTables = func(catalog, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 					var qualifier string
 					if catalog != "" {
 						qualifier = fmt.Sprintf("`%[1]s`.`%[2]s`", base.EscapeSqlString(catalog), base.EscapeSqlString(schema))
@@ -109,7 +109,7 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 						{A: fmt.Sprintf("SHOW TABLES IN %[1]s", qualifier), B: "tableName"},
 					}
 				}
-				cmds.TableExists = func(schema, table, catalog base.UnquotedIdentifier) string {
+				cmds.TableExists = func(catalog, schema, table base.UnquotedIdentifier) string {
 					if catalog != "" {
 						return fmt.Sprintf("SHOW TABLES IN `%[1]s`.`%[2]s` LIKE '%[3]s'", catalog, schema, base.EscapeSqlString(table))
 					}
@@ -120,9 +120,6 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 						return fmt.Sprintf("DESCRIBE TABLE `%[1]s`.`%[2]s`", schema, table), "col_name", "data_type"
 					}
 					return fmt.Sprintf("DESCRIBE TABLE `%[1]s`.`%[2]s`.`%[3]s`", catalog, schema, table), "col_name", "data_type"
-				}
-				cmds.DropSchema = func(schema base.QuotedIdentifier) string {
-					return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema)
 				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {
 					return fmt.Sprintf("ALTER TABLE %[1]s.%[2]s RENAME TO %[1]s.%[3]s", schema, oldName, newName)

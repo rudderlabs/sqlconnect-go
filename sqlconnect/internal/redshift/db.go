@@ -72,14 +72,14 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 					}
 					return stmt, "schema_name"
 				}
-				cmds.SchemaExists = func(schema, catalog base.UnquotedIdentifier) string {
+				cmds.SchemaExists = func(catalog, schema base.UnquotedIdentifier) string {
 					stmt := fmt.Sprintf("SELECT schema_name FROM svv_all_schemas WHERE schema_name = '%[1]s'", base.EscapeSqlString(schema))
 					if catalog != "" {
 						stmt += fmt.Sprintf(" AND database_name = '%[1]s'", base.EscapeSqlString(catalog))
 					}
 					return stmt
 				}
-				cmds.ListTables = func(schema, catalog base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+				cmds.ListTables = func(catalog, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 					stmt := fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name = '%[1]s'", base.EscapeSqlString(schema))
 					if catalog != "" {
 						stmt += fmt.Sprintf(" AND database_name = '%[1]s'", base.EscapeSqlString(catalog))
@@ -91,7 +91,7 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 						{A: stmt, B: "table_name"},
 					}
 				}
-				cmds.TableExists = func(schema, table, catalog base.UnquotedIdentifier) string {
+				cmds.TableExists = func(catalog, schema, table base.UnquotedIdentifier) string {
 					stmt := fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name='%[1]s' and table_name = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
 					if catalog != "" {
 						stmt += fmt.Sprintf(" AND database_name = '%[1]s'", base.EscapeSqlString(catalog))

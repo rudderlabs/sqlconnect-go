@@ -25,11 +25,6 @@ func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sql
 		return nil, err
 	}
 	stmt, colName := db.sqlCommands.ListSchemas(UnquotedIdentifier(filterCatalogOpts.Catalog))
-	return db.listSchemasFromQuery(ctx, stmt, colName)
-}
-
-// listSchemasFromQuery executes the given SQL statement and scans the results into a list of SchemaRefs
-func (db *DB) listSchemasFromQuery(ctx context.Context, stmt, colName string) ([]sqlconnect.SchemaRef, error) {
 	rows, err := db.QueryContext(ctx, stmt)
 	if err != nil {
 		return nil, fmt.Errorf("querying list schemas: %w", err)
@@ -79,7 +74,7 @@ func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, 
 	if err != nil {
 		return false, err
 	}
-	rows, err := db.QueryContext(ctx, db.sqlCommands.SchemaExists(UnquotedIdentifier(schemaRef.Name), UnquotedIdentifier(filterCatalogOpts.Catalog)))
+	rows, err := db.QueryContext(ctx, db.sqlCommands.SchemaExists(UnquotedIdentifier(filterCatalogOpts.Catalog), UnquotedIdentifier(schemaRef.Name)))
 	if err != nil {
 		return false, fmt.Errorf("querying schema exists: %w", err)
 	}

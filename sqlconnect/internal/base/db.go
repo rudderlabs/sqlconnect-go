@@ -40,7 +40,7 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 				}
 				return stmt, "schema_name"
 			},
-			SchemaExists: func(schema, catalog UnquotedIdentifier) string {
+			SchemaExists: func(catalog, schema UnquotedIdentifier) string {
 				stmt := fmt.Sprintf("SELECT schema_name FROM information_schema.schemata where schema_name = '%[1]s'", EscapeSqlString(schema))
 				if catalog != "" {
 					stmt += fmt.Sprintf(" AND catalog_name = '%[1]s'", EscapeSqlString(catalog))
@@ -51,7 +51,7 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 			CreateTestTable: func(table QuotedIdentifier) string {
 				return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %[1]s (c1 INT, c2 VARCHAR(255))", table)
 			},
-			ListTables: func(schema, catalog UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+			ListTables: func(catalog, schema UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 				stmt := fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema = '%[1]s'", EscapeSqlString(schema))
 				if catalog != "" {
 					stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", EscapeSqlString(catalog))
@@ -63,7 +63,7 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 					{A: stmt, B: "table_name"},
 				}
 			},
-			TableExists: func(schema, table, catalog UnquotedIdentifier) string {
+			TableExists: func(catalog, schema, table UnquotedIdentifier) string {
 				stmt := fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema='%[1]s' and table_name = '%[2]s'", EscapeSqlString(schema), EscapeSqlString(table))
 				if catalog != "" {
 					stmt += fmt.Sprintf(" AND table_catalog = '%[1]s'", EscapeSqlString(catalog))
@@ -147,15 +147,15 @@ type (
 		// Provides the SQL command to list schemas, optionally filtered by catalog
 		ListSchemas func(catalog UnquotedIdentifier) (sql, columnName string)
 		// Provides the SQL command to check if a schema exists, optionally within a catalog
-		SchemaExists func(schema, catalog UnquotedIdentifier) string
+		SchemaExists func(catalog, schema UnquotedIdentifier) string
 		// Provides the SQL command to drop a schema,
 		DropSchema func(schema QuotedIdentifier) string
 		// Provides the SQL command to create a test table
 		CreateTestTable func(table QuotedIdentifier) string
 		// Provides the SQL command(s) to list tables in a schema, optionally filtered by catalog and/or prefix
-		ListTables func(schema, catalog UnquotedIdentifier, prefix string) (sqlAndColumnNamePairs []lo.Tuple2[string, string])
+		ListTables func(catalog, schema UnquotedIdentifier, prefix string) (sqlAndColumnNamePairs []lo.Tuple2[string, string])
 		// Provides the SQL command to check if a table exists, optionally within a catalog
-		TableExists func(schema, table, catalog UnquotedIdentifier) string
+		TableExists func(catalog, schema, table UnquotedIdentifier) string
 		// Provides the SQL command to list all columns in a table along with the column names in the result set that point to the name and type
 		ListColumns func(catalog, schema, table UnquotedIdentifier) (sql, nameCol, typeCol string)
 		// Provides the SQL command to count the rows in a table

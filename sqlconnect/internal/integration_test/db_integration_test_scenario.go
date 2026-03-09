@@ -32,8 +32,6 @@ type Options struct {
 	SpecialCharactersInQuotedTable string // special characters to test in quoted table identifiers (default: <space>,",',``)
 
 	ExtraTests func(t *testing.T, db sqlconnect.DB)
-
-	SkipNonExistentCatalogTests bool
 }
 
 func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMessage, formatfn func(string) string, opts Options) {
@@ -162,9 +160,6 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 
 			t.Run("with nonexistent catalog", func(t *testing.T) {
-				if opts.SkipNonExistentCatalogTests {
-					t.Skipf("skipping test for warehouse %s: %v", warehouse, sqlconnect.ErrNotSupported)
-				}
 				exists, err := db.SchemaExists(ctx, schema, sqlconnect.WithCatalog("nonexistent"))
 				require.NoError(t, err, "it should be able to check if a schema exists in catalog")
 				require.False(t, exists, "it should return false for a schema that doesn't exist in catalog")
@@ -193,9 +188,6 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			})
 
 			t.Run("with nonexistent catalog", func(t *testing.T) {
-				if opts.SkipNonExistentCatalogTests {
-					t.Skipf("skipping test for warehouse %s: %v", warehouse, sqlconnect.ErrNotSupported)
-				}
 				schemas, err := db.ListSchemas(ctx, sqlconnect.WithCatalog("nonexistent"))
 				require.NoError(t, err, "it should be able to list schemas in catalog")
 				require.Empty(t, schemas, "it should not contain any schemas")
@@ -631,9 +623,6 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		})
 
 		t.Run("list tables with nonexistent catalog", func(t *testing.T) {
-			if opts.SkipNonExistentCatalogTests {
-				t.Skipf("skipping test for warehouse %s: %v", warehouse, sqlconnect.ErrNotSupported)
-			}
 			tables, err := db.ListTables(ctx, schema, sqlconnect.WithCatalog("nonexistent"))
 			require.NoError(t, err, "it should be able to list tables in catalog")
 			require.Empty(t, tables, "it should not contain any tables")

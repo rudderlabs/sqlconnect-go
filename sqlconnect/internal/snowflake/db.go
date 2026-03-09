@@ -54,13 +54,13 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 					}
 					return "SHOW TERSE SCHEMAS", "name"
 				}
-				cmds.SchemaExists = func(schema, catalog base.UnquotedIdentifier) string {
+				cmds.SchemaExists = func(catalog, schema base.UnquotedIdentifier) string {
 					if catalog != "" {
 						return fmt.Sprintf(`SHOW TERSE SCHEMAS LIKE '%[1]s' IN DATABASE "%[2]s"`, base.EscapeSqlString(schema), catalog)
 					}
 					return fmt.Sprintf("SHOW TERSE SCHEMAS LIKE '%[1]s'", base.EscapeSqlString(schema))
 				}
-				cmds.ListTables = func(schema, catalog base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+				cmds.ListTables = func(catalog, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 					var schemaQualifier string
 					if catalog != "" {
 						schemaQualifier = fmt.Sprintf(`"%[1]s"."%[2]s"`, catalog, schema)
@@ -77,17 +77,18 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 						{A: fmt.Sprintf(`SHOW TERSE VIEWS IN SCHEMA %[1]s`, schemaQualifier), B: "name"},
 					}
 				}
-				cmds.TableExists = func(schema, table, _ base.UnquotedIdentifier) string {
-					return fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%[1]s' AND TABLE_NAME = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
+				cmds.TableExists = func(catalog, schema, table base.UnquotedIdentifier) string {
+					stmt := fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%[1]s' AND TABLE_NAME = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
+					if catalog != "" {
+						stmt += fmt.Sprintf(" AND TABLE_CATALOG = '%[1]s'", base.EscapeSqlString(catalog))
+					}
+					return stmt
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
 					if catalog != "" {
 						return fmt.Sprintf(`DESCRIBE TABLE "%[1]s"."%[2]s"."%[3]s"`, catalog, schema, table), "name", "type"
 					}
 					return fmt.Sprintf(`DESCRIBE TABLE "%[1]s"."%[2]s"`, schema, table), "name", "type"
-				}
-				cmds.DropSchema = func(schema base.QuotedIdentifier) string {
-					return fmt.Sprintf("DROP SCHEMA %[1]s CASCADE", schema)
 				}
 				cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {
 					return fmt.Sprintf(`ALTER TABLE %[1]s.%[2]s RENAME TO %[1]s.%[3]s`, schema, oldName, newName)

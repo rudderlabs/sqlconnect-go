@@ -24,7 +24,7 @@ func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, 
 			return false, err
 		}
 		if currentCatalog.Name != filterCatalogOpts.Catalog {
-			return false, sqlconnect.ErrNotSupported
+			return false, nil
 		}
 	}
 	var exists bool
@@ -60,7 +60,7 @@ func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sql
 			return nil, err
 		}
 		if currentCatalog.Name != filterCatalogOpts.Catalog {
-			return nil, sqlconnect.ErrNotSupported
+			return nil, nil
 		}
 	}
 
