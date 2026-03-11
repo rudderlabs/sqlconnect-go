@@ -14,6 +14,20 @@ import (
 // SchemaExists uses the bigquery client instead of [INFORMATION_SCHEMA.SCHEMATA] due to absence of a region qualifier
 // https://cloud.google.com/bigquery/docs/information-schema-datasets-schemata#scope_and_syntax
 func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, opts ...sqlconnect.Option) (bool, error) {
+	filterCatalogOpts, err := sqlconnect.NewFilterOptions(opts...)
+	if err != nil {
+		return false, err
+	}
+
+	if filterCatalogOpts.Catalog != "" {
+		currentCatalog, err := db.CurrentCatalog(ctx)
+		if err != nil {
+			return false, err
+		}
+		if currentCatalog.Name != filterCatalogOpts.Catalog {
+			return false, nil
+		}
+	}
 	var exists bool
 	if err := db.WithBigqueryClient(ctx, func(c *bigquery.Client) error {
 		if _, err := c.Dataset(schemaRef.Name).Metadata(ctx); err != nil {
@@ -36,6 +50,20 @@ func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, 
 // ListSchemas uses the bigquery client instead of [INFORMATION_SCHEMA.SCHEMATA] due to absence of a region qualifier
 // https://cloud.google.com/bigquery/docs/information-schema-datasets-schemata#scope_and_syntax
 func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sqlconnect.SchemaRef, error) {
+	filterCatalogOpts, err := sqlconnect.NewFilterOptions(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	if filterCatalogOpts.Catalog != "" {
+		currentCatalog, err := db.CurrentCatalog(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if currentCatalog.Name != filterCatalogOpts.Catalog {
+			return nil, nil
+		}
+	}
 	var schemas []sqlconnect.SchemaRef
 	if err := db.WithBigqueryClient(ctx, func(c *bigquery.Client) error {
 		datasets := c.Datasets(ctx)
