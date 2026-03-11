@@ -18,7 +18,7 @@ func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef, opts 
 			return nil, err
 		}
 		if currentCatalog.Name != listOpts.Catalog {
-			return nil, nil
+			return []sqlconnect.RelationRef{}, nil
 		}
 	}
 	return db.DB.ListTables(ctx, schema, opts...)
