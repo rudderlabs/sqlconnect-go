@@ -10,7 +10,7 @@ import (
 func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef, opts ...sqlconnect.Option) ([]sqlconnect.RelationRef, error) {
 	tables, err := db.DB.ListTables(ctx, schema, opts...)
 	if err != nil {
-		if isCatalogNotFoundError(err) {
+		if isObjectInaccessibleError(err) {
 			return []sqlconnect.RelationRef{}, nil
 		}
 		return nil, err

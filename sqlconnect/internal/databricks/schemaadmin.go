@@ -13,7 +13,7 @@ import (
 func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, opts ...sqlconnect.Option) (bool, error) {
 	exists, err := db.DB.SchemaExists(ctx, schemaRef, opts...)
 	if err != nil {
-		if isCatalogNotFoundError(err) {
+		if isObjectInaccessibleError(err) {
 			return false, nil
 		}
 		return false, err
@@ -25,7 +25,7 @@ func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, 
 func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sqlconnect.SchemaRef, error) {
 	schemas, err := db.DB.ListSchemas(ctx, opts...)
 	if err != nil {
-		if isCatalogNotFoundError(err) {
+		if isObjectInaccessibleError(err) {
 			return []sqlconnect.SchemaRef{}, nil
 		}
 		return nil, err
@@ -33,11 +33,16 @@ func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sql
 	return schemas, nil
 }
 
-func isCatalogNotFoundError(err error) bool {
+const (
+	dbSqlStateInsufficientPrivileges = "42501" // invalid permission to access catalog
+	dbSqlStateCatalogNotFound        = "42704" // catalog not found
+)
+
+func isObjectInaccessibleError(err error) bool {
 	if execErr, ok := errors.AsType[dbsqlerr.DBExecutionError](err); ok {
 		switch execErr.SqlState() {
-		case "42501", // invalid permission to access catalog
-			"42704": // catalog not found
+		case dbSqlStateInsufficientPrivileges,
+			dbSqlStateCatalogNotFound:
 			return true
 		}
 	}
