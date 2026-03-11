@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/trinodb/trino-go-client/trino"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
 // SchemaExists overrides the base implementation to handle nonexistent catalog gracefully
