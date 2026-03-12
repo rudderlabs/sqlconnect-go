@@ -45,17 +45,24 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				cmds.CreateTestTable = func(table base.QuotedIdentifier) string {
 					return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %[1]s (c1 INT, c2 STRING)", table)
 				}
-				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
+				cmds.ListTables = func(catalog, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+					stmt := fmt.Sprintf("SELECT table_name FROM `%[1]s`.INFORMATION_SCHEMA.TABLES", schema)
+					if catalog != "" {
+						stmt += fmt.Sprintf(" WHERE table_catalog = '%[1]s'", base.EscapeSqlString(catalog))
+						if prefix != "" {
+							stmt += fmt.Sprintf(" AND table_name LIKE '%[1]s'", prefix+"%")
+						}
+					} else if prefix != "" {
+						stmt += fmt.Sprintf(" WHERE table_name LIKE '%[1]s'", prefix+"%")
+					}
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SELECT table_name FROM `%[1]s`.INFORMATION_SCHEMA.TABLES", schema), B: "table_name"},
+						{A: stmt, B: "table_name"},
 					}
 				}
-				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
-					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SELECT table_name FROM `%[1]s`.INFORMATION_SCHEMA.TABLES WHERE table_name LIKE '%[2]s'", schema, prefix+"%"), B: "table_name"},
+				cmds.TableExists = func(catalog, schema, table base.UnquotedIdentifier) string {
+					if catalog != "" {
+						return fmt.Sprintf("SELECT table_name FROM `%[1]s`.INFORMATION_SCHEMA.TABLES WHERE table_name = '%[2]s' AND table_catalog = '%[3]s'", schema, base.EscapeSqlString(table), base.EscapeSqlString(catalog))
 					}
-				}
-				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SELECT table_name FROM `%[1]s`.INFORMATION_SCHEMA.TABLES WHERE table_name = '%[2]s'", schema, base.EscapeSqlString(table))
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {

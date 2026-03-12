@@ -16,20 +16,36 @@ func (db *DB) CreateTestTable(ctx context.Context, table sqlconnect.RelationRef)
 	return err
 }
 
-// ListTables returns a list of tables in the given schema
-func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef) ([]sqlconnect.RelationRef, error) {
+// ListTables returns a list of tables in the given schema, optionally filtered by prefix
+func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef, opts ...sqlconnect.Option) ([]sqlconnect.RelationRef, error) {
+	listOpts, err := sqlconnect.NewTableListOptions(opts...)
+	if err != nil {
+		return nil, err
+	}
+	makeRef := func(name string) sqlconnect.RelationRef {
+		refOpts := []sqlconnect.Option{sqlconnect.WithSchema(schema.Name)}
+		if listOpts.Catalog != "" {
+			refOpts = append(refOpts, sqlconnect.WithCatalog(listOpts.Catalog))
+		}
+		return sqlconnect.NewRelationRef(name, refOpts...)
+	}
+	tuples := db.sqlCommands.ListTables(
+		UnquotedIdentifier(listOpts.Catalog),
+		UnquotedIdentifier(schema.Name),
+		listOpts.Prefix,
+	)
 	var res []sqlconnect.RelationRef
-	for _, tuple := range db.sqlCommands.ListTables(UnquotedIdentifier(schema.Name)) {
+	for _, tuple := range tuples {
 		stmt := tuple.A
 		colName := tuple.B
 		rows, err := db.QueryContext(ctx, stmt)
 		if err != nil {
-			return nil, fmt.Errorf("querying list tables for schema %s: %w", schema, err)
+			return nil, fmt.Errorf("querying list tables: %w", err)
 		}
 		defer func() { _ = rows.Close() }()
 		cols, err := rows.Columns()
 		if err != nil {
-			return nil, fmt.Errorf("getting columns in list tables for schema %s: %w", schema, err)
+			return nil, fmt.Errorf("getting columns in list tables: %w", err)
 		}
 		cols = lo.Map(cols, func(col string, _ int) string { return strings.ToLower(col) })
 		var name string
@@ -55,59 +71,10 @@ func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef) ([]sq
 			if err != nil {
 				return nil, fmt.Errorf("scanning list tables: %w", err)
 			}
-			res = append(res, sqlconnect.NewRelationRef(name, sqlconnect.WithSchema(schema.Name)))
+			res = append(res, makeRef(name))
 		}
 		if err := rows.Err(); err != nil {
 			return nil, fmt.Errorf("iterating list tables: %w", err)
-		}
-	}
-
-	return res, nil
-}
-
-// ListTablesWithPrefix returns a list of tables in the given schema that have the given prefix
-func (db *DB) ListTablesWithPrefix(ctx context.Context, schema sqlconnect.SchemaRef, prefix string) ([]sqlconnect.RelationRef, error) {
-	var res []sqlconnect.RelationRef
-	for _, tuple := range db.sqlCommands.ListTablesWithPrefix(UnquotedIdentifier(schema.Name), prefix) {
-		stmt := tuple.A
-		colName := tuple.B
-		rows, err := db.QueryContext(ctx, stmt)
-		if err != nil {
-			return nil, fmt.Errorf("querying list tables for schema %s with prefix %s: %w", schema, prefix, err)
-		}
-		defer func() { _ = rows.Close() }()
-		cols, err := rows.Columns()
-		if err != nil {
-			return nil, fmt.Errorf("getting columns in list tables for schema %s with prefix %s: %w", schema, prefix, err)
-		}
-		cols = lo.Map(cols, func(col string, _ int) string { return strings.ToLower(col) })
-		var name string
-		scanValues := make([]any, len(cols))
-		if len(cols) == 1 {
-			scanValues[0] = &name
-		} else {
-			tableNameColIdx := lo.IndexOf(cols, strings.ToLower(colName))
-			if tableNameColIdx == -1 {
-				return nil, fmt.Errorf("column %s not found in result set: %+v", colName, cols)
-			}
-			var otherCol sqlconnect.NilAny
-			for i := 0; i < len(cols); i++ {
-				if i == tableNameColIdx {
-					scanValues[i] = &name
-				} else {
-					scanValues[i] = &otherCol
-				}
-			}
-		}
-		for rows.Next() {
-			if err := rows.Scan(scanValues...); err != nil {
-				return nil, fmt.Errorf("scanning list tables for schema %s with prefix %s: %w", schema, prefix, err)
-			}
-			res = append(res, sqlconnect.NewRelationRef(name, sqlconnect.WithSchema(schema.Name)))
-		}
-		// rows.Err will report the last error encountered by rows.Scan.
-		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("iterating list tables for schema %s with prefix %s: %w", schema, prefix, err)
 		}
 	}
 	return res, nil
@@ -115,7 +82,7 @@ func (db *DB) ListTablesWithPrefix(ctx context.Context, schema sqlconnect.Schema
 
 // TableExists returns true if the table exists
 func (db *DB) TableExists(ctx context.Context, relation sqlconnect.RelationRef) (bool, error) {
-	stmt := db.sqlCommands.TableExists(UnquotedIdentifier(relation.Schema), UnquotedIdentifier(relation.Name))
+	stmt := db.sqlCommands.TableExists(UnquotedIdentifier(relation.Catalog), UnquotedIdentifier(relation.Schema), UnquotedIdentifier(relation.Name))
 	rows, err := db.QueryContext(ctx, stmt)
 	if err != nil {
 		return false, fmt.Errorf("querying table %s exists: %w", relation, err)

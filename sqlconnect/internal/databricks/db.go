@@ -77,25 +77,42 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 				cmds.ListCatalogs = func() (string, string) {
 					return "SHOW CATALOGS", "catalog"
 				}
-				cmds.ListSchemas = func() (string, string) { return "SHOW SCHEMAS", "schema_name" }
-				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
+				cmds.ListSchemas = func(catalog base.UnquotedIdentifier) (string, string) {
+					if catalog != "" {
+						return fmt.Sprintf("SHOW SCHEMAS IN `%[1]s`", catalog), "schema_name"
+					}
+					return "SHOW SCHEMAS", "schema_name"
+				}
+				cmds.SchemaExists = func(catalog, schema base.UnquotedIdentifier) string {
+					if catalog != "" {
+						return fmt.Sprintf("SHOW SCHEMAS IN `%[1]s` LIKE '%[2]s'", catalog, base.EscapeSqlString(schema))
+					}
 					return fmt.Sprintf(`SHOW SCHEMAS LIKE '%s'`, base.EscapeSqlString(schema))
 				}
 
 				cmds.CreateTestTable = func(table base.QuotedIdentifier) string {
 					return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %[1]s (c1 INT, c2 STRING)", table)
 				}
-				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
+				cmds.ListTables = func(catalog, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+					var qualifier string
+					if catalog != "" {
+						qualifier = fmt.Sprintf("`%[1]s`.`%[2]s`", base.EscapeSqlString(catalog), base.EscapeSqlString(schema))
+					} else {
+						qualifier = fmt.Sprintf("`%s`", base.EscapeSqlString(schema))
+					}
+					if prefix != "" {
+						return []lo.Tuple2[string, string]{
+							{A: fmt.Sprintf("SHOW TABLES IN %[1]s LIKE '%[2]s'", qualifier, prefix+"*"), B: "tableName"},
+						}
+					}
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SHOW TABLES IN `%s`", base.EscapeSqlString(schema)), B: "tableName"},
+						{A: fmt.Sprintf("SHOW TABLES IN %[1]s", qualifier), B: "tableName"},
 					}
 				}
-				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
-					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SHOW TABLES IN `%[1]s` LIKE '%[2]s'", schema, prefix+"*"), B: "tableName"},
+				cmds.TableExists = func(catalog, schema, table base.UnquotedIdentifier) string {
+					if catalog != "" {
+						return fmt.Sprintf("SHOW TABLES IN `%[1]s`.`%[2]s` LIKE '%[3]s'", catalog, schema, base.EscapeSqlString(table))
 					}
-				}
-				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
 					return fmt.Sprintf("SHOW TABLES IN `%[1]s` LIKE '%[2]s'", schema, base.EscapeSqlString(table))
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {

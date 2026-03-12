@@ -65,24 +65,38 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 					return `SELECT database_name FROM svv_redshift_databases
 							WHERE database_name <> 'padb_harvest'`, "database_name"
 				}
-				cmds.ListSchemas = func() (string, string) {
-					return "SELECT schema_name FROM svv_all_schemas", "schema_name"
+				cmds.ListSchemas = func(catalog base.UnquotedIdentifier) (string, string) {
+					stmt := "SELECT schema_name FROM svv_all_schemas"
+					if catalog != "" {
+						stmt += fmt.Sprintf(" WHERE database_name = '%[1]s'", base.EscapeSqlString(catalog))
+					}
+					return stmt, "schema_name"
 				}
-				cmds.SchemaExists = func(schema base.UnquotedIdentifier) string {
-					return fmt.Sprintf("SELECT schema_name FROM svv_all_schemas WHERE schema_name = '%[1]s'", base.EscapeSqlString(schema))
+				cmds.SchemaExists = func(catalog, schema base.UnquotedIdentifier) string {
+					stmt := fmt.Sprintf("SELECT schema_name FROM svv_all_schemas WHERE schema_name = '%[1]s'", base.EscapeSqlString(schema))
+					if catalog != "" {
+						stmt += fmt.Sprintf(" AND database_name = '%[1]s'", base.EscapeSqlString(catalog))
+					}
+					return stmt
 				}
-				cmds.ListTables = func(schema base.UnquotedIdentifier) (sqlAndColumnNamePairs []lo.Tuple2[string, string]) {
+				cmds.ListTables = func(catalog, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+					stmt := fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name = '%[1]s'", base.EscapeSqlString(schema))
+					if catalog != "" {
+						stmt += fmt.Sprintf(" AND database_name = '%[1]s'", base.EscapeSqlString(catalog))
+					}
+					if prefix != "" {
+						stmt += fmt.Sprintf(" AND table_name LIKE '%[1]s'", prefix+"%")
+					}
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name = '%[1]s'", base.EscapeSqlString(schema)), B: "table_name"},
+						{A: stmt, B: "table_name"},
 					}
 				}
-				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
-					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name='%[1]s' AND table_name LIKE '%[2]s'", base.EscapeSqlString(schema), prefix+"%"), B: "table_name"},
+				cmds.TableExists = func(catalog, schema, table base.UnquotedIdentifier) string {
+					stmt := fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name='%[1]s' and table_name = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
+					if catalog != "" {
+						stmt += fmt.Sprintf(" AND database_name = '%[1]s'", base.EscapeSqlString(catalog))
 					}
-				}
-				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
-					return fmt.Sprintf("SELECT table_name FROM svv_all_tables WHERE schema_name='%[1]s' and table_name = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
+					return stmt
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
 					stmt := fmt.Sprintf("SELECT column_name, data_type FROM SVV_ALL_COLUMNS WHERE schema_name = '%[1]s' AND table_name = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))

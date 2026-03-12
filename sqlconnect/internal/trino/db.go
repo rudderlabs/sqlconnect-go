@@ -52,17 +52,38 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 				cmds.ListCatalogs = func() (string, string) {
 					return "SHOW CATALOGS", "Catalog"
 				}
-				cmds.ListTables = func(schema base.UnquotedIdentifier) []lo.Tuple2[string, string] {
+				cmds.ListSchemas = func(catalog base.UnquotedIdentifier) (string, string) {
+					if catalog != "" {
+						return fmt.Sprintf(`SHOW SCHEMAS FROM "%[1]s"`, catalog), "Schema"
+					}
+					return "SHOW SCHEMAS", "Schema"
+				}
+				cmds.SchemaExists = func(catalog, schema base.UnquotedIdentifier) string {
+					if catalog != "" {
+						return fmt.Sprintf(`SHOW SCHEMAS FROM "%[1]s" LIKE '%[2]s'`, catalog, base.EscapeSqlString(schema))
+					}
+					return fmt.Sprintf(`SHOW SCHEMAS LIKE '%[1]s'`, base.EscapeSqlString(schema))
+				}
+				cmds.ListTables = func(catalog, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
+					var qualifier string
+					if catalog != "" {
+						qualifier = fmt.Sprintf(`"%[1]s"."%[2]s"`, catalog, schema)
+					} else {
+						qualifier = fmt.Sprintf(`"%[1]s"`, schema)
+					}
+					if prefix != "" {
+						return []lo.Tuple2[string, string]{
+							{A: fmt.Sprintf(`SHOW TABLES FROM %[1]s LIKE '%[2]s'`, qualifier, prefix+"%"), B: "tableName"},
+						}
+					}
 					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf(`SHOW TABLES FROM %[1]s`, schema), B: "tableName"},
+						{A: fmt.Sprintf(`SHOW TABLES FROM %[1]s`, qualifier), B: "tableName"},
 					}
 				}
-				cmds.ListTablesWithPrefix = func(schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
-					return []lo.Tuple2[string, string]{
-						{A: fmt.Sprintf(`SHOW TABLES FROM "%[1]s" LIKE '%[2]s'`, schema, prefix+"%"), B: "tableName"},
+				cmds.TableExists = func(catalog, schema, table base.UnquotedIdentifier) string {
+					if catalog != "" {
+						return fmt.Sprintf(`SHOW TABLES FROM "%[1]s"."%[2]s" LIKE '%[3]s'`, catalog, schema, base.EscapeSqlString(table))
 					}
-				}
-				cmds.TableExists = func(schema, table base.UnquotedIdentifier) string {
 					return fmt.Sprintf(`SHOW TABLES FROM "%[1]s" LIKE '%[2]s'`, schema, base.EscapeSqlString(table))
 				}
 				cmds.TruncateTable = func(table base.QuotedIdentifier) string {

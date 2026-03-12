@@ -6,9 +6,13 @@ import (
 )
 
 func NewRelationRef(name string, options ...Option) RelationRef {
-	var o RelationRefOption
+	var o Options
 	for _, option := range options {
 		option(&o)
+	}
+
+	if o.Prefix != "" {
+		panic("prefix is not supported for relation reference construction")
 	}
 
 	relationType := TableRelation
