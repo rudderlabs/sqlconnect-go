@@ -3,8 +3,6 @@ package trino
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 
 	"github.com/trinodb/trino-go-client/trino"
 
@@ -35,16 +33,15 @@ func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sql
 	return schemas, nil
 }
 
+// trinoCatalogNotFoundErrorCode is the Trino error code for "catalog not found"
+const trinoCatalogNotFoundErrorCode = 44
+
 func isCatalogNotFoundError(err error) bool {
 	var queryErr *trino.ErrQueryFailed
-
-	fmt.Println("*** ERROR ***", err)
 	if errors.As(err, &queryErr) {
-		if queryErr.Reason != nil {
-			reason := queryErr.Reason.Error()
-			if strings.Contains(reason, "Catalog") && strings.Contains(reason, "not found") {
-				return true
-			}
+		var trinoErr *trino.ErrTrino
+		if errors.As(queryErr.Unwrap(), &trinoErr) {
+			return trinoErr.ErrorCode == trinoCatalogNotFoundErrorCode
 		}
 	}
 	return false
