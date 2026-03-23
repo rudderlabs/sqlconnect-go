@@ -602,6 +602,11 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			exists, err = db.TableExists(ctx, viewWithCatalog)
 			require.NoError(t, err, "it should be able to check if a view exists in catalog")
 			require.True(t, exists, "it should return true for a view that exists in the current catalog")
+
+			tableWithCatalog.Name = "nonexistent"
+			exists, err = db.TableExists(ctx, tableWithCatalog)
+			require.NoError(t, err, "it should be able to check if a table exists in catalog")
+			require.False(t, exists, "it should return false for a table that doesn't exist in the current catalog")
 		})
 
 		t.Run("list tables", func(t *testing.T) {
