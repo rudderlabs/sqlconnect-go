@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.25.0...v1.25.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* add catalog aware table existence for snowflake ([#462](https://github.com/rudderlabs/sqlconnect-go/issues/462)) ([af47448](https://github.com/rudderlabs/sqlconnect-go/commit/af47448ce3a59b999f19c3b8857f897e665ce472))
+
 ## [1.25.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.24.1...v1.25.0) (2026-03-12)
 
 
