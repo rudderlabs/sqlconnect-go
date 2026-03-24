@@ -78,11 +78,16 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 					}
 				}
 				cmds.TableExists = func(catalog, schema, table base.UnquotedIdentifier) string {
-					stmt := fmt.Sprintf("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%[1]s' AND TABLE_NAME = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
 					if catalog != "" {
-						stmt += fmt.Sprintf(" AND TABLE_CATALOG = '%[1]s'", base.EscapeSqlString(catalog))
+						return fmt.Sprintf(
+							"SELECT TABLE_NAME FROM %[3]s.INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%[1]s' AND TABLE_CATALOG = '%[3]s' AND TABLE_NAME = '%[2]s'",
+							base.EscapeSqlString(schema), base.EscapeSqlString(table), base.EscapeSqlString(catalog),
+						)
 					}
-					return stmt
+					return fmt.Sprintf(
+						"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%[1]s' AND TABLE_NAME = '%[2]s'",
+						base.EscapeSqlString(schema), base.EscapeSqlString(table),
+					)
 				}
 				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
 					if catalog != "" {
