@@ -2,7 +2,6 @@ package databricks
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/samber/lo"
@@ -12,15 +11,6 @@ import (
 
 // ListColumns returns a list of columns for the given table
 func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) ([]sqlconnect.ColumnRef, error) {
-	if relation.Catalog != "" {
-		currentCatalog, err := db.CurrentCatalog(ctx) // make sure the catalog matches the current catalog
-		if err != nil {
-			return nil, fmt.Errorf("getting current catalog: %w", err)
-		}
-		if relation.Catalog != currentCatalog.Name {
-			return nil, fmt.Errorf("catalog %s not found", relation.Catalog)
-		}
-	}
 	cols, err := db.DB.ListColumns(ctx, relation)
 	if db.skipColumnNormalization {
 		return cols, err
