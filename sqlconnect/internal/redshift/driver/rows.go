@@ -114,6 +114,11 @@ func (rows *redshiftRows) Next(dest []driver.Value) error {
 				case "timetz", "time with time zone":
 					t, err := time.Parse("15:04:05.999999-07", field.Value)
 					if err != nil {
+						// Redshift stores timetz values in UTC. The Data API may return
+						// them without a timezone offset, so parse as UTC in that case.
+						t, err = time.Parse("15:04:05.999999", field.Value)
+					}
+					if err != nil {
 						dest[i] = field.Value
 					} else {
 						dest[i] = t.UTC().Format(time.RFC3339Nano)
