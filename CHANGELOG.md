@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.25.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.25.1...v1.25.2) (2026-04-03)
+
+
+### Bug Fixes
+
+* **redshift:** handle timetz values without timezone offset from Data API ([#466](https://github.com/rudderlabs/sqlconnect-go/issues/466)) ([8680bb8](https://github.com/rudderlabs/sqlconnect-go/commit/8680bb82f40ab5f20ef8202a29adf469eaeb971a))
+* remove catalog validation from ListColumns method for databricks ([#464](https://github.com/rudderlabs/sqlconnect-go/issues/464)) ([38b5161](https://github.com/rudderlabs/sqlconnect-go/commit/38b5161b12893ce2f9c4298532e5ba4a33ca14dd))
+
+
+### Miscellaneous
+
+* **deps:** bump actions/create-github-app-token from 2.2.1 to 3.0.0 ([#458](https://github.com/rudderlabs/sqlconnect-go/issues/458)) ([595a2f8](https://github.com/rudderlabs/sqlconnect-go/commit/595a2f8db5a4cf7bcfb80a293d1a2090fdad1cc9))
+* **deps:** bump actions/download-artifact from 5.0.0 to 8.0.1 ([#457](https://github.com/rudderlabs/sqlconnect-go/issues/457)) ([897e669](https://github.com/rudderlabs/sqlconnect-go/commit/897e669232ecf459065958f046bbe334e55e203b))
+* **deps:** bump actions/setup-go from 6.2.0 to 6.3.0 ([#452](https://github.com/rudderlabs/sqlconnect-go/issues/452)) ([e0fe47f](https://github.com/rudderlabs/sqlconnect-go/commit/e0fe47fa50befbe938b56033df0e7d6a3a4d3f0e))
+* **deps:** bump actions/upload-artifact from 4.6.2 to 7.0.0 ([#448](https://github.com/rudderlabs/sqlconnect-go/issues/448)) ([8c39d00](https://github.com/rudderlabs/sqlconnect-go/commit/8c39d0052ce6a1fb602f59b960ed02fe7f39e7a5))
+* **deps:** bump cloud.google.com/go/bigquery from 1.73.1 to 1.74.0 ([#451](https://github.com/rudderlabs/sqlconnect-go/issues/451)) ([8eb0b1b](https://github.com/rudderlabs/sqlconnect-go/commit/8eb0b1bbc081086bdf2d74407fc728e6bcf112ce))
+* **deps:** bump github.com/aws/aws-sdk-go-v2/config from 1.32.7 to 1.32.12 ([#460](https://github.com/rudderlabs/sqlconnect-go/issues/460)) ([efb0425](https://github.com/rudderlabs/sqlconnect-go/commit/efb0425815b507930a80fab796a1f6bc1033cea6))
+* **deps:** bump github.com/databricks/databricks-sql-go from 1.9.0 to 1.10.0 ([#443](https://github.com/rudderlabs/sqlconnect-go/issues/443)) ([e25c0c9](https://github.com/rudderlabs/sqlconnect-go/commit/e25c0c92500541ced36bc91e8e42209cfd3b241b))
+* **deps:** bump golang.org/x/crypto from 0.48.0 to 0.49.0 ([#459](https://github.com/rudderlabs/sqlconnect-go/issues/459)) ([e782b9c](https://github.com/rudderlabs/sqlconnect-go/commit/e782b9cc6898b8ca94d20ae50510143f894e84e2))
+* **deps:** bump step-security/harden-runner from 2.14.2 to 2.16.0 ([#456](https://github.com/rudderlabs/sqlconnect-go/issues/456)) ([7a6d6bf](https://github.com/rudderlabs/sqlconnect-go/commit/7a6d6bfe5c4b1eb87b9b7a9280eb397450ca8b25))
+* **deps:** bump the go_modules group across 1 directory with 4 updates ([#467](https://github.com/rudderlabs/sqlconnect-go/issues/467)) ([8797b7c](https://github.com/rudderlabs/sqlconnect-go/commit/8797b7cabdf58fc4e866c2131f5d0c9425f8af1a))
+
 ## [1.25.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.25.0...v1.25.1) (2026-03-24)
 
 
