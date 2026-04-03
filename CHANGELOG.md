@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.3](https://github.com/rudderlabs/sqlconnect-go/compare/v1.25.2...v1.25.3) (2026-04-03)
+
+
+### Miscellaneous
+
+* add dependabot cooldown ([#468](https://github.com/rudderlabs/sqlconnect-go/issues/468)) ([2b09c56](https://github.com/rudderlabs/sqlconnect-go/commit/2b09c562082a56aecda5c1faf43da2244686b199))
+
 ## [1.25.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.25.1...v1.25.2) (2026-04-03)
 
 
