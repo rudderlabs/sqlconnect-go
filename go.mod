@@ -22,7 +22,7 @@ require (
 	github.com/rudderlabs/goqu/v10 v10.3.1
 	github.com/rudderlabs/rudder-go-kit v0.72.3
 	github.com/rudderlabs/sql-tunnels v0.1.7
-	github.com/samber/lo v1.52.0
+	github.com/samber/lo v1.53.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/snowflakedb/gosnowflake v1.19.0
 	github.com/stretchr/testify v1.11.1
