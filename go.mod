@@ -1,6 +1,6 @@
 module github.com/rudderlabs/sqlconnect-go
 
-go 1.26.0
+go 1.26.1
 
 require (
 	cloud.google.com/go v0.123.0
@@ -20,7 +20,7 @@ require (
 	github.com/lib/pq v1.11.2
 	github.com/ory/dockertest/v3 v3.12.0
 	github.com/rudderlabs/goqu/v10 v10.3.1
-	github.com/rudderlabs/rudder-go-kit v0.72.3
+	github.com/rudderlabs/rudder-go-kit v0.74.1
 	github.com/rudderlabs/sql-tunnels v0.1.7
 	github.com/samber/lo v1.52.0
 	github.com/sirupsen/logrus v1.9.4
