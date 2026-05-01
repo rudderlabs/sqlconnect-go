@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.25.3](https://github.com/rudderlabs/sqlconnect-go/compare/v1.25.2...v1.25.3) (2026-05-01)
+
+
+### Miscellaneous
+
+* add dependabot cooldown ([#468](https://github.com/rudderlabs/sqlconnect-go/issues/468)) ([2b09c56](https://github.com/rudderlabs/sqlconnect-go/commit/2b09c562082a56aecda5c1faf43da2244686b199))
+* exclude trino from cleanup ([#478](https://github.com/rudderlabs/sqlconnect-go/issues/478)) ([4feb215](https://github.com/rudderlabs/sqlconnect-go/commit/4feb215980f7ae082c78b69d6b1c48058f0ef769))
+* **vuln:** scope workflow permissions to least privilege (SEC-167) ([#479](https://github.com/rudderlabs/sqlconnect-go/issues/479)) ([c57b20b](https://github.com/rudderlabs/sqlconnect-go/commit/c57b20b0f77c753ecc2b3b1f1acd5b1609f029b5))
+
 ## [1.25.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.25.1...v1.25.2) (2026-04-03)
 
 
