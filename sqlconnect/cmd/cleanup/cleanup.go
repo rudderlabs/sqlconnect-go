@@ -14,7 +14,6 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/databricks"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/snowflake"
-	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/trino"
 )
 
 func main() {
@@ -31,7 +30,7 @@ func main() {
 		{Env: "REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS", Type: redshift.DatabaseType},
 		{Env: "REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS", Type: redshift.DatabaseType},
 		{Env: "SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS", Type: snowflake.DatabaseType},
-		{Env: "TRINO_TEST_ENVIRONMENT_CREDENTIALS", Type: trino.DatabaseType},
+		// {Env: "TRINO_TEST_ENVIRONMENT_CREDENTIALS", Type: trino.DatabaseType},
 	}
 
 	g, ctx := errgroup.WithContext(context.Background())
