@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
@@ -38,12 +39,15 @@ func (b bigQueryDriver) Open(uri string) (driver.Conn, error) {
 		opts = append(opts, option.WithoutAuthentication())
 	}
 	if config.credentialFile != "" {
-		// TODO: switching to WithAuthCredentialsFile requires auth type handling
-		opts = append(opts, option.WithCredentialsFile(config.credentialFile)) // nolint: staticcheck
+		data, err := os.ReadFile(config.credentialFile)
+		if err != nil {
+			return nil, fmt.Errorf("reading credential file: %w", err)
+		}
+		opts = append(opts, option.WithAuthCredentialsFile(CredentialsTypeFromJSON(data), config.credentialFile))
 	}
 	if config.credentialsJSON != "" {
-		// TODO: switching to WithAuthCredentialsJSON requires auth type handling
-		opts = append(opts, option.WithCredentialsJSON([]byte(config.credentialsJSON))) // nolint: staticcheck
+		creds := []byte(config.credentialsJSON)
+		opts = append(opts, option.WithAuthCredentialsJSON(CredentialsTypeFromJSON(creds), creds))
 	}
 
 	client, err := bigquery.NewClient(ctx, config.projectID, opts...)

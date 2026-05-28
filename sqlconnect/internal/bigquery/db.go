@@ -28,11 +28,11 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		return nil, err
 	}
 
+	creds := []byte(config.CredentialsJSON)
 	db := sql.OpenDB(driver.NewConnector(
 		config.ProjectID,
-		// TODO: switching to WithAuthCredentialsJSON requires auth type handling
-		option.WithCredentialsJSON([]byte(config.CredentialsJSON))), // nolint: staticcheck
-	)
+		option.WithAuthCredentialsJSON(driver.CredentialsTypeFromJSON(creds), creds),
+	))
 
 	return &DB{
 		DB: base.NewDB(
