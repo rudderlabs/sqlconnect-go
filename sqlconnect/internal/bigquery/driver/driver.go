@@ -5,7 +5,6 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
@@ -31,6 +30,18 @@ func (b bigQueryDriver) Open(uri string) (driver.Conn, error) {
 
 	ctx := context.Background()
 
+	client, err := bigquery.NewClient(ctx, config.projectID, optionsFor(config)...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &bigQueryConnection{
+		ctx:    ctx,
+		client: client,
+	}, nil
+}
+
+func optionsFor(config *bigQueryConfig) []option.ClientOption {
 	opts := []option.ClientOption{option.WithScopes(config.scopes...)}
 	if config.endpoint != "" {
 		opts = append(opts, option.WithEndpoint(config.endpoint))
@@ -42,27 +53,13 @@ func (b bigQueryDriver) Open(uri string) (driver.Conn, error) {
 		opts = append(opts, option.WithoutAuthentication())
 	} else {
 		if config.credentialFile != "" {
-			data, err := os.ReadFile(config.credentialFile)
-			if err != nil {
-				return nil, fmt.Errorf("reading credential file: %w", err)
-			}
-			opts = append(opts, option.WithAuthCredentialsFile(CredentialsTypeFromJSON(data), config.credentialFile))
+			opts = append(opts, option.WithAuthCredentialsFile(option.ServiceAccount, config.credentialFile))
 		}
 		if config.credentialsJSON != "" {
-			creds := []byte(config.credentialsJSON)
-			opts = append(opts, option.WithAuthCredentialsJSON(CredentialsTypeFromJSON(creds), creds))
+			opts = append(opts, option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(config.credentialsJSON)))
 		}
 	}
-
-	client, err := bigquery.NewClient(ctx, config.projectID, opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	return &bigQueryConnection{
-		ctx:    ctx,
-		client: client,
-	}, nil
+	return opts
 }
 
 func configFromUri(uri string) (*bigQueryConfig, error) {

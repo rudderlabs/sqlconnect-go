@@ -28,10 +28,9 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		return nil, err
 	}
 
-	creds := []byte(config.CredentialsJSON)
 	db := sql.OpenDB(driver.NewConnector(
 		config.ProjectID,
-		option.WithAuthCredentialsJSON(driver.CredentialsTypeFromJSON(creds), creds),
+		option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(config.CredentialsJSON)),
 	))
 
 	return &DB{
