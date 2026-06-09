@@ -64,7 +64,7 @@ func columnTypeMapper(columnType base.ColumnType) string {
 
 // jsonRowMapper maps a row's scanned column to a json object's field
 func jsonRowMapper(databaseTypeName string, value any) any {
-	switch v := (value).(type) {
+	switch v := value.(type) {
 	case *big.Rat:
 		if !v.IsInt() {
 			floatVal, _ := v.Float64()
