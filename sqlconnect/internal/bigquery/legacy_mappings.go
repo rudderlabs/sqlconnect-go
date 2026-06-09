@@ -46,7 +46,7 @@ func legacyColumnTypeMapper(columnType base.ColumnType) string {
 
 // legacyJsonRowMapper maps a row's scanned column to a json object's field
 func legacyJsonRowMapper(_ string, value any) any {
-	switch v := (value).(type) {
+	switch v := value.(type) {
 	case *big.Rat:
 		// Handle big.Rat values
 		if !v.IsInt() {
