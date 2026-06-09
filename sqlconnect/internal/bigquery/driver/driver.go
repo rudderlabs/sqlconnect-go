@@ -36,18 +36,22 @@ func (b bigQueryDriver) Open(uri string) (driver.Conn, error) {
 		opts = append(opts, option.WithEndpoint(config.endpoint))
 	}
 	if config.disableAuth {
+		// When authentication is disabled, skip credential options to avoid
+		// passing conflicting auth options to the client and to avoid failing
+		// early on missing/unreadable credential files.
 		opts = append(opts, option.WithoutAuthentication())
-	}
-	if config.credentialFile != "" {
-		data, err := os.ReadFile(config.credentialFile)
-		if err != nil {
-			return nil, fmt.Errorf("reading credential file: %w", err)
+	} else {
+		if config.credentialFile != "" {
+			data, err := os.ReadFile(config.credentialFile)
+			if err != nil {
+				return nil, fmt.Errorf("reading credential file: %w", err)
+			}
+			opts = append(opts, option.WithAuthCredentialsFile(CredentialsTypeFromJSON(data), config.credentialFile))
 		}
-		opts = append(opts, option.WithAuthCredentialsFile(CredentialsTypeFromJSON(data), config.credentialFile))
-	}
-	if config.credentialsJSON != "" {
-		creds := []byte(config.credentialsJSON)
-		opts = append(opts, option.WithAuthCredentialsJSON(CredentialsTypeFromJSON(creds), creds))
+		if config.credentialsJSON != "" {
+			creds := []byte(config.credentialsJSON)
+			opts = append(opts, option.WithAuthCredentialsJSON(CredentialsTypeFromJSON(creds), creds))
+		}
 	}
 
 	client, err := bigquery.NewClient(ctx, config.projectID, opts...)
