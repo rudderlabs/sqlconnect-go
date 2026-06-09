@@ -18,8 +18,7 @@ func TestOpenMissingCredentialFile(t *testing.T) {
 
 	db, err := sql.Open("bigquery", urn.String())
 	require.NoError(t, err, "sql.Open should defer connection setup")
-	t.Cleanup(func() { _ = db.Close() })
-
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	err = db.Ping()
 	require.ErrorContains(t, err, "reading credential file",
 		"opening a connection with an unreadable credential file should surface the read error")
