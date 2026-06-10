@@ -30,23 +30,7 @@ func (b bigQueryDriver) Open(uri string) (driver.Conn, error) {
 
 	ctx := context.Background()
 
-	opts := []option.ClientOption{option.WithScopes(config.scopes...)}
-	if config.endpoint != "" {
-		opts = append(opts, option.WithEndpoint(config.endpoint))
-	}
-	if config.disableAuth {
-		opts = append(opts, option.WithoutAuthentication())
-	}
-	if config.credentialFile != "" {
-		// TODO: switching to WithAuthCredentialsFile requires auth type handling
-		opts = append(opts, option.WithCredentialsFile(config.credentialFile)) // nolint: staticcheck
-	}
-	if config.credentialsJSON != "" {
-		// TODO: switching to WithAuthCredentialsJSON requires auth type handling
-		opts = append(opts, option.WithCredentialsJSON([]byte(config.credentialsJSON))) // nolint: staticcheck
-	}
-
-	client, err := bigquery.NewClient(ctx, config.projectID, opts...)
+	client, err := bigquery.NewClient(ctx, config.projectID, optionsFor(config)...)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +39,27 @@ func (b bigQueryDriver) Open(uri string) (driver.Conn, error) {
 		ctx:    ctx,
 		client: client,
 	}, nil
+}
+
+func optionsFor(config *bigQueryConfig) []option.ClientOption {
+	opts := []option.ClientOption{option.WithScopes(config.scopes...)}
+	if config.endpoint != "" {
+		opts = append(opts, option.WithEndpoint(config.endpoint))
+	}
+	if config.disableAuth {
+		// When authentication is disabled, skip credential options to avoid
+		// passing conflicting auth options to the client and to avoid failing
+		// early on missing/unreadable credential files.
+		opts = append(opts, option.WithoutAuthentication())
+	} else {
+		if config.credentialFile != "" {
+			opts = append(opts, option.WithAuthCredentialsFile(option.ServiceAccount, config.credentialFile))
+		}
+		if config.credentialsJSON != "" {
+			opts = append(opts, option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(config.credentialsJSON)))
+		}
+	}
+	return opts
 }
 
 func configFromUri(uri string) (*bigQueryConfig, error) {
