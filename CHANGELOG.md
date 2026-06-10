@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.26.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.25.2...v1.26.0) (2026-06-10)
+
+
+### Features
+
+* **databricks:** bump github.com/databricks/databricks-sql-go from 1.10.0 to 1.12.0 ([#502](https://github.com/rudderlabs/sqlconnect-go/issues/502)) ([d68b3a6](https://github.com/rudderlabs/sqlconnect-go/commit/d68b3a6afeb0d24515f940e7eafd9d8c7f39bda6))
+* **deps:** bump github.com/aws/aws-sdk-go-v2/service/sts from 1.41.10 to 1.42.3 ([#490](https://github.com/rudderlabs/sqlconnect-go/issues/490)) ([4c2c400](https://github.com/rudderlabs/sqlconnect-go/commit/4c2c4009303ebf68c5361107adf46f18feac8ee3))
+* **redshiftdata:** bump github.com/aws/aws-sdk-go-v2/service/redshiftdata from 1.38.4 to 1.40.1 ([#500](https://github.com/rudderlabs/sqlconnect-go/issues/500)) ([be2c9e8](https://github.com/rudderlabs/sqlconnect-go/commit/be2c9e8cbe88aa9df89cab79ba799708a6a2f1c1))
+
+
+### Bug Fixes
+
+* **bigquery:** migrate credential options to WithAuthCredentials* (ServiceAccount) ([#492](https://github.com/rudderlabs/sqlconnect-go/issues/492)) ([500d383](https://github.com/rudderlabs/sqlconnect-go/commit/500d383b16dad7015fc3ece360cac380e00a2a43))
+
+
+### Miscellaneous
+
+* add dependabot cooldown ([#468](https://github.com/rudderlabs/sqlconnect-go/issues/468)) ([2b09c56](https://github.com/rudderlabs/sqlconnect-go/commit/2b09c562082a56aecda5c1faf43da2244686b199))
+* **deps:** bump actions/create-github-app-token from 3.0.0 to 3.2.0 ([#493](https://github.com/rudderlabs/sqlconnect-go/issues/493)) ([841bf95](https://github.com/rudderlabs/sqlconnect-go/commit/841bf950291483819a074f8dc6a8224a935dc8ff))
+* **deps:** bump actions/labeler from 6.0.1 to 6.1.0 ([#496](https://github.com/rudderlabs/sqlconnect-go/issues/496)) ([069b5a6](https://github.com/rudderlabs/sqlconnect-go/commit/069b5a67b437e3891ad0d9322ad55405d71ca799))
+* **deps:** bump codecov/codecov-action from 5.5.2 to 7.0.0 ([#494](https://github.com/rudderlabs/sqlconnect-go/issues/494)) ([5b522cb](https://github.com/rudderlabs/sqlconnect-go/commit/5b522cba4197a48acc8e34408cfc2faaf7a323c2))
+* **deps:** bump golang.org/x/crypto from 0.51.0 to 0.52.0 ([#501](https://github.com/rudderlabs/sqlconnect-go/issues/501)) ([6ba33b0](https://github.com/rudderlabs/sqlconnect-go/commit/6ba33b03e7f0a80ae7643358b489ccbe2294aaf3))
+* **deps:** bump golangci/golangci-lint-action from 8.0.0 to 9.2.1 ([#498](https://github.com/rudderlabs/sqlconnect-go/issues/498)) ([2cbb7f5](https://github.com/rudderlabs/sqlconnect-go/commit/2cbb7f56dc6dc58be22163de2d174c62da863576))
+* **deps:** bump google.golang.org/api from 0.267.0 to 0.280.0 ([#503](https://github.com/rudderlabs/sqlconnect-go/issues/503)) ([9ffaf40](https://github.com/rudderlabs/sqlconnect-go/commit/9ffaf4073b0e4ebb226632ad536a4acf9cea8322))
+* **deps:** bump step-security/harden-runner from 2.16.0 to 2.19.4 ([#499](https://github.com/rudderlabs/sqlconnect-go/issues/499)) ([3babb21](https://github.com/rudderlabs/sqlconnect-go/commit/3babb21f9ce11dceb6622bf1a998a2880c0b48ec))
+* **docs:** bootstrap agent knowledge for sqlconnect-go ([#497](https://github.com/rudderlabs/sqlconnect-go/issues/497)) ([fcd11d4](https://github.com/rudderlabs/sqlconnect-go/commit/fcd11d43006d983640e101b48ffcaa936f1a8dd7))
+* exclude trino from cleanup ([#478](https://github.com/rudderlabs/sqlconnect-go/issues/478)) ([4feb215](https://github.com/rudderlabs/sqlconnect-go/commit/4feb215980f7ae082c78b69d6b1c48058f0ef769))
+* **vuln:** scope workflow permissions to least privilege (SEC-167) ([#479](https://github.com/rudderlabs/sqlconnect-go/issues/479)) ([c57b20b](https://github.com/rudderlabs/sqlconnect-go/commit/c57b20b0f77c753ecc2b3b1f1acd5b1609f029b5))
+
 ## [1.25.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.25.1...v1.25.2) (2026-04-03)
 
 
