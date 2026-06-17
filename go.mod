@@ -186,8 +186,9 @@ require (
 	gotest.tools/gotestsum v1.8.2 // indirect
 )
 
-// TODO: bump these to the rebased rudderlabs/google-cloud-go tags once
-// rudderlabs/google-cloud-go#48 is merged and new -rudder.N tags are cut.
-replace cloud.google.com/go => github.com/rudderlabs/google-cloud-go v0.123.0-rudder.4
+// Pinned to the rudderlabs/google-cloud-go fork, which carries the bigquery
+// WithMaxRetries support this release builds on, rebased onto the matching
+// upstream versions (cloud.google.com/go v0.123.0, bigquery v1.79.0).
+replace cloud.google.com/go => github.com/rudderlabs/google-cloud-go v0.123.0-rudder.5
 
-replace cloud.google.com/go/bigquery => github.com/rudderlabs/google-cloud-go/bigquery v1.69.0-rudder.3
+replace cloud.google.com/go/bigquery => github.com/rudderlabs/google-cloud-go/bigquery v1.79.0-rudder.1
