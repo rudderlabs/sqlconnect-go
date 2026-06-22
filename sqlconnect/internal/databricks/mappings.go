@@ -50,11 +50,37 @@ var columnTypeMappings = map[string]string{
 var re = regexp.MustCompile(`(\(.+\)|<.+>)`) // remove type parameters [<>] and size constraints [()]
 
 func columnTypeMapper(columnType base.ColumnType) string {
+	if rudderType, ok := arrayRudderType(columnType.DatabaseTypeName()); ok {
+		return rudderType
+	}
 	databaseTypeName := strings.ToUpper(re.ReplaceAllString(columnType.DatabaseTypeName(), ""))
 	if mappedType, ok := columnTypeMappings[strings.ToUpper(databaseTypeName)]; ok {
 		return mappedType
 	}
 	return databaseTypeName
+}
+
+// arrayRudderType decides the rudder type for a native array column from its raw
+// type name (read BEFORE type parameters are stripped). Scalar-element arrays
+// (ARRAY<STRING>, ARRAY<INT>, …) map to "array" so they can be targeted by array
+// column filters; arrays of structs/maps/arrays stay "json" — nested element
+// paths are out of scope (Feature 4). Returns ok=false when the column is not a
+// parameterised array (a bare "ARRAY" with no element type falls through to the
+// standard map, preserving prior behaviour).
+func arrayRudderType(rawTypeName string) (string, bool) {
+	upper := strings.ToUpper(strings.TrimSpace(rawTypeName))
+	if !strings.HasPrefix(upper, "ARRAY<") || !strings.HasSuffix(upper, ">") {
+		return "", false
+	}
+	elem := strings.TrimSpace(upper[len("ARRAY<") : len(upper)-1])
+	switch {
+	case strings.HasPrefix(elem, "STRUCT"),
+		strings.HasPrefix(elem, "RECORD"),
+		strings.HasPrefix(elem, "ARRAY"),
+		strings.HasPrefix(elem, "MAP"):
+		return "json", true
+	}
+	return "array", true
 }
 
 // jsonRowMapper maps a row's scanned column to a json object's field
