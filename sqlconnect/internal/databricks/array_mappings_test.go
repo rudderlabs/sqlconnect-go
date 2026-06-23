@@ -12,11 +12,16 @@ func TestColumnTypeMapper_Array(t *testing.T) {
 		raw  string
 		want string
 	}{
-		// scalar-element arrays → array (filterable)
+		// string-element arrays → array (the only filterable arrays in v1)
 		{"ARRAY<STRING>", "array"},
-		{"ARRAY<INT>", "array"},
-		{"ARRAY<BOOLEAN>", "array"},
 		{"array<string>", "array"},
+		{"ARRAY < STRING >", "array"}, // whitespace tolerated
+		// non-string scalar arrays → json (numeric/boolean membership can't match string filters)
+		{"ARRAY<INT>", "json"},
+		{"ARRAY<BIGINT>", "json"},
+		{"ARRAY<DOUBLE>", "json"},
+		{"ARRAY<BOOLEAN>", "json"},
+		{"ARRAY<TIMESTAMP>", "json"},
 		// struct / nested / map element arrays → json (Feature 4)
 		{"ARRAY<STRUCT<a: INT>>", "json"},
 		{"ARRAY<ARRAY<STRING>>", "json"},

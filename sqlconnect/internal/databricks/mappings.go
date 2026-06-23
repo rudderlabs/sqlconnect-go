@@ -61,26 +61,25 @@ func columnTypeMapper(columnType base.ColumnType) string {
 }
 
 // arrayRudderType decides the rudder type for a native array column from its raw
-// type name (read BEFORE type parameters are stripped). Scalar-element arrays
-// (ARRAY<STRING>, ARRAY<INT>, …) map to "array" so they can be targeted by array
-// column filters; arrays of structs/maps/arrays stay "json" — nested element
-// paths are out of scope (Feature 4). Returns ok=false when the column is not a
-// parameterised array (a bare "ARRAY" with no element type falls through to the
-// standard map, preserving prior behaviour).
+// type name (read BEFORE type parameters are stripped). v1 supports
+// string-element arrays only: membership filters compare string values, so a
+// numeric/boolean array filtered as text would never match. So ARRAY<STRING> →
+// "array" (filterable); non-string scalar arrays (ARRAY<INT>, ARRAY<BOOLEAN>, …)
+// and complex element arrays (struct/map/nested array) → "json". Whether the
+// element is a string reuses the driver's own columnTypeMappings, so there is one
+// source of truth for "what is a string type". Returns ok=false when the column
+// is not a parameterised array (a bare "ARRAY" with no element type falls through
+// to the standard map, preserving prior behaviour).
 func arrayRudderType(rawTypeName string) (string, bool) {
-	upper := strings.ToUpper(strings.TrimSpace(rawTypeName))
+	upper := strings.ReplaceAll(strings.ToUpper(rawTypeName), " ", "")
 	if !strings.HasPrefix(upper, "ARRAY<") || !strings.HasSuffix(upper, ">") {
 		return "", false
 	}
-	elem := strings.TrimSpace(upper[len("ARRAY<") : len(upper)-1])
-	switch {
-	case strings.HasPrefix(elem, "STRUCT"),
-		strings.HasPrefix(elem, "RECORD"),
-		strings.HasPrefix(elem, "ARRAY"),
-		strings.HasPrefix(elem, "MAP"):
-		return "json", true
+	elem := re.ReplaceAllString(upper[len("ARRAY<"):len(upper)-1], "")
+	if columnTypeMappings[elem] == "string" {
+		return "array", true
 	}
-	return "array", true
+	return "json", true
 }
 
 // jsonRowMapper maps a row's scanned column to a json object's field
