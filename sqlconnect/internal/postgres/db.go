@@ -64,7 +64,8 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 							"WHERE n.nspname = '%[1]s' AND c.relname = '%[2]s' "+
 							"AND a.attnum > 0 AND NOT a.attisdropped%[3]s "+
 							"ORDER BY a.attnum",
-						base.EscapeSqlString(schema), base.EscapeSqlString(table), catalogClause)
+						base.EscapeSqlString(schema), base.EscapeSqlString(table), catalogClause,
+					)
 					return stmt, "column_name", "data_type"
 				}
 				return cmds
