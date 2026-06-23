@@ -55,36 +55,35 @@ var columnTypeMappings = map[string]string{
 var re = regexp.MustCompile(`(\(.+\)|<.+>)`) // remove type parameters [<>] and size constraints [()]
 
 func columnTypeMapper(columnType base.ColumnType) string {
-	if rudderType, ok := arrayRudderType(columnType.DatabaseTypeName()); ok {
-		return rudderType
-	}
-	databaseTypeName := strings.ToUpper(re.ReplaceAllString(columnType.DatabaseTypeName(), ""))
-	if mappedType, ok := columnTypeMappings[strings.ToUpper(databaseTypeName)]; ok {
+	raw := columnType.DatabaseTypeName()
+	databaseTypeName := strings.TrimSpace(strings.ToUpper(re.ReplaceAllString(raw, "")))
+	if mappedType, ok := columnTypeMappings[databaseTypeName]; ok {
+		// A native array is filterable (rudder type "array") only when its element
+		// is a string; numeric/boolean/complex-element arrays keep the mapped
+		// "json" — string membership filters can't match non-string elements. The
+		// map keys on the param-stripped name, so every array collapses to "ARRAY"
+		// and the element has to be recovered from the raw name here.
+		if databaseTypeName == "ARRAY" && isStringElementArray(raw) {
+			return "array"
+		}
 		return mappedType
 	}
 	return databaseTypeName
 }
 
-// arrayRudderType decides the rudder type for a native array column from its raw
-// type name (read BEFORE type parameters are stripped). v1 supports
-// string-element arrays only: membership filters compare string values, so a
-// numeric/boolean array filtered as text would never match. So ARRAY<STRING> →
-// "array" (filterable); non-string scalar arrays (ARRAY<INT64>, ARRAY<BOOL>, …)
-// and complex element arrays (struct/record/map/nested array) → "json". Whether
-// the element is a string reuses the driver's own columnTypeMappings, so there
-// is one source of truth for "what is a string type". Returns ok=false when the
-// column is not a parameterised array (a bare "ARRAY" with no element type falls
-// through to the standard map, preserving prior behaviour).
-func arrayRudderType(rawTypeName string) (string, bool) {
+// isStringElementArray reports whether a native array column has a string element
+// type (ARRAY<STRING>, ARRAY<BYTES>, …), read from the raw type name before its
+// parameters are stripped. It reuses columnTypeMappings so "what is a string
+// type" has a single source of truth. A bare "ARRAY" (no element type) and
+// non-string or complex elements (int, bool, struct, map, nested array) return
+// false.
+func isStringElementArray(rawTypeName string) bool {
 	upper := strings.ReplaceAll(strings.ToUpper(rawTypeName), " ", "")
 	if !strings.HasPrefix(upper, "ARRAY<") || !strings.HasSuffix(upper, ">") {
-		return "", false
+		return false
 	}
 	elem := re.ReplaceAllString(upper[len("ARRAY<"):len(upper)-1], "")
-	if columnTypeMappings[elem] == "string" {
-		return "array", true
-	}
-	return "json", true
+	return columnTypeMappings[elem] == "string"
 }
 
 // jsonRowMapper maps a row's scanned column to a json object's field
