@@ -3,6 +3,7 @@ package postgres
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 
 	_ "github.com/lib/pq" // postgres driver
 
@@ -45,8 +46,29 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 			db,
 			tunnelCloser,
 			base.WithGoquDialect(base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())),
-			base.WithColumnTypeMappings(getColumnTypeMappings(config)),
+			base.WithColumnTypeMapper(getColumnTypeMapper(config)),
 			base.WithJsonRowMapper(getJonRowMapper(config)),
+			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
+				// information_schema.columns reports data_type = 'ARRAY' without the
+				// element type; pg_catalog.format_type yields text[], integer[], etc.
+				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
+					catalogClause := ""
+					if catalog != "" {
+						catalogClause = fmt.Sprintf(" AND current_database() = '%s'", base.EscapeSqlString(catalog))
+					}
+					stmt := fmt.Sprintf(
+						"SELECT a.attname AS column_name, pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type "+
+							"FROM pg_catalog.pg_attribute a "+
+							"JOIN pg_catalog.pg_class c ON a.attrelid = c.oid "+
+							"JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid "+
+							"WHERE n.nspname = '%[1]s' AND c.relname = '%[2]s' "+
+							"AND a.attnum > 0 AND NOT a.attisdropped%[3]s "+
+							"ORDER BY a.attnum",
+						base.EscapeSqlString(schema), base.EscapeSqlString(table), catalogClause)
+					return stmt, "column_name", "data_type"
+				}
+				return cmds
+			}),
 		),
 	}, nil
 }
@@ -61,11 +83,11 @@ type DB struct {
 	*base.DB
 }
 
-func getColumnTypeMappings(config Config) map[string]string {
+func getColumnTypeMapper(config Config) func(base.ColumnType) string {
 	if config.UseLegacyMappings {
-		return legacyColumnTypeMappings
+		return legacyColumnTypeMapper
 	}
-	return columnTypeMappings
+	return columnTypeMapper
 }
 
 func getJonRowMapper(config Config) func(databaseTypeName string, value any) any {

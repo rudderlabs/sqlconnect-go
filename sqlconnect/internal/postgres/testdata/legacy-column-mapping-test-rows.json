@@ -34,7 +34,10 @@
         },
         "_jsonb": {
             "a": 1
-        }
+        },
+        "_tags": "{alpha,beta}",
+        "_intarr": "{1,2}",
+        "_boolarr": "{t,f}"
     },
     {
         "_order": 2,
@@ -67,7 +70,10 @@
         "_boolean": false,
         "_bool": false,
         "_json": {},
-        "_jsonb": {}
+        "_jsonb": {},
+        "_tags": "{}",
+        "_intarr": "{}",
+        "_boolarr": "{}"
     },
     {
         "_order": 3,
@@ -100,6 +106,9 @@
         "_boolean": null,
         "_bool": null,
         "_json": null,
-        "_jsonb": null
+        "_jsonb": null,
+        "_tags": null,
+        "_intarr": null,
+        "_boolarr": null
     }
 ]

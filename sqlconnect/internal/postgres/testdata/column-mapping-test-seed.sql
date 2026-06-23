@@ -29,12 +29,15 @@ CREATE TABLE "{{.schema}}"."column_mappings_test" (
     _boolean BOOLEAN,
     _bool BOOL,
     _json JSON,
-    _jsonb JSONB
+    _jsonb JSONB,
+    _tags TEXT[],
+    _intarr INTEGER[],
+    _boolarr BOOLEAN[]
 );
 
 INSERT INTO "{{.schema}}"."column_mappings_test"
-    (_order, _int, _int2, _int4, _int8, _integer, _smallint, _bigint, _real, _float, _float4, _float8, _numeric, _double, _text, _varchar, _charvar, _nchar, _bpchar, _character, _date, _time, _timetz, _timestamptz, _timestampntz, _timestampwtz, _timestamp, _boolean, _bool, _json, _jsonb)
+    (_order, _int, _int2, _int4, _int8, _integer, _smallint, _bigint, _real, _float, _float4, _float8, _numeric, _double, _text, _varchar, _charvar, _nchar, _bpchar, _character, _date, _time, _timetz, _timestamptz, _timestampntz, _timestampwtz, _timestamp, _boolean, _bool, _json, _jsonb, _tags, _intarr, _boolarr)
 VALUES
-    (1, 1,    1,    1,    1,    1,    1,    1,    1.1,  1.1,  1.1,  1.1,  1.1,  1.1,  'abc', 'abc', 'abc', 'abc', 'abc', 'abc', '2004-10-19', '10:23:54', '10:23:54+02', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54+02', true,  true,  '{"a": 1}', '{"a": 1}'),
-    (2, 0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    '',    '',    '',    '',    '',    '',    '2004-10-19', '10:23:54', '10:23:54+02', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54+02', false, false, '{}',       '{}'      ), 
-    (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,         NULL,       NULL,          NULL,                     NULL,                  NULL,                     NULL,                     NULL,  NULL,  NULL,       NULL      );
+    (1, 1,    1,    1,    1,    1,    1,    1,    1.1,  1.1,  1.1,  1.1,  1.1,  1.1,  'abc', 'abc', 'abc', 'abc', 'abc', 'abc', '2004-10-19', '10:23:54', '10:23:54+02', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54+02', true,  true,  '{"a": 1}', '{"a": 1}', ARRAY['alpha','beta'], ARRAY[1,2], ARRAY[true,false]),
+    (2, 0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    '',    '',    '',    '',    '',    '',    '2004-10-19', '10:23:54', '10:23:54+02', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54', '2004-10-19 10:23:54+02', '2004-10-19 10:23:54+02', false, false, '{}',       '{}',       '{}',                 '{}',                 '{}'),
+    (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,  NULL,  NULL,  NULL,  NULL,  NULL,  NULL,         NULL,       NULL,          NULL,                     NULL,                  NULL,                     NULL,                     NULL,  NULL,  NULL,       NULL,       NULL,                 NULL,                 NULL);

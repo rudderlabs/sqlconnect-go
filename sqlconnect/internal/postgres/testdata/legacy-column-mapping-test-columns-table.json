@@ -29,5 +29,8 @@
     "_boolean": "boolean",
     "_bool": "boolean",
     "_json": "json",
-    "_jsonb": "json"
+    "_jsonb": "json",
+    "_tags": "text[]",
+    "_intarr": "integer[]",
+    "_boolarr": "boolean[]"
 }

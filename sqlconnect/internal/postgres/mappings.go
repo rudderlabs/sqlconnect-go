@@ -2,7 +2,13 @@ package postgres
 
 import (
 	"encoding/json"
+	"regexp"
 	"strconv"
+	"strings"
+
+	"github.com/lib/pq"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 )
 
 // mapping of database column types to rudder types
@@ -41,10 +47,79 @@ var columnTypeMappings = map[string]string{
 	"bool":                        "boolean",
 	"json":                        "json",
 	"jsonb":                       "json",
+	"array":                       "json", // information_schema bare ARRAY (no element type)
+}
+
+var re = regexp.MustCompile(`(\(.+\)|<.+>)`) // remove type parameters [<>] and size constraints [()]
+
+func columnTypeMapper(columnType base.ColumnType) string {
+	raw := strings.TrimSpace(columnType.DatabaseTypeName())
+	lower := strings.ToLower(raw)
+
+	// Postgres array types: text[], integer[], or lib/pq internal names like _text.
+	// String-element arrays → array (filterable); numeric/boolean/complex-element
+	// arrays → json — membership compares string values, so int/bool arrays must not
+	// surface as array (same gate as BQ ARRAY<STRING> vs ARRAY<INT>).
+	if strings.HasSuffix(lower, "[]") {
+		if isStringElementArray(raw) {
+			return "array"
+		}
+		return "json"
+	}
+	if strings.HasPrefix(lower, "_") {
+		if elementMapsToString(lower[1:]) {
+			return "array"
+		}
+		return "json"
+	}
+
+	databaseTypeName := strings.TrimSpace(strings.ToLower(re.ReplaceAllString(raw, "")))
+	if mappedType, ok := columnTypeMappings[databaseTypeName]; ok {
+		return mappedType
+	}
+	return databaseTypeName
+}
+
+func legacyColumnTypeMapper(columnType base.ColumnType) string {
+	raw := strings.TrimSpace(columnType.DatabaseTypeName())
+	if mappedType, ok := legacyColumnTypeMappings[strings.ToLower(raw)]; ok {
+		return mappedType
+	}
+	if mappedType, ok := legacyColumnTypeMappings[strings.ToUpper(raw)]; ok {
+		return mappedType
+	}
+	stripped := strings.TrimSpace(strings.ToLower(re.ReplaceAllString(raw, "")))
+	if mappedType, ok := legacyColumnTypeMappings[stripped]; ok {
+		return mappedType
+	}
+	return raw
+}
+
+// isStringElementArray reports whether a native array column has a string element
+// type (text[], varchar(n)[], …), read from the raw type name. It reuses
+// columnTypeMappings so "what is a string type" has a single source of truth.
+func isStringElementArray(rawTypeName string) bool {
+	trimmed := strings.TrimSpace(rawTypeName)
+	if !strings.HasSuffix(strings.ToLower(trimmed), "[]") {
+		return false
+	}
+	elem := trimmed[:len(trimmed)-2]
+	return elementMapsToString(elem)
+}
+
+func elementMapsToString(elem string) bool {
+	normalized := strings.TrimSpace(strings.ToLower(re.ReplaceAllString(elem, "")))
+	return columnTypeMappings[normalized] == "string"
 }
 
 // jsonRowMapper maps a row's scanned column to a json object's field
 func jsonRowMapper(databaseTypeName string, value any) any {
+	if isPostgresStringArrayDBType(databaseTypeName) {
+		if parsed, ok := parsePostgresStringArray(value); ok {
+			return parsed
+		}
+	}
+
 	switch databaseTypeName {
 	case "JSON", "JSONB":
 		switch v := value.(type) {
@@ -68,4 +143,32 @@ func jsonRowMapper(databaseTypeName string, value any) any {
 	}
 
 	return value
+}
+
+func isPostgresStringArrayDBType(databaseTypeName string) bool {
+	lower := strings.ToLower(strings.TrimSpace(databaseTypeName))
+	if strings.HasSuffix(lower, "[]") {
+		return isStringElementArray(databaseTypeName)
+	}
+	if strings.HasPrefix(lower, "_") {
+		return elementMapsToString(databaseTypeName[1:])
+	}
+	return false
+}
+
+func parsePostgresStringArray(value any) ([]string, bool) {
+	var raw string
+	switch v := value.(type) {
+	case string:
+		raw = v
+	case []byte:
+		raw = string(v)
+	default:
+		return nil, false
+	}
+	var arr pq.StringArray
+	if err := arr.Scan(raw); err != nil {
+		return nil, false
+	}
+	return []string(arr), true
 }
