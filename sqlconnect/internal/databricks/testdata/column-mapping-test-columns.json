@@ -23,6 +23,10 @@
     "_timestamp": "datetime",
     "_timestampntz": "datetime",
     "_array": "array",
+    "_arrayint": "json",
+    "_arraybool": "json",
+    "_arraydouble": "json",
+    "_arraystruct": "json",
     "_map": "json",
     "_struct": "json"
 }

@@ -31,6 +31,8 @@
     "_json": "json",
     "_jsonb": "json",
     "_tags": "text[]",
+    "_varchararr": "character varying(10)[]",
     "_intarr": "integer[]",
+    "_bigintarr": "bigint[]",
     "_boolarr": "boolean[]"
 }

@@ -31,6 +31,8 @@
     "_json": "JSON",
     "_jsonb": "json",
     "_tags": "_TEXT",
+    "_varchararr": "_VARCHAR",
     "_intarr": "_INT4",
+    "_bigintarr": "_INT8",
     "_boolarr": "_BOOL"
 }

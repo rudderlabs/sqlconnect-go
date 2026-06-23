@@ -36,7 +36,9 @@
             "a": 1
         },
         "_tags": ["alpha", "beta"],
+        "_varchararr": ["x", "y"],
         "_intarr": "{1,2}",
+        "_bigintarr": "{10,20}",
         "_boolarr": "{t,f}"
     },
     {
@@ -72,7 +74,9 @@
         "_json": {},
         "_jsonb": {},
         "_tags": [],
+        "_varchararr": [],
         "_intarr": "{}",
+        "_bigintarr": "{}",
         "_boolarr": "{}"
     },
     {
@@ -108,7 +112,9 @@
         "_json": null,
         "_jsonb": null,
         "_tags": null,
+        "_varchararr": null,
         "_intarr": null,
+        "_bigintarr": null,
         "_boolarr": null
     }
 ]
