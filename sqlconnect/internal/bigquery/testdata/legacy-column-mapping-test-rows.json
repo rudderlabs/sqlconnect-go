@@ -2,6 +2,10 @@
     {
         "_order": 1,
         "_array": ["ONE"],
+        "_arrayint": [1, 2],
+        "_arraybool": [true, false],
+        "_arrayfloat": [1.1, 2.2],
+        "_arraystruct": [{"a": "a", "b": 1}],
         "_bignumeric": 1.1,
         "_bignumericnoscale": 1,
         "_bigdecimal": 1,
@@ -39,6 +43,10 @@
     {
         "_order": 2,
         "_array": [],
+        "_arrayint": [],
+        "_arraybool": [],
+        "_arrayfloat": [],
+        "_arraystruct": [],
         "_bignumeric": 0,
         "_bignumericnoscale": 0,
         "_bigdecimal": 0,
@@ -76,6 +84,10 @@
     {
         "_order": 3,
         "_array": [],
+        "_arrayint": [],
+        "_arraybool": [],
+        "_arrayfloat": [],
+        "_arraystruct": [],
         "_bignumeric": null,
         "_bignumericnoscale": null,
         "_bigdecimal": null,

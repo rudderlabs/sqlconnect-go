@@ -1,6 +1,10 @@
 {
     "_order": "int",
     "_array": "array",
+    "_arrayint": "array",
+    "_arraybool": "array",
+    "_arrayfloat": "array",
+    "_arraystruct": "array",
     "_bignumeric": "float",
     "_bignumericnoscale": "float",
     "_bigdecimal": "float",
