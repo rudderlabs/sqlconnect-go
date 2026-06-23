@@ -42,6 +42,7 @@ func TestDatabricksDB(t *testing.T) {
 			strings.ToLower,
 			integrationtest.Options{
 				LegacySupport:                  true,
+				QueryColumnsArrayAsJSON:        true,
 				SpecialCharactersInQuotedTable: "`-",
 			},
 		)
@@ -67,6 +68,7 @@ func TestDatabricksDB(t *testing.T) {
 			strings.ToLower,
 			integrationtest.Options{
 				LegacySupport:                  true,
+				QueryColumnsArrayAsJSON:        true,
 				SpecialCharactersInQuotedTable: "_A",
 			},
 		)
@@ -85,6 +87,7 @@ func TestDatabricksDB(t *testing.T) {
 			strings.ToLower,
 			integrationtest.Options{
 				LegacySupport:                  true,
+				QueryColumnsArrayAsJSON:        true,
 				SpecialCharactersInQuotedTable: "_A", // No special characters allowed
 			},
 		)
@@ -105,6 +108,7 @@ func TestDatabricksDB(t *testing.T) {
 			strings.ToLower,
 			integrationtest.Options{
 				LegacySupport:                  true,
+				QueryColumnsArrayAsJSON:        true,
 				SpecialCharactersInQuotedTable: "_A",
 			},
 		)

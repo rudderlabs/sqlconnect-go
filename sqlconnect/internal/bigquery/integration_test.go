@@ -25,6 +25,7 @@ func TestBigqueryDB(t *testing.T) {
 		strings.ToLower,
 		integrationtest.Options{
 			LegacySupport:                  true,
+			QueryColumnsArrayAsJSON:        true,
 			SpecialCharactersInQuotedTable: "-",
 		},
 	)

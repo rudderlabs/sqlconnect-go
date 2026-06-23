@@ -31,6 +31,13 @@ type Options struct {
 
 	SpecialCharactersInQuotedTable string // special characters to test in quoted table identifiers (default: <space>,",',``)
 
+	// QueryColumnsArrayAsJSON indicates the driver's query-result metadata exposes
+	// a bare "ARRAY" without the element type, so native arrays surface as json on
+	// the ListColumnsForSqlQuery path even though ListColumns (DESCRIBE /
+	// INFORMATION_SCHEMA) types string arrays as array. BigQuery and Databricks set
+	// this; Snowflake reports ARRAY (→ array) on both paths.
+	QueryColumnsArrayAsJSON bool
+
 	ExtraTests func(t *testing.T, db sqlconnect.DB)
 }
 
@@ -1012,7 +1019,19 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				return col
 			})
 			require.NoError(t, err, "it should be able to list columns")
-			require.ElementsMatch(t, actualCols, expectedCols, "it should return the correct columns")
+			expectedForQuery := expectedCols
+			if opts.QueryColumnsArrayAsJSON {
+				// The driver's query metadata exposes a bare "ARRAY" without the
+				// element type, so native string arrays surface as json here (vs
+				// array on the DESCRIBE / INFORMATION_SCHEMA schema path).
+				expectedForQuery = lo.Map(expectedCols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+					if col.Type == "array" {
+						col.Type = "json"
+					}
+					return col
+				})
+			}
+			require.ElementsMatch(t, actualCols, expectedForQuery, "it should return the correct columns")
 		})
 
 		t.Run("json mapper", func(t *testing.T) {
