@@ -41,6 +41,15 @@ var columnTypeMappings = map[string]string{
 	"bool":                        "boolean",
 	"json":                        "json",
 	"jsonb":                       "json",
+	// String-element array types (Postgres reports array columns as the element type
+	// prefixed with "_"). Only string arrays map to the array rudder-type in v1;
+	// non-string array types (e.g. _int4) stay unmapped → surfaced as unsupported.
+	"_text":              "array",
+	"_varchar":           "array",
+	"_bpchar":            "array",
+	"_char":              "array",
+	"_character varying": "array",
+	"_name":              "array",
 }
 
 // jsonRowMapper maps a row's scanned column to a json object's field
