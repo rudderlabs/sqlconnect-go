@@ -41,9 +41,12 @@ var columnTypeMappings = map[string]string{
 	"bool":                        "boolean",
 	"json":                        "json",
 	"jsonb":                       "json",
-	// String-element array types (Postgres reports array columns as the element type
-	// prefixed with "_"). Only string arrays map to the array rudder-type in v1;
-	// non-string array types (e.g. _int4) stay unmapped → surfaced as unsupported.
+	// Array columns. On the data path (row scan) Postgres reports the element type prefixed
+	// with "_" (e.g. text[] → "_text"), so only string-element arrays map to array — non-string
+	// array types (e.g. _int4) stay unmapped → unsupported. The generic "array" key covers
+	// schema introspection via information_schema.data_type, which reports "ARRAY" for every
+	// array column (no element type available there).
+	"array":              "array",
 	"_text":              "array",
 	"_varchar":           "array",
 	"_bpchar":            "array",
