@@ -3,7 +3,35 @@ package postgres
 import (
 	"encoding/json"
 	"strconv"
+	"strings"
+
+	"github.com/lib/pq"
 )
+
+// pgStringArrayTypes are the Postgres string-element array type names (element type prefixed
+// with "_"). Their values are parsed from the array literal into a JSON array of strings so
+// the emitted trait is a real JSON array, not the text literal "{a,b}".
+var pgStringArrayTypes = map[string]bool{
+	"_TEXT": true, "_VARCHAR": true, "_BPCHAR": true, "_CHAR": true, "_NAME": true, "_CHARACTER VARYING": true,
+}
+
+// parsePgStringArray parses a Postgres array literal ("{a,b}") into a []string. Returns nil
+// (caller falls through) if the value isn't a parseable array literal. A NULL array column
+// scans to nil and is left as nil (→ JSON null).
+func parsePgStringArray(value any) any {
+	var arr pq.StringArray
+	switch v := value.(type) {
+	case []byte:
+		if arr.Scan(v) == nil {
+			return []string(arr)
+		}
+	case string:
+		if arr.Scan([]byte(v)) == nil {
+			return []string(arr)
+		}
+	}
+	return nil
+}
 
 // mapping of database column types to rudder types
 var columnTypeMappings = map[string]string{
@@ -73,6 +101,11 @@ func jsonRowMapper(databaseTypeName string, value any) any {
 			}
 		}
 	default:
+		if pgStringArrayTypes[strings.ToUpper(databaseTypeName)] {
+			if arr := parsePgStringArray(value); arr != nil {
+				return arr
+			}
+		}
 		switch v := value.(type) {
 		case []byte:
 			return string(v)

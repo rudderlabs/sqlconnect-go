@@ -1,6 +1,9 @@
 package postgres
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 var legacyColumnTypeMappings = map[string]string{
 	"int":                         "int",
@@ -59,6 +62,11 @@ func legacyJsonRowMapper(databaseTypeName string, value any) any {
 			return json.RawMessage(v)
 		}
 	default:
+		if pgStringArrayTypes[strings.ToUpper(databaseTypeName)] {
+			if arr := parsePgStringArray(value); arr != nil {
+				return arr
+			}
+		}
 		switch v := value.(type) {
 		case []byte:
 			return string(v)
