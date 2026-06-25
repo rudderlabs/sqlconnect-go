@@ -54,8 +54,17 @@ var columnTypeMappings = map[string]string{
 
 var re = regexp.MustCompile(`(\(.+\)|<.+>)`) // remove type parameters [<>] and size constraints [()]
 
+// stringElementArray matches ARRAY<STRING|BYTES ...> — string-element arrays map to the array
+// rudder-type in v1 (checked before the type-parameter strip). Other element types (e.g.
+// ARRAY<INT64>) fall through to the generic ARRAY → json mapping (surfaced as unsupported).
+var stringElementArray = regexp.MustCompile(`^ARRAY<\s*(STRING|BYTES)`)
+
 func columnTypeMapper(columnType base.ColumnType) string {
-	databaseTypeName := strings.ToUpper(re.ReplaceAllString(columnType.DatabaseTypeName(), ""))
+	raw := strings.ToUpper(columnType.DatabaseTypeName())
+	if stringElementArray.MatchString(raw) {
+		return "array"
+	}
+	databaseTypeName := strings.ToUpper(re.ReplaceAllString(raw, ""))
 	if mappedType, ok := columnTypeMappings[strings.ToUpper(databaseTypeName)]; ok {
 		return mappedType
 	}
