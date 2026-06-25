@@ -27,10 +27,14 @@ var legacyColumnTypeMappings = map[string]string{
 	"date":                        "datetime",
 	"timestamp without time zone": "datetime",
 	"timestamp with time zone":    "datetime",
+	"super":                       "array", // SUPER (semi-structured) → array rudder-type for the audience use case
 }
 
 // legacyJsonRowMapper maps a row's scanned column to a json object's field
 func legacyJsonRowMapper(databaseTypeName string, value any) any {
+	if databaseTypeName == "" { // SUPER and other lib/pq-unnamed types → emit JSON as raw JSON
+		return superJSONValue(value)
+	}
 	switch v := value.(type) {
 	case []byte:
 		return string(v)
