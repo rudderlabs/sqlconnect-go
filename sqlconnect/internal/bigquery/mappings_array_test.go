@@ -1,9 +1,14 @@
 package bigquery
 
-import ("testing"; "github.com/stretchr/testify/require")
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 type mockCT struct{ n string }
-func (m mockCT) DatabaseTypeName() string { return m.n }
+
+func (m mockCT) DatabaseTypeName() string        { return m.n }
 func (mockCT) DecimalSize() (int64, int64, bool) { return 0, 0, false }
 
 func TestColumnTypeMapper_Array(t *testing.T) {
