@@ -35,3 +35,15 @@ func TestColumnTypeMapper_Array(t *testing.T) {
 		require.Equal(t, "json", columnTypeMapper(mockColumnType{"MAP<STRING,INT>"}))
 	})
 }
+
+// The data-graph schema path (useStandardTypeMappings) uses the legacy mapper, so it must
+// agree with columnTypeMapper on string-element arrays (DESCRIBE TABLE yields the full type).
+func TestLegacyColumnTypeMapper_Array(t *testing.T) {
+	for _, raw := range []string{"ARRAY<STRING>", "array<string>", "ARRAY<VARCHAR(255)>"} {
+		require.Equal(t, "array", legacyColumnTypeMapper(mockColumnType{raw}), raw)
+	}
+	for _, raw := range []string{"ARRAY<BIGINT>", "ARRAY<INT>"} {
+		require.Equal(t, "json", legacyColumnTypeMapper(mockColumnType{raw}), raw)
+	}
+	require.Equal(t, "string", legacyColumnTypeMapper(mockColumnType{"STRING"}))
+}
