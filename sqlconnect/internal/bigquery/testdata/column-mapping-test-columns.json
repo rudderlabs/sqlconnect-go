@@ -1,6 +1,6 @@
 {
     "_order": "int",
-    "_array": "json",
+    "_array": "array",
     "_bignumeric": "float",
     "_bignumericnoscale": "float",
     "_bigdecimal": "float",
