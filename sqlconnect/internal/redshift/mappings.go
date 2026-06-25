@@ -1,27 +1,40 @@
 package redshift
 
 import (
+	"bytes"
 	"encoding/json"
 	"strconv"
 )
 
 // superJSONValue emits a SUPER value as raw JSON (so an array trait is a JSON array, not a
 // string). lib/pq reports an EMPTY DatabaseTypeName for SUPER (its OID is unknown to the driver),
-// so the mapper keys on the empty type name + a valid-JSON check; known scalar types report their
-// type name and are unaffected. Non-JSON values fall through to a string.
+// so the mapper keys on the empty type name + this check; known scalar types report their type
+// name and are unaffected. To avoid mis-emitting a plain scalar held by some other unnamed-OID type
+// (e.g. VARBYTE/GEOMETRY reporting "" and holding the valid-JSON literal `123`/`true`), only
+// container-shaped values (a JSON array or object) are emitted as raw JSON; everything else stays a
+// string. The audience use case is array<string>, which is always a JSON array.
 func superJSONValue(value any) any {
 	switch v := value.(type) {
 	case []byte:
-		if json.Valid(v) {
+		if isJSONContainer(v) {
 			return json.RawMessage(v)
 		}
 		return string(v)
 	case string:
-		if json.Valid([]byte(v)) {
+		if isJSONContainer([]byte(v)) {
 			return json.RawMessage(v)
 		}
 	}
 	return value
+}
+
+// isJSONContainer reports whether b is valid JSON whose top level is an array or object.
+func isJSONContainer(b []byte) bool {
+	t := bytes.TrimSpace(b)
+	if len(t) == 0 || (t[0] != '[' && t[0] != '{') {
+		return false
+	}
+	return json.Valid(t)
 }
 
 var columnTypeMappings = map[string]string{
