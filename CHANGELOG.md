@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.27.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.26.0...v1.27.0) (2026-06-29)
+
+
+### Features
+
+* **array:** map array&lt;string&gt; warehouse columns + serialize as JSON arrays ([#517](https://github.com/rudderlabs/sqlconnect-go/issues/517)) ([6f4e406](https://github.com/rudderlabs/sqlconnect-go/commit/6f4e406d9d82943532542c58504a892cda40e35e))
+
+
+### Miscellaneous
+
+* **databricks:** expect null for all-null STRUCT in column-mapping testdata ([#518](https://github.com/rudderlabs/sqlconnect-go/issues/518)) ([a19d910](https://github.com/rudderlabs/sqlconnect-go/commit/a19d910b2ab382240267cae638abc6246db4137d))
+* update codeowners ([#515](https://github.com/rudderlabs/sqlconnect-go/issues/515)) ([158b389](https://github.com/rudderlabs/sqlconnect-go/commit/158b3897ee501ae8e189840ad8759d7be0aba260))
+
 ## [1.26.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.25.2...v1.26.0) (2026-06-10)
 
 
