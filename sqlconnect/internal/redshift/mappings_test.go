@@ -13,8 +13,9 @@ func TestRedshift_SuperArrayMappingAndSerialization(t *testing.T) {
 		require.Equal(t, "array", legacyColumnTypeMappings["super"])
 	})
 
-	// lib/pq reports an empty DatabaseTypeName for SUPER; its JSON value must be emitted as raw
-	// JSON (an array trait → JSON array), while non-JSON values and named types stay strings.
+	// SUPER's JSON value must be emitted as raw JSON (an array trait → JSON array), while non-JSON
+	// values and named types stay strings — on both backends: lib/pq reports an empty
+	// DatabaseTypeName for SUPER, the Redshift Data API backend reports the real name "SUPER".
 	for _, m := range []struct {
 		name string
 		fn   func(string, any) any
@@ -29,6 +30,14 @@ func TestRedshift_SuperArrayMappingAndSerialization(t *testing.T) {
 			// emitted as raw JSON — only container shapes are.
 			require.Equal(t, "123", m.fn("", []byte("123")), "bare number stays a string")
 			require.Equal(t, "true", m.fn("", []byte("true")), "bare bool stays a string")
+
+			// Redshift Data API backend reports the real type name "SUPER" and hands the value over
+			// as a string (FieldMemberStringValue); the same JSON-array emission must apply there.
+			require.Equal(t, json.RawMessage(`["electronics","books"]`), m.fn("SUPER", `["electronics","books"]`), "Data API: SUPER string → raw JSON array")
+			require.Equal(t, json.RawMessage(`[]`), m.fn("SUPER", `[]`))
+			require.Equal(t, json.RawMessage(`{"a":1}`), m.fn("SUPER", `{"a":1}`), "Data API: SUPER object → raw JSON")
+			require.Equal(t, "123", m.fn("SUPER", `123`), "Data API: bare scalar SUPER stays a string")
+			require.Equal(t, json.RawMessage(`["x"]`), m.fn("SUPER", []byte(`["x"]`)), "SUPER as []byte also handled")
 		})
 	}
 }

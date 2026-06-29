@@ -90,8 +90,11 @@ func jsonRowMapper(databaseTypeName string, value any) any {
 				return n
 			}
 		}
-	case "":
-		// SUPER (and other Redshift-specific types lib/pq can't name) — emit JSON as raw JSON.
+	case "", "SUPER":
+		// SUPER — emit JSON as raw JSON (an array trait → JSON array). lib/pq can't resolve SUPER's
+		// OID so reports an empty name (""); the Redshift Data API backend reports the real name
+		// "SUPER". Both route here; superJSONValue handles the []byte (lib/pq) and string (Data API)
+		// value forms alike.
 		return superJSONValue(value)
 	default:
 		switch v := value.(type) {

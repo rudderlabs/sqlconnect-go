@@ -32,7 +32,9 @@ var legacyColumnTypeMappings = map[string]string{
 
 // legacyJsonRowMapper maps a row's scanned column to a json object's field
 func legacyJsonRowMapper(databaseTypeName string, value any) any {
-	if databaseTypeName == "" { // SUPER and other lib/pq-unnamed types → emit JSON as raw JSON
+	// lib/pq reports "" for SUPER (OID unknown to the driver); the Redshift Data API backend reports
+	// the real name "SUPER". Both → emit JSON as raw JSON.
+	if databaseTypeName == "" || databaseTypeName == "SUPER" {
 		return superJSONValue(value)
 	}
 	switch v := value.(type) {
