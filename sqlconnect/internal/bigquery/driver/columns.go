@@ -2,6 +2,7 @@ package driver
 
 import (
 	"database/sql/driver"
+	"fmt"
 
 	"cloud.google.com/go/bigquery"
 )
@@ -34,7 +35,10 @@ func (columns bigQueryColumns) ColumnTypeDatabaseTypeName(index int) string {
 	if index > -1 && len(columns.columns) > index {
 		column := columns.columns[index]
 		if column.FieldSchema.Repeated {
-			return "ARRAY"
+			// Carry the element type (e.g. ARRAY<STRING>) so the result-set/live path matches what
+			// INFORMATION_SCHEMA reports on the catalog path; element-aware type mapping (string
+			// arrays → the array rudder-type) depends on it. A bare "ARRAY" collapses to json.
+			return fmt.Sprintf("ARRAY<%s>", column.FieldSchema.Type)
 		}
 		return string(column.FieldSchema.Type)
 	}

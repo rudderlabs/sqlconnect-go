@@ -1,6 +1,9 @@
 package postgres
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 var legacyColumnTypeMappings = map[string]string{
 	"int":                         "int",
@@ -31,6 +34,18 @@ var legacyColumnTypeMappings = map[string]string{
 	"boolean":                     "boolean",
 	"bool":                        "boolean",
 	"jsonb":                       "json",
+	// Array columns. The standard schema introspection (ListColumns) reads
+	// information_schema.columns.data_type, which reports the generic "ARRAY" for every array
+	// column regardless of element type (element type lives in udt_name, not selected here).
+	// So this maps ALL Postgres arrays to the array rudder-type; element-type precision
+	// (string-only) is enforced on the data path via columnTypeMappings (_text etc). The
+	// "_text" udt family is also mapped for any caller that introspects via udt_name.
+	"array":    "array",
+	"_text":    "array",
+	"_varchar": "array",
+	"_bpchar":  "array",
+	"_char":    "array",
+	"_name":    "array",
 }
 
 // legacyJsonRowMapper maps a row's scanned column to a json object's field
@@ -47,6 +62,11 @@ func legacyJsonRowMapper(databaseTypeName string, value any) any {
 			return json.RawMessage(v)
 		}
 	default:
+		if pgStringArrayTypes[strings.ToUpper(databaseTypeName)] {
+			if arr := parsePgStringArray(value); arr != nil {
+				return arr
+			}
+		}
 		switch v := value.(type) {
 		case []byte:
 			return string(v)

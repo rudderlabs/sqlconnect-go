@@ -31,7 +31,14 @@ func legacyColumnTypeMapper(columnType base.ColumnType) string {
 		"MAP":           "json",
 		"STRUCT":        "json",
 	}
-	databaseTypeName := strings.ToUpper(re.ReplaceAllString(columnType.DatabaseTypeName(), ""))
+	raw := strings.ToUpper(columnType.DatabaseTypeName())
+	// String-element arrays map to the array rudder-type (checked before the type-parameter
+	// strip); other element types fall through to the generic ARRAY → json mapping. Mirrors
+	// the non-legacy columnTypeMapper so the schema path (useStandardTypeMappings) agrees.
+	if stringElementArray.MatchString(raw) {
+		return "array"
+	}
+	databaseTypeName := strings.ToUpper(re.ReplaceAllString(raw, ""))
 	if mappedType, ok := columnTypeMappings[strings.ToUpper(databaseTypeName)]; ok {
 		return mappedType
 	}

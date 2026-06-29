@@ -152,7 +152,7 @@ func TestBigqueryDriver(t *testing.T) {
 			require.NoError(t, err, "it should be able to get the column types")
 			require.Len(t, colTypes, 2, "it should be able to get the correct number of column types")
 			require.EqualValues(t, "INTEGER", colTypes[0].DatabaseTypeName(), "it should be able to get the correct column type")
-			require.EqualValues(t, "ARRAY", colTypes[1].DatabaseTypeName(), "it should be able to get the correct column type")
+			require.EqualValues(t, "ARRAY<STRING>", colTypes[1].DatabaseTypeName(), "the element type must be carried so string arrays map to the array rudder-type")
 
 			require.True(t, rows.Next(), "it should be able to get a row")
 			var c1 int
