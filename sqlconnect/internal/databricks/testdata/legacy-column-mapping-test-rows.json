@@ -81,6 +81,6 @@
         "_timestampntz": null,
         "_array": null,
         "_map": null,
-        "_struct": "{\"col1\":null,\"col2\":null}"
+        "_struct": null
     }
 ]
