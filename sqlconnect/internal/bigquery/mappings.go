@@ -46,7 +46,7 @@ var columnTypeMappings = map[string]string{
 	"DATETIME":  "datetime",
 	"TIMESTAMP": "datetime",
 
-	"JSON":   "json",
+	"JSON": "json",
 	// Non-string arrays fall through here after stringElementArray (ARRAY<STRING|BYTES> → array).
 	// Must not map to json — json-path navigation breaks on container columns.
 	"ARRAY":  "unsupported",

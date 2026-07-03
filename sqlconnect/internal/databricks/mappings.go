@@ -44,9 +44,9 @@ var columnTypeMappings = map[string]string{
 
 	"VARIANT": "json",
 	// Non-string arrays fall through here after stringElementArray (ARRAY<STRING|…> → array).
-	"ARRAY":   "unsupported",
-	"MAP":     "unsupported",
-	"STRUCT":  "unsupported",
+	"ARRAY":  "unsupported",
+	"MAP":    "unsupported",
+	"STRUCT": "unsupported",
 }
 
 var re = regexp.MustCompile(`(\(.+\)|<.+>)`) // remove type parameters [<>] and size constraints [()]
