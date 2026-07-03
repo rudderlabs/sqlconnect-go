@@ -27,13 +27,14 @@ func legacyColumnTypeMapper(columnType base.ColumnType) string {
 		"VOID":          "string",
 		"TIMESTAMP":     "datetime",
 		"TIMESTAMP_NTZ": "datetime",
-		"ARRAY":         "json",
-		"MAP":           "json",
-		"STRUCT":        "json",
+		"ARRAY":         "unsupported",
+		"MAP":           "unsupported",
+		"VARIANT":       "json",
+		"STRUCT":        "unsupported",
 	}
 	raw := strings.ToUpper(columnType.DatabaseTypeName())
 	// String-element arrays map to the array rudder-type (checked before the type-parameter
-	// strip); other element types fall through to the generic ARRAY → json mapping. Mirrors
+	// strip); other element types fall through to the generic ARRAY → unsupported mapping. Mirrors
 	// the non-legacy columnTypeMapper so the schema path (useStandardTypeMappings) agrees.
 	if stringElementArray.MatchString(raw) {
 		return "array"

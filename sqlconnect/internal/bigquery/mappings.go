@@ -47,16 +47,18 @@ var columnTypeMappings = map[string]string{
 	"TIMESTAMP": "datetime",
 
 	"JSON":   "json",
-	"ARRAY":  "json",
-	"STRUCT": "json", // STRUCT and RECORD are represented as an array of json objects
-	"RECORD": "json",
+	// Non-string arrays fall through here after stringElementArray (ARRAY<STRING|BYTES> → array).
+	// Must not map to json — json-path navigation breaks on container columns.
+	"ARRAY":  "unsupported",
+	"STRUCT": "unsupported",
+	"RECORD": "unsupported",
 }
 
 var re = regexp.MustCompile(`(\(.+\)|<.+>)`) // remove type parameters [<>] and size constraints [()]
 
 // stringElementArray matches ARRAY<STRING|BYTES ...> — string-element arrays map to the array
 // rudder-type in v1 (checked before the type-parameter strip). Other element types (e.g.
-// ARRAY<INT64>) fall through to the generic ARRAY → json mapping (surfaced as unsupported).
+// ARRAY<INT64>) fall through to the generic ARRAY → unsupported mapping.
 var stringElementArray = regexp.MustCompile(`^ARRAY<\s*(STRING|BYTES)`)
 
 func columnTypeMapper(columnType base.ColumnType) string {
