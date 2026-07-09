@@ -1067,6 +1067,8 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 
 				case "json":
 					// this can be anything
+				case "unsupported":
+					// container/composite columns excluded from json-path typing; values still scan
 				default:
 					t.Errorf("unexpected column type %s for column  %q: %v", col.Type, col.Name, actualRow[col.Name])
 				}

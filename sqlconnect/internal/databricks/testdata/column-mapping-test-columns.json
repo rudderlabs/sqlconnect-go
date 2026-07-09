@@ -22,7 +22,7 @@
     "_date": "datetime",
     "_timestamp": "datetime",
     "_timestampntz": "datetime",
-    "_array": "json",
-    "_map": "json",
-    "_struct": "json"
+    "_array": "unsupported",
+    "_map": "unsupported",
+    "_struct": "unsupported"
 }

@@ -23,16 +23,18 @@ func TestColumnTypeMapper_Array(t *testing.T) {
 		}
 	})
 
-	t.Run("non-string-element arrays stay json (unsupported in v1)", func(t *testing.T) {
+	t.Run("non-string-element arrays are unsupported in v1", func(t *testing.T) {
 		for _, raw := range []string{"ARRAY<BIGINT>", "ARRAY<INT>", "ARRAY<DOUBLE>", "ARRAY<STRUCT<a:INT>>"} {
-			require.Equal(t, "json", columnTypeMapper(mockColumnType{raw}), raw)
+			require.Equal(t, "unsupported", columnTypeMapper(mockColumnType{raw}), raw)
 		}
 	})
 
-	t.Run("scalar types unaffected", func(t *testing.T) {
+	t.Run("scalar and semi-structured types", func(t *testing.T) {
 		require.Equal(t, "string", columnTypeMapper(mockColumnType{"STRING"}))
 		require.Equal(t, "int", columnTypeMapper(mockColumnType{"BIGINT"}))
-		require.Equal(t, "json", columnTypeMapper(mockColumnType{"MAP<STRING,INT>"}))
+		require.Equal(t, "unsupported", columnTypeMapper(mockColumnType{"MAP<STRING,INT>"}))
+		require.Equal(t, "json", columnTypeMapper(mockColumnType{"VARIANT"}))
+		require.Equal(t, "unsupported", columnTypeMapper(mockColumnType{"STRUCT<a:INT>"}))
 	})
 }
 
@@ -43,7 +45,7 @@ func TestLegacyColumnTypeMapper_Array(t *testing.T) {
 		require.Equal(t, "array", legacyColumnTypeMapper(mockColumnType{raw}), raw)
 	}
 	for _, raw := range []string{"ARRAY<BIGINT>", "ARRAY<INT>"} {
-		require.Equal(t, "json", legacyColumnTypeMapper(mockColumnType{raw}), raw)
+		require.Equal(t, "unsupported", legacyColumnTypeMapper(mockColumnType{raw}), raw)
 	}
 	require.Equal(t, "string", legacyColumnTypeMapper(mockColumnType{"STRING"}))
 }
