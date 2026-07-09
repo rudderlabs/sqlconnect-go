@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.27.0...v1.28.0) (2026-07-09)
+
+
+### Features
+
+* **json:** narrow json typing to native semi-structured types ([#522](https://github.com/rudderlabs/sqlconnect-go/issues/522)) ([f79b15d](https://github.com/rudderlabs/sqlconnect-go/commit/f79b15d8fc76255ee730bc882e8499769c207619))
+
 ## [1.27.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.26.0...v1.27.0) (2026-06-29)
 
 
