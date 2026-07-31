@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/redshiftdata v1.40.1
 	github.com/aws/aws-sdk-go-v2/service/sts v1.42.3
 	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/databricks/databricks-sql-go v1.12.0
+	github.com/databricks/databricks-sql-go v1.14.0
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/gliderlabs/ssh v0.3.8
 	github.com/go-sql-driver/mysql v1.9.3
@@ -56,7 +56,7 @@ require (
 	github.com/apache/arrow-go/v18 v18.4.0 // indirect
 	github.com/apache/arrow/go/v12 v12.0.1 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
-	github.com/apache/thrift v0.22.0 // indirect
+	github.com/apache/thrift v0.23.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.4 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.21 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.21.1 // indirect
