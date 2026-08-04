@@ -3,6 +3,10 @@ package mysql
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"strconv"
+
+	mysqldriver "github.com/go-sql-driver/mysql"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
@@ -23,12 +27,28 @@ type Config struct {
 	UseLegacyMappings  bool `json:"useLegacyMappings"`
 }
 
+// ConnectionString builds the go-sql-driver DSN from typed fields.
+//
+// Do not rewrite this to format the DSN by hand. Every value here comes from
+// caller-supplied connection config, and the driver reads part of the DSN as
+// connection parameters, so an unescaped field can change the settings the
+// driver ends up with. FormatDSN escapes each field for us.
 func (c Config) ConnectionString() (string, error) {
 	tls, err := c.TLS()
 	if err != nil {
-		return "", fmt.Errorf("error while creating connecton string, %w", err)
+		return "", fmt.Errorf("creating connection string: %w", err)
 	}
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?tls=%s", c.User, c.Password, c.Host, c.Port, c.DBName, tls), nil
+	cfg := mysqldriver.NewConfig()
+	cfg.User = c.User
+	cfg.Passwd = c.Password
+	cfg.Net = "tcp"
+	cfg.Addr = net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
+	cfg.DBName = c.DBName
+	cfg.TLSConfig = tls
+	// Pinned explicitly: reading local files on behalf of the server is never
+	// wanted here, and the connection config is caller-supplied.
+	cfg.AllowAllFiles = false
+	return cfg.FormatDSN(), nil
 }
 
 func (c Config) TLS() (string, error) {

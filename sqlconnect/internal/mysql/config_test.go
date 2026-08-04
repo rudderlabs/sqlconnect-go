@@ -1,8 +1,10 @@
 package mysql_test
 
 import (
+	"fmt"
 	"testing"
 
+	mysqldriver "github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/mysql"
@@ -46,6 +48,105 @@ func TestConfig(t *testing.T) {
 			c := mysql.Config{SSLMode: "other"}
 			_, err := c.TLS()
 			require.Error(t, err, "should not allow other tls")
+		})
+	})
+
+	t.Run("connection string", func(t *testing.T) {
+		baseConfig := func(dbname string) mysql.Config {
+			return mysql.Config{
+				Host: "db.example.com", Port: 3306,
+				User: "rudder_svc", Password: "s3cr3t",
+				DBName: dbname, SSLMode: "false",
+			}
+		}
+
+		// dbname is caller-supplied and part of the DSN the driver parses, so
+		// values containing DSN syntax must not be able to change the settings
+		// the driver ends up with. AllowAllFiles in particular must stay off.
+		t.Run("dbname cannot alter driver parameters", func(t *testing.T) {
+			for _, dbname := range []string{
+				`prod?allowAllFiles=true&`, // the reported payload
+				`prod?allowAllFiles=1`,
+				`prod?allowAllFiles=true&tls=skip-verify`,
+				`prod&allowAllFiles=true`,
+				`prod?allowAllFiles=true#frag`,
+				`prod%3FallowAllFiles=true`,
+				`prod?loc=UTC&parseTime=true`,
+			} {
+				t.Run(dbname, func(t *testing.T) {
+					dsn, err := baseConfig(dbname).ConnectionString()
+					require.NoError(t, err, "it should build a connection string")
+
+					parsed, err := mysqldriver.ParseDSN(dsn)
+					require.NoError(t, err, "the driver should parse the generated dsn")
+
+					require.False(t, parsed.AllowAllFiles,
+						"allowAllFiles must never be enabled via dbname, dsn: %s", dsn)
+					require.Equal(t, dbname, parsed.DBName,
+						"dbname must round-trip literally, dsn: %s", dsn)
+					require.NotContains(t, parsed.Params, "allowAllFiles",
+						"allowAllFiles must not leak into params, dsn: %s", dsn)
+				})
+			}
+		})
+
+		// The DSN used to be built with this format string. Parsing both and
+		// comparing proves the move to FormatDSN did not change how the driver
+		// sees a benign connection — mysqldriver.NewConfig() sets defaults that
+		// the old DSN left implicit, and this is what catches any drift.
+		t.Run("matches the previously hand-built dsn for a benign config", func(t *testing.T) {
+			c := baseConfig("analytics")
+
+			legacy := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?tls=%s",
+				c.User, c.Password, c.Host, c.Port, c.DBName, "false")
+			legacyParsed, err := mysqldriver.ParseDSN(legacy)
+			require.NoError(t, err, "the legacy dsn should parse")
+
+			dsn, err := c.ConnectionString()
+			require.NoError(t, err, "it should build a connection string")
+			parsed, err := mysqldriver.ParseDSN(dsn)
+			require.NoError(t, err, "the generated dsn should parse")
+
+			require.Equal(t, legacyParsed, parsed,
+				"the driver must see an identical config, legacy: %s, new: %s", legacy, dsn)
+		})
+
+		t.Run("tls mode reaches the driver", func(t *testing.T) {
+			for sslMode, want := range map[string]string{
+				"":            "false",
+				"false":       "false",
+				"skip-verify": "skip-verify",
+			} {
+				c := baseConfig("analytics")
+				c.SSLMode = sslMode
+				dsn, err := c.ConnectionString()
+				require.NoError(t, err, "it should build a connection string for %q", sslMode)
+				parsed, err := mysqldriver.ParseDSN(dsn)
+				require.NoError(t, err, "the generated dsn should parse for %q", sslMode)
+				require.Equal(t, want, parsed.TLSConfig, "sslmode %q", sslMode)
+			}
+		})
+
+		t.Run("ipv6 host", func(t *testing.T) {
+			c := baseConfig("analytics")
+			c.Host = "2001:db8::1"
+			dsn, err := c.ConnectionString()
+			require.NoError(t, err, "it should build a connection string")
+			parsed, err := mysqldriver.ParseDSN(dsn)
+			require.NoError(t, err, "the driver should parse an ipv6 address, dsn: %s", dsn)
+			require.Equal(t, "[2001:db8::1]:3306", parsed.Addr, "it should bracket the address")
+		})
+
+		t.Run("credentials with dsn metacharacters", func(t *testing.T) {
+			c := baseConfig("analytics")
+			c.User = "user@host"
+			c.Password = "p@ss:w/rd?x"
+			dsn, err := c.ConnectionString()
+			require.NoError(t, err, "it should build a connection string")
+			parsed, err := mysqldriver.ParseDSN(dsn)
+			require.NoError(t, err, "the driver should parse the generated dsn, dsn: %s", dsn)
+			require.Equal(t, "user@host", parsed.User, "user should round-trip")
+			require.Equal(t, "p@ss:w/rd?x", parsed.Passwd, "password should round-trip")
 		})
 	})
 }
