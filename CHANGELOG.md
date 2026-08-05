@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.28.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.28.0...v1.28.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **mysql:** build the dsn from typed fields instead of string formatting ([#531](https://github.com/rudderlabs/sqlconnect-go/issues/531)) ([228da7f](https://github.com/rudderlabs/sqlconnect-go/commit/228da7f3c34912e1aa1c744111ae41aece31c7d1))
+
 ## [1.28.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.27.0...v1.28.0) (2026-07-09)
 
 
