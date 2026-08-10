@@ -72,8 +72,9 @@ func (c *Config) Parse(input json.RawMessage) error {
 			return err
 		}
 	}
-	if !c.SkipHostValidation {
-		return util.ValidateHost(c.Host)
-	}
-	return nil
+	// SkipHostValidation used to bypass validation entirely. It now only
+	// permits loopback, which is all a container-backed test needs —
+	// link-local, private and unspecified addresses stay rejected whether or
+	// not it is set.
+	return util.ValidateHost(c.Host, util.AllowLoopback(c.SkipHostValidation))
 }

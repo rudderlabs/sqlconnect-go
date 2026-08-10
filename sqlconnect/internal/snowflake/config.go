@@ -11,6 +11,8 @@ import (
 
 	"github.com/snowflakedb/gosnowflake"
 	"github.com/youmark/pkcs8"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
 
 type Config struct {
@@ -100,7 +102,21 @@ func (c Config) ConnectionString() (dsn string, err error) {
 }
 
 func (c *Config) Parse(configJSON json.RawMessage) error {
-	return json.Unmarshal(configJSON, c)
+	if err := json.Unmarshal(configJSON, c); err != nil {
+		return err
+	}
+	// The driver treats any protocol other than https as a downgrade request
+	// and honours it, which would put credentials and query results on the
+	// wire in cleartext. It is caller-supplied, so constrain it here.
+	if c.Protocol != "" && c.Protocol != "https" {
+		return fmt.Errorf("unsupported protocol %q: only https is supported", c.Protocol)
+	}
+	// Host is optional for Snowflake — the driver derives it from Account when
+	// it is empty — so only validate what was actually supplied.
+	if c.Host != "" {
+		return util.ValidateHost(c.Host)
+	}
+	return nil
 }
 
 func (c *Config) ParsePrivateKey() (*rsa.PrivateKey, error) {

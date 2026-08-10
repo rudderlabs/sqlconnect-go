@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
 
 type Config struct {
@@ -58,5 +59,5 @@ func (c *Config) Parse(input json.RawMessage) error {
 	if c.MaxRetryWaitTime == 0 {
 		c.MaxRetryWaitTime = 30 * time.Second
 	}
-	return nil
+	return util.ValidateHost(c.Host)
 }
