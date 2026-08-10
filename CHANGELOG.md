@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.30.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.28.1...v1.30.0) (2026-08-10)
+
+
+### Bug Fixes
+
+* **bigquery:** reject google credential documents that are not service accounts ([#542](https://github.com/rudderlabs/sqlconnect-go/issues/542)) ([5b56b90](https://github.com/rudderlabs/sqlconnect-go/commit/5b56b9055e1733d3371cfc595ee0b084ef653464))
+* validate connection hosts consistently across connectors ([#541](https://github.com/rudderlabs/sqlconnect-go/issues/541)) ([0162037](https://github.com/rudderlabs/sqlconnect-go/commit/0162037c0308d5d2a2dc2719fd1bdb681dd04ba8))
+
+
+### Miscellaneous
+
+* force release 1.30.0 ([#544](https://github.com/rudderlabs/sqlconnect-go/issues/544)) ([6b8346d](https://github.com/rudderlabs/sqlconnect-go/commit/6b8346defed1a3bc5cb61ea5ddc818267a480ac4))
+* force release 1.30.0 ([#545](https://github.com/rudderlabs/sqlconnect-go/issues/545)) ([633f5d3](https://github.com/rudderlabs/sqlconnect-go/commit/633f5d3b5a16cb41442be022f0572676123c9bbf))
+
 ## [1.28.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.28.0...v1.28.1) (2026-08-04)
 
 
