@@ -55,17 +55,9 @@ func (c *Config) Parse(input json.RawMessage) error {
 			return err
 		}
 	}
-	return util.ValidateHost(c.Host, c.hostValidationOptions()...)
-}
-
-// hostValidationOptions relaxes host validation for local test databases.
-//
-// SkipHostValidation used to bypass validation entirely. It now only permits
-// loopback, which is all a container-backed test needs — link-local, private
-// and unspecified addresses stay rejected whether or not it is set.
-func (c Config) hostValidationOptions() []util.HostValidationOption {
-	if c.SkipHostValidation {
-		return []util.HostValidationOption{util.AllowLoopback()}
-	}
-	return nil
+	// SkipHostValidation used to bypass validation entirely. It now only
+	// permits loopback, which is all a container-backed test needs —
+	// link-local, private and unspecified addresses stay rejected whether or
+	// not it is set.
+	return util.ValidateHost(c.Host, util.AllowLoopback(c.SkipHostValidation))
 }

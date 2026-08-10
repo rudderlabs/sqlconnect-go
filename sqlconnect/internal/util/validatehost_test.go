@@ -63,9 +63,9 @@ func TestValidateHost(t *testing.T) {
 	// database. It must not become a general bypass.
 	t.Run("AllowLoopback", func(t *testing.T) {
 		t.Run("permits loopback", func(t *testing.T) {
-			require.NoError(t, util.ValidateHost("127.0.0.1", util.AllowLoopback()),
+			require.NoError(t, util.ValidateHost("127.0.0.1", util.AllowLoopback(true)),
 				"should allow loopback when opted in")
-			require.NoError(t, util.ValidateHost("::1", util.AllowLoopback()),
+			require.NoError(t, util.ValidateHost("::1", util.AllowLoopback(true)),
 				"should allow ipv6 loopback when opted in")
 		})
 
@@ -79,7 +79,7 @@ func TestValidateHost(t *testing.T) {
 				"unspecified":       "0.0.0.0",
 			} {
 				t.Run(name, func(t *testing.T) {
-					require.Error(t, util.ValidateHost(host, util.AllowLoopback()),
+					require.Error(t, util.ValidateHost(host, util.AllowLoopback(true)),
 						"AllowLoopback must not permit %s (%s)", name, host)
 				})
 			}

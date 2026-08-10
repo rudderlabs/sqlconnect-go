@@ -12,14 +12,15 @@ type hostValidationOptions struct {
 	allowLoopback bool
 }
 
-// AllowLoopback permits hosts that resolve to loopback addresses.
+// AllowLoopback permits hosts that resolve to loopback addresses when allow is
+// true, and is a no-op otherwise, so callers can pass a flag through directly.
 //
 // Intended only for tests that run against a database in a local container.
 // It deliberately relaxes nothing else: link-local, private and unspecified
 // addresses stay rejected, so this cannot be used to reach cloud metadata or
 // in-cluster services.
-func AllowLoopback() HostValidationOption {
-	return func(o *hostValidationOptions) { o.allowLoopback = true }
+func AllowLoopback(allow bool) HostValidationOption {
+	return func(o *hostValidationOptions) { o.allowLoopback = allow }
 }
 
 // ValidateHost checks that the hostname is resolvable and that none of the
