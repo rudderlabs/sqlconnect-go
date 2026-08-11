@@ -20,6 +20,11 @@ type Config struct {
 
 	TunnelInfo       *sshtunnel.Config `json:"tunnel_info,omitempty"`
 	customClientName string            `json:"-"`
+
+	// SkipHostValidation relaxes host validation to permit loopback addresses,
+	// for tests that run against a local container. It cannot be used to reach
+	// link-local, private or unspecified addresses — those stay rejected.
+	SkipHostValidation bool `json:"skipHostValidation"`
 }
 
 func (c Config) ConnectionString() (string, error) {
@@ -59,5 +64,5 @@ func (c *Config) Parse(input json.RawMessage) error {
 			return err
 		}
 	}
-	return util.ValidateHost(c.Host)
+	return util.ValidateHost(c.Host, util.AllowLoopback(c.SkipHostValidation))
 }
