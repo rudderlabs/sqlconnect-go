@@ -27,6 +27,11 @@ type Config struct {
 
 	SessionParams map[string]string `json:"sessionParams"`
 
+	// SkipHostValidation relaxes host validation to permit loopback addresses,
+	// for tests that run against a local container. It cannot be used to reach
+	// link-local, private or unspecified addresses — those stay rejected.
+	SkipHostValidation bool `json:"skipHostValidation"`
+
 	UseOAuth          bool   `json:"useOauth"`
 	OAuthClientID     string `json:"oauthClientId"`
 	OAuthClientSecret string `json:"oauthClientSecret"`
@@ -59,5 +64,5 @@ func (c *Config) Parse(input json.RawMessage) error {
 	if c.MaxRetryWaitTime == 0 {
 		c.MaxRetryWaitTime = 30 * time.Second
 	}
-	return util.ValidateHost(c.Host)
+	return util.ValidateHost(c.Host, util.AllowLoopback(c.SkipHostValidation))
 }
