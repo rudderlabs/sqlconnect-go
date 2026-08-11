@@ -40,6 +40,12 @@ func TestSshTunnelScenarios(t *testing.T, warehouse string, configJSON json.RawM
 	configJSON, err = sjson.SetBytes(configJSON, "tunnel_info", tunnelConfig)
 	require.NoError(t, err, "it should be able to set the tunnel info in the config")
 
+	// The ssh server above runs on loopback, and the tunnel host is validated
+	// like any other. Opt in so the connectors permit it — this relaxes
+	// loopback only, so the scenario still cannot reach anything else.
+	configJSON, err = sjson.SetBytes(configJSON, "skipHostValidation", true)
+	require.NoError(t, err, "it should be able to opt into loopback for the tunnel host")
+
 	t.Run("ssh tunnel", func(t *testing.T) {
 		db, err := sqlconnect.NewDB(warehouse, configJSON)
 		require.NoError(t, err, "it should be able to create a new DB")

@@ -64,5 +64,13 @@ func (c *Config) Parse(input json.RawMessage) error {
 			return err
 		}
 	}
-	return util.ValidateHost(c.Host, util.AllowLoopback(c.SkipHostValidation))
+	if err := util.ValidateHost(c.Host, util.AllowLoopback(c.SkipHostValidation)); err != nil {
+		return err
+	}
+	if c.TunnelInfo != nil {
+		if err := util.ValidateHost(c.TunnelInfo.Host, util.AllowLoopback(c.SkipHostValidation)); err != nil {
+			return fmt.Errorf("ssh tunnel host: %w", err)
+		}
+	}
+	return nil
 }

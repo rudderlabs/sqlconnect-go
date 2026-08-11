@@ -2,6 +2,7 @@ package databricks
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
@@ -64,5 +65,13 @@ func (c *Config) Parse(input json.RawMessage) error {
 	if c.MaxRetryWaitTime == 0 {
 		c.MaxRetryWaitTime = 30 * time.Second
 	}
-	return util.ValidateHost(c.Host, util.AllowLoopback(c.SkipHostValidation))
+	if err := util.ValidateHost(c.Host, util.AllowLoopback(c.SkipHostValidation)); err != nil {
+		return err
+	}
+	if c.TunnelInfo != nil {
+		if err := util.ValidateHost(c.TunnelInfo.Host, util.AllowLoopback(c.SkipHostValidation)); err != nil {
+			return fmt.Errorf("ssh tunnel host: %w", err)
+		}
+	}
+	return nil
 }
