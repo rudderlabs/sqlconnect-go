@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.30.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.30.0...v1.30.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* **databricks,trino:** allow loopback for local test databases ([#546](https://github.com/rudderlabs/sqlconnect-go/issues/546)) ([9c64e95](https://github.com/rudderlabs/sqlconnect-go/commit/9c64e956522f6503fd23d394fd3db3cf8714e319))
+* validate the ssh tunnel host ([#548](https://github.com/rudderlabs/sqlconnect-go/issues/548)) ([e75387b](https://github.com/rudderlabs/sqlconnect-go/commit/e75387b4ac49e7f2648155907eb01386a1d7724f))
+
 ## [1.30.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.28.1...v1.30.0) (2026-08-10)
 
 
