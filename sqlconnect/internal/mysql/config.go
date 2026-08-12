@@ -79,18 +79,5 @@ func (c *Config) Parse(input json.RawMessage) error {
 	if err := util.ValidateHost(c.Host, util.AllowLoopback(c.SkipHostValidation)); err != nil {
 		return err
 	}
-	return c.validateTunnelHost()
-}
-
-// validateTunnelHost applies the same rules to the ssh tunnel endpoint.
-// It is caller-supplied too and is an outbound connection in its own right,
-// so a benign warehouse host says nothing about where the tunnel goes.
-func (c Config) validateTunnelHost() error {
-	if c.TunnelInfo == nil {
-		return nil
-	}
-	if err := util.ValidateHost(c.TunnelInfo.Host, util.AllowLoopback(c.SkipHostValidation)); err != nil {
-		return fmt.Errorf("ssh tunnel host: %w", err)
-	}
-	return nil
+	return sshtunnel.ValidateHost(c.TunnelInfo, util.AllowLoopback(c.SkipHostValidation))
 }
