@@ -36,10 +36,6 @@ func TestValidateHost(t *testing.T) {
 			"instance metadata":  "169.254.169.254",
 			"link-local v4":      "169.254.10.1",
 			"link-local v6":      "fe80::1",
-			"private 10/8":       "10.0.0.1",
-			"private 172.16/12":  "172.16.5.4",
-			"private 192.168/16": "192.168.1.1",
-			"unique local v6":    "fd00::1",
 			"multicast":          "239.1.1.1",
 		} {
 			t.Run(name, func(t *testing.T) {
@@ -52,6 +48,22 @@ func TestValidateHost(t *testing.T) {
 		for name, host := range map[string]string{
 			"public v4": "8.8.8.8",
 			"public v6": "2001:4860:4860::8888",
+		} {
+			t.Run(name, func(t *testing.T) {
+				require.NoError(t, util.ValidateHost(host), "should allow %s (%s)", name, host)
+			})
+		}
+	})
+
+	// A warehouse reached over AWS PrivateLink resolves to a private address in
+	// the customer's VPC. Rejecting private space would break every such
+	// connection, so it must stay allowed.
+	t.Run("allows private addresses so PrivateLink keeps working", func(t *testing.T) {
+		for name, host := range map[string]string{
+			"private 10/8":       "10.0.0.1",
+			"private 172.16/12":  "172.16.5.4",
+			"private 192.168/16": "192.168.1.1",
+			"unique local v6":    "fd00::1",
 		} {
 			t.Run(name, func(t *testing.T) {
 				require.NoError(t, util.ValidateHost(host), "should allow %s (%s)", name, host)
@@ -73,9 +85,7 @@ func TestValidateHost(t *testing.T) {
 			for name, host := range map[string]string{
 				"instance metadata": "169.254.169.254",
 				"link-local":        "169.254.10.1",
-				"private 10/8":      "10.0.0.1",
-				"private 192.168":   "192.168.1.1",
-				"unique local v6":   "fd00::1",
+				"multicast":         "239.1.1.1",
 				"unspecified":       "0.0.0.0",
 			} {
 				t.Run(name, func(t *testing.T) {

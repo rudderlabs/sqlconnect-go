@@ -43,7 +43,6 @@ func TestConfigParseValidation(t *testing.T) {
 			for name, host := range map[string]string{
 				"loopback":          "127.0.0.1",
 				"instance metadata": "169.254.169.254",
-				"private":           "10.0.0.1",
 			} {
 				t.Run(name, func(t *testing.T) {
 					var config snowflake.Config
