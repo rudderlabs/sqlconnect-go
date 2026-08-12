@@ -26,7 +26,8 @@ func AllowLoopback(allow bool) HostValidationOption {
 // addresses it resolves to are ones a warehouse connection should ever reach.
 //
 // Rejected: unspecified (0.0.0.0, ::), loopback, link-local — which covers the
-// cloud instance metadata endpoint 169.254.169.254 — and multicast.
+// instance metadata endpoint 169.254.169.254 — multicast, and AWS's reserved
+// prefix for instance metadata over IPv6.
 //
 // Private RFC1918/ULA space is deliberately NOT rejected. Warehouses reached
 // over AWS PrivateLink resolve to a private address in the customer's VPC, so
@@ -75,7 +76,19 @@ func disallowedAddrReason(ip net.IP) string {
 		return "link-local"
 	case ip.IsInterfaceLocalMulticast(), ip.IsMulticast():
 		return "multicast"
+	case awsIMDSv6.Contains(ip):
+		return "instance metadata"
 	default:
 		return ""
 	}
 }
+
+// awsIMDSv6 is the prefix AWS reserves for the instance metadata service over
+// IPv6, where the endpoint is fd00:ec2::254.
+//
+// It sits inside fc00::/7, so it used to be caught by the blanket rejection of
+// private space. That rejection had to go for PrivateLink, and unlike the IPv4
+// endpoint this one is not link-local, so nothing else catches it. Blocking the
+// reserved prefix is safe: it belongs to AWS, so no customer VPC is numbered
+// from it.
+var awsIMDSv6 = &net.IPNet{IP: net.ParseIP("fd00:ec2::"), Mask: net.CIDRMask(32, 128)}

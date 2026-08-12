@@ -37,6 +37,11 @@ func TestValidateHost(t *testing.T) {
 			"link-local v4":      "169.254.10.1",
 			"link-local v6":      "fe80::1",
 			"multicast":          "239.1.1.1",
+			// Instance metadata over IPv6 sits in fc00::/7 and is not
+			// link-local, so it needs its own guard now that private space is
+			// allowed for PrivateLink.
+			"instance metadata v6":        "fd00:ec2::254",
+			"instance metadata v6 prefix": "fd00:ec2::1",
 		} {
 			t.Run(name, func(t *testing.T) {
 				require.Error(t, util.ValidateHost(host), "should reject %s (%s)", name, host)
@@ -64,6 +69,9 @@ func TestValidateHost(t *testing.T) {
 			"private 172.16/12":  "172.16.5.4",
 			"private 192.168/16": "192.168.1.1",
 			"unique local v6":    "fd00::1",
+			// Adjacent to AWS's reserved metadata prefix but not in it — the
+			// metadata guard must stay narrow enough to leave ULAs alone.
+			"unique local v6, other": "fdab:1234::5",
 		} {
 			t.Run(name, func(t *testing.T) {
 				require.NoError(t, util.ValidateHost(host), "should allow %s (%s)", name, host)
