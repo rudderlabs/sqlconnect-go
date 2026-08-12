@@ -16,9 +16,8 @@ type hostValidationOptions struct {
 // true, and is a no-op otherwise, so callers can pass a flag through directly.
 //
 // Intended only for tests that run against a database in a local container.
-// It deliberately relaxes nothing else: link-local, private and unspecified
-// addresses stay rejected, so this cannot be used to reach cloud metadata or
-// in-cluster services.
+// It deliberately relaxes nothing else: link-local, multicast and unspecified
+// addresses stay rejected, so this cannot be used to reach cloud metadata.
 func AllowLoopback(allow bool) HostValidationOption {
 	return func(o *hostValidationOptions) { o.allowLoopback = allow }
 }
@@ -27,8 +26,16 @@ func AllowLoopback(allow bool) HostValidationOption {
 // addresses it resolves to are ones a warehouse connection should ever reach.
 //
 // Rejected: unspecified (0.0.0.0, ::), loopback, link-local — which covers the
-// cloud instance metadata endpoint 169.254.169.254 — multicast, and private
-// RFC1918/ULA space, which is how in-cluster services are addressed.
+// instance metadata endpoint 169.254.169.254 — multicast, and AWS's reserved
+// prefix for instance metadata over IPv6.
+//
+// Private RFC1918/ULA space is deliberately NOT rejected. Warehouses reached
+// over AWS PrivateLink resolve to a private address in the customer's VPC, so
+// rejecting private space would break every such connection. Those ranges are
+// customer-chosen and can overlap our own, which means they cannot be told
+// apart from in-cluster addresses by inspecting the IP alone — blocking
+// in-cluster services needs an operator-supplied CIDR list instead, which is
+// tracked separately.
 //
 // Note this cannot defend against DNS rebinding: the address checked here is
 // not necessarily the address dialled later. It raises the bar for a
@@ -69,9 +76,19 @@ func disallowedAddrReason(ip net.IP) string {
 		return "link-local"
 	case ip.IsInterfaceLocalMulticast(), ip.IsMulticast():
 		return "multicast"
-	case ip.IsPrivate():
-		return "private"
+	case awsIMDSv6.Contains(ip):
+		return "instance metadata"
 	default:
 		return ""
 	}
 }
+
+// awsIMDSv6 is the prefix AWS reserves for the instance metadata service over
+// IPv6, where the endpoint is fd00:ec2::254.
+//
+// It sits inside fc00::/7, so it used to be caught by the blanket rejection of
+// private space. That rejection had to go for PrivateLink, and unlike the IPv4
+// endpoint this one is not link-local, so nothing else catches it. Blocking the
+// reserved prefix is safe: it belongs to AWS, so no customer VPC is numbered
+// from it.
+var awsIMDSv6 = &net.IPNet{IP: net.ParseIP("fd00:ec2::"), Mask: net.CIDRMask(32, 128)}

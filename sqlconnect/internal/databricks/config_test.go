@@ -13,7 +13,6 @@ func TestConfigHostValidation(t *testing.T) {
 		for name, host := range map[string]string{
 			"loopback":          "127.0.0.1",
 			"instance metadata": "169.254.169.254",
-			"private":           "10.0.0.1",
 		} {
 			t.Run(name, func(t *testing.T) {
 				var config databricks.Config
@@ -42,7 +41,6 @@ func TestConfigHostValidation(t *testing.T) {
 			for name, host := range map[string]string{
 				"instance metadata": "169.254.169.254",
 				"link-local":        "169.254.10.1",
-				"private":           "10.0.0.1",
 				"unspecified":       "0.0.0.0",
 			} {
 				t.Run(name, func(t *testing.T) {
