@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.30.1...v1.30.2) (2026-08-12)
+
+
+### Bug Fixes
+
+* **util:** allow private addresses so PrivateLink warehouses keep working ([#549](https://github.com/rudderlabs/sqlconnect-go/issues/549)) ([c371abb](https://github.com/rudderlabs/sqlconnect-go/commit/c371abb74668c45b0b267c138085387accb3b354))
+
 ## [1.30.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.30.0...v1.30.1) (2026-08-12)
 
 
