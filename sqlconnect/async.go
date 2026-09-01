@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 
 	"github.com/rudderlabs/rudder-go-kit/async"
 )
@@ -33,6 +34,7 @@ func QueryJSONAsync(ctx context.Context, db JsonQueryDB, query string, params ..
 		if err != nil {
 			return nil, err
 		}
+		nullifyNonFiniteFloats(m)
 		b, err := json.Marshal(m)
 		if err != nil {
 			return nil, fmt.Errorf("marshalling rows to json: %w", err)
@@ -40,6 +42,34 @@ func QueryJSONAsync(ctx context.Context, db JsonQueryDB, query string, params ..
 		return b, nil
 	}
 	return QueryAsync[json.RawMessage](ctx, db, mapper, query, params...)
+}
+
+// nullifyNonFiniteFloats replaces IEEE-754 NaN/±Inf with nil, in place.
+//
+// JSON has no representation for them, so json.Marshal returns "unsupported value: NaN" — and
+// because QueryAsync returns on the first mapper error, a single such cell fails the *entire*
+// result set rather than one row or one column. Warehouses do store these values (Snowflake FLOAT
+// accepts 'NaN'), so a query that merely reads user data could not be served at all.
+//
+// null is the only lossless-in-shape option: the column stays JSON-null rather than changing type
+// to a "NaN" string, which would break consumers that parse the column as a number. This mirrors
+// the undefined-in-ARRAY → null normalisation the snowflake mapper already performs.
+//
+// Deliberately confined to the JSON-bytes path: QueryJSONMapAsync hands callers the native
+// map[string]any, where a float64 NaN is representable and meaningful, so it is left untouched.
+func nullifyNonFiniteFloats(m map[string]any) {
+	for k, v := range m {
+		switch f := v.(type) {
+		case float64:
+			if math.IsNaN(f) || math.IsInf(f, 0) {
+				m[k] = nil
+			}
+		case float32:
+			if f64 := float64(f); math.IsNaN(f64) || math.IsInf(f64, 0) {
+				m[k] = nil
+			}
+		}
+	}
 }
 
 // QueryAsync executes a query and returns a channel that will receive the results or an error, along with a function that the caller can use to leave the channel early.
