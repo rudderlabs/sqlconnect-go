@@ -73,14 +73,14 @@ func collect(t *testing.T, db *fakeJSONDB) (json.RawMessage, error) {
 	t.Helper()
 	ch, leave := QueryJSONAsync(context.Background(), db, "SELECT 1")
 	defer leave()
-	for v := range ch {
-		if v.Err != nil {
-			return nil, v.Err
-		}
-		return v.Value, nil
+	v, ok := <-ch
+	if !ok {
+		t.Fatal("no row received")
 	}
-	t.Fatal("no row received")
-	return nil, nil
+	if v.Err != nil {
+		return nil, v.Err
+	}
+	return v.Value, nil
 }
 
 // The wiring itself: without nullifyNonFiniteFloats being called from QueryJSONAsync, this query
@@ -145,12 +145,10 @@ func TestQueryJSONMapAsync_LeavesNonFiniteIntact(t *testing.T) {
 
 	ch, leave := QueryJSONMapAsync(context.Background(), db, "SELECT 1")
 	defer leave()
-	for v := range ch {
-		require.NoError(t, v.Err)
-		f, ok := v.Value["nan"].(float64)
-		require.True(t, ok, "value should still be a float64, not nil")
-		require.True(t, math.IsNaN(f), "QueryJSONMapAsync must not normalise NaN")
-		return
-	}
-	t.Fatal("no row received")
+	v, ok := <-ch
+	require.True(t, ok, "no row received")
+	require.NoError(t, v.Err)
+	f, isFloat := v.Value["nan"].(float64)
+	require.True(t, isFloat, "value should still be a float64, not nil")
+	require.True(t, math.IsNaN(f), "QueryJSONMapAsync must not normalise NaN")
 }
