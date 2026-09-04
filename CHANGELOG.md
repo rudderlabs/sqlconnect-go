@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.30.3](https://github.com/rudderlabs/sqlconnect-go/compare/v1.30.2...v1.30.3) (2026-09-02)
+
+
+### Bug Fixes
+
+* a NaN or Inf cell must not fail an entire JSON query ([#560](https://github.com/rudderlabs/sqlconnect-go/issues/560)) ([a85e111](https://github.com/rudderlabs/sqlconnect-go/commit/a85e111def32e0491fa012068518c1e8fb3f0060))
+
 ## [1.30.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.30.1...v1.30.2) (2026-08-12)
 
 
