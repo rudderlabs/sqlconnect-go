@@ -42,3 +42,8 @@
 - Integration confidence is secret- and environment-dependent: core behavior is validated mostly through integration-heavy scenarios (`sqlconnect/internal/integration_test/db_integration_test_scenario.go::TestDatabaseScenarios`) and CI secrets wiring (`.github/workflows/test.yaml`), so local/unit-only runs do not exercise most backend contracts.
 - The Trino path shows a recurring doc-vs-automation skew: it is part of public API/config surface (`README.md`, `sqlconnect/internal/trino/config.go`) but is partially excluded from routine automation (`.github/workflows/test.yaml`, `sqlconnect/cmd/cleanup/cleanup.go`).
 - Toolchain and release automation constraints are also cross-cutting: Go 1.26 is pinned in module/CI/lint (`go.mod`, `.github/workflows/test.yaml`, `.github/workflows/verify.yml`, `.golangci.yml`) while release metadata currently references `package-name: rudder-server`, which should be validated by maintainers for this repo (`.github/workflows/release-please.yaml`).
+
+## ACT2-523 — Postgres session timezone remains caller-owned
+
+- Postgres construction does not set or force a session timezone: the dialect path builds a DSN via `sqlconnect/internal/postgres.Config.ConnectionString` and opens it with `sql.Open("postgres", config.ConnectionString())`, while `base.NewDB` performs no session initialization.
+- Avoid treating Postgres rolling-window timezone behavior as normalized by this library; adding `TimeZone=UTC` or issuing `SET TIME ZONE` would be a behavior-changing runtime initialization change and would also affect Redshift's Postgres-driver path.
