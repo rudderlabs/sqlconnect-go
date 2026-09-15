@@ -61,6 +61,13 @@ if err != nil {
 }
 ```
 
+**Postgres session timezone**
+
+The Postgres client inherits the session timezone from lib/pq/Postgres startup defaults, including server, database, user, and deployment-level settings. `sqlconnect-go` only adds connection fields such as host, port, database, user, password, and `sslmode`; it does not add a `TimeZone=UTC` startup parameter or execute `SET TIME ZONE` after connecting.
+
+For rETL rolling-window queries, this means comparisons against `timestamptz` columns keep the same session-timezone dependence for anchored and rolling clock expressions, but rolling windows on `timestamp` (without time zone) columns can shift by the session offset if the actual connector session is not UTC. Verify UTC in the RudderStack rETL Postgres execution environment with `SHOW TIME ZONE` or `SELECT current_setting('TimeZone')` when UTC semantics are required.
+
+This repository does not verify the production RudderStack rETL connector session timezone. Until an observed `SHOW TIME ZONE` or `current_setting('TimeZone')` result from that execution environment is recorded, UTC remains an external deployment, database, or user-level assumption rather than a guarantee provided by `sqlconnect-go`.
 
 **Performing admin operations**
 ```go
