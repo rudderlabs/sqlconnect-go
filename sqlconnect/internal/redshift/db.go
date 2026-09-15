@@ -98,17 +98,41 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 					}
 					return stmt
 				}
-				cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
-					stmt := fmt.Sprintf("SELECT column_name, data_type FROM SVV_ALL_COLUMNS WHERE schema_name = '%[1]s' AND table_name = '%[2]s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
-					if catalog != "" {
-						stmt += fmt.Sprintf(" AND database_name = '%[1]s'", base.EscapeSqlString(catalog))
-					}
-					return stmt + " ORDER BY ordinal_position ASC", "column_name", "data_type"
-				}
+				cmds.ListColumns = redshiftListColumns
 				return cmds
 			}),
 		),
 	}, nil
+}
+
+func redshiftListColumns(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
+	regularColumnsWhere := fmt.Sprintf(
+		"table_schema = '%[1]s' AND table_name = '%[2]s'",
+		base.EscapeSqlString(schema),
+		base.EscapeSqlString(table),
+	)
+	lateBindingViewColumnsWhere := fmt.Sprintf(
+		"view_schema = '%[1]s' AND view_name = '%[2]s'",
+		base.EscapeSqlString(schema),
+		base.EscapeSqlString(table),
+	)
+	if catalog != "" {
+		regularColumnsWhere += fmt.Sprintf(" AND table_catalog = '%[1]s'", base.EscapeSqlString(catalog))
+		lateBindingViewColumnsWhere += fmt.Sprintf(" AND current_database() = '%[1]s'", base.EscapeSqlString(catalog))
+	}
+
+	return fmt.Sprintf(`
+SELECT column_name, data_type
+FROM (
+	SELECT column_name, LOWER(data_type) AS data_type, ordinal_position
+	FROM information_schema.columns
+	WHERE %[1]s
+	UNION ALL
+	SELECT col_name AS column_name, LOWER(TRIM(SPLIT_PART(col_type, '(', 1))) AS data_type, col_num AS ordinal_position
+	FROM pg_get_late_binding_view_cols() cols(view_schema name, view_name name, col_name name, col_type varchar, col_num int)
+	WHERE %[2]s
+) AS redshift_columns
+ORDER BY ordinal_position ASC`, regularColumnsWhere, lateBindingViewColumnsWhere), "column_name", "data_type"
 }
 
 func newPostgresDB(credentialsJSON json.RawMessage) (*sql.DB, func() error, error) {
