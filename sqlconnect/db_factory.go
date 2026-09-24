@@ -14,7 +14,7 @@ func NewDB(name string, credentialsJSON json.RawMessage, opts ...DBOption) (DB, 
 		for _, opt := range opts {
 			opt.apply(&factoryOptions)
 		}
-		return factory(credentialsJSON, DBFactoryOptions{bigQueryTokenSource: factoryOptions.bigQueryTokenSource})
+		return factory(credentialsJSON, DBFactoryOptions(factoryOptions))
 	}
 
 	factory, ok := dbfactories[name]
