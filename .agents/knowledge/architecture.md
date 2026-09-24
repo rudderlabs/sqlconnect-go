@@ -42,3 +42,12 @@
 - Integration confidence is secret- and environment-dependent: core behavior is validated mostly through integration-heavy scenarios (`sqlconnect/internal/integration_test/db_integration_test_scenario.go::TestDatabaseScenarios`) and CI secrets wiring (`.github/workflows/test.yaml`), so local/unit-only runs do not exercise most backend contracts.
 - The Trino path shows a recurring doc-vs-automation skew: it is part of public API/config surface (`README.md`, `sqlconnect/internal/trino/config.go`) but is partially excluded from routine automation (`.github/workflows/test.yaml`, `sqlconnect/cmd/cleanup/cleanup.go`).
 - Toolchain and release automation constraints are also cross-cutting: Go 1.26 is pinned in module/CI/lint (`go.mod`, `.github/workflows/test.yaml`, `.github/workflows/verify.yml`, `.golangci.yml`) while release metadata currently references `package-name: rudder-server`, which should be validated by maintainers for this repo (`.github/workflows/release-please.yaml`).
+
+## ACT2-855 — Option-Aware Factory Compatibility
+
+<!-- session: 2026-09-24 -->
+
+- `sqlconnect/db_factory.go` preserves the public `DBFactory func(json.RawMessage) (DB, error)` contract and adds a separate option-aware registration path for BigQuery. This lets `sqlconnect.NewDB` accept `WithGoogleClientOptions` without breaking external custom factory registrations or forcing unrelated dialects to understand Google options.
+- Construction options use the distinct `DBOption` type because the exported `Option` name is already reserved for relation/table options in `sqlconnect/options.go`; keeping these option domains separate also avoids a compile-time API conflict.
+- In `sqlconnect/internal/bigquery/db.go`, caller-supplied Google client options replace the built-in service-account credentials option rather than being appended to it; combining both authentication sources can create conflicting Google client configuration.
+- Google client-option injection does not bypass credential validation: `Config.Parse` still validates every non-empty credentials document and accepts only empty/whitespace/`{}` input or `type: service_account`. Injected options control only whether the built-in `option.WithAuthCredentialsJSON` is appended, preventing `external_account` or `authorized_user` documents from entering through the public option-aware path.

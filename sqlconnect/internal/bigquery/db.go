@@ -30,7 +30,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 // credentials option.
 func NewDBWithClientOptions(configJSON json.RawMessage, clientOptions ...option.ClientOption) (*DB, error) {
 	var config Config
-	if err := config.parse(configJSON, len(clientOptions) == 0); err != nil {
+	if err := config.Parse(configJSON); err != nil {
 		return nil, err
 	}
 

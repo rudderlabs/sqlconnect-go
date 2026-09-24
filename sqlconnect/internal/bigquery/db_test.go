@@ -26,7 +26,7 @@ func TestGetClientOptions(t *testing.T) {
 func TestNewDBWithClientOptionsUsesCallerAuthentication(t *testing.T) {
 	configJSON, err := json.Marshal(map[string]string{
 		"project":     "test-project",
-		"credentials": `{"type":"external_account","token_url":"https://example.invalid/"}`,
+		"credentials": `{"type":"service_account"}`,
 	})
 	require.NoError(t, err)
 
@@ -36,15 +36,45 @@ func TestNewDBWithClientOptionsUsesCallerAuthentication(t *testing.T) {
 }
 
 func TestNewDBRejectsUnsupportedCredentialTypes(t *testing.T) {
-	configJSON, err := json.Marshal(map[string]string{
-		"project":     "test-project",
-		"credentials": `{"type":"external_account","token_url":"https://example.invalid/"}`,
-	})
-	require.NoError(t, err)
+	for name, credentials := range map[string]string{
+		"external_account":             `{"type":"external_account","token_url":"https://example.invalid/"}`,
+		"impersonated_service_account": `{"type":"impersonated_service_account","service_account_impersonation_url":"https://example.invalid/"}`,
+		"authorized_user":              `{"type":"authorized_user"}`,
+		"malformed json":               `{"type":`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			configJSON, err := json.Marshal(map[string]string{
+				"project":     "test-project",
+				"credentials": credentials,
+			})
+			require.NoError(t, err)
 
-	db, err := NewDB(configJSON)
-	require.ErrorContains(t, err, "unsupported credential type")
-	require.Nil(t, db)
+			db, err := NewDB(configJSON)
+			require.Error(t, err)
+			require.Nil(t, db)
+		})
+	}
+}
+
+func TestNewDBWithClientOptionsRejectsUnsupportedCredentialTypes(t *testing.T) {
+	for name, credentials := range map[string]string{
+		"external_account":             `{"type":"external_account","token_url":"https://example.invalid/"}`,
+		"impersonated_service_account": `{"type":"impersonated_service_account","service_account_impersonation_url":"https://example.invalid/"}`,
+		"authorized_user":              `{"type":"authorized_user"}`,
+		"malformed json":               `{"type":`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			configJSON, err := json.Marshal(map[string]string{
+				"project":     "test-project",
+				"credentials": credentials,
+			})
+			require.NoError(t, err)
+
+			db, err := NewDBWithClientOptions(configJSON, option.WithoutAuthentication())
+			require.Error(t, err)
+			require.Nil(t, db)
+		})
+	}
 }
 
 func TestNewDBWithClientOptionsAcceptsEmptyCredentials(t *testing.T) {
