@@ -8,6 +8,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/samber/lo"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
@@ -20,18 +21,23 @@ const (
 	DatabaseType = "bigquery"
 )
 
-// NewDB creates a new bigquery db client
+// NewDB creates a new BigQuery database client.
 func NewDB(configJSON json.RawMessage) (*DB, error) {
+	return NewDBWithTokenSource(configJSON, nil)
+}
+
+// NewDBWithTokenSource creates a new BigQuery database client using tokenSource
+// instead of the configured service account JSON credentials when tokenSource is
+// non-nil. The config credentials JSON is still parsed and validated before the
+// token source is used.
+func NewDBWithTokenSource(configJSON json.RawMessage, tokenSource oauth2.TokenSource) (*DB, error) {
 	var config Config
 	err := config.Parse(configJSON)
 	if err != nil {
 		return nil, err
 	}
 
-	db := sql.OpenDB(driver.NewConnector(
-		config.ProjectID,
-		option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(config.CredentialsJSON)),
-	))
+	db := sql.OpenDB(driver.NewConnector(config.ProjectID, selectClientOptions(config, tokenSource)...))
 
 	return &DB{
 		DB: base.NewDB(
@@ -79,9 +85,18 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 }
 
 func init() {
-	sqlconnect.RegisterDBFactory(DatabaseType, func(credentialsJSON json.RawMessage) (sqlconnect.DB, error) {
-		return NewDB(credentialsJSON)
+	sqlconnect.RegisterDBFactoryWithOptions(DatabaseType, func(credentialsJSON json.RawMessage, opts sqlconnect.DBFactoryOptions) (sqlconnect.DB, error) {
+		return NewDBWithTokenSource(credentialsJSON, opts.BigQueryTokenSource())
 	})
+}
+
+func selectClientOptions(config Config, tokenSource oauth2.TokenSource) []option.ClientOption {
+	if tokenSource != nil {
+		return []option.ClientOption{option.WithTokenSource(tokenSource)}
+	}
+	return []option.ClientOption{
+		option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(config.CredentialsJSON)),
+	}
 }
 
 type DB struct {
