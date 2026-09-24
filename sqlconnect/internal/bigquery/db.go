@@ -20,18 +20,21 @@ const (
 	DatabaseType = "bigquery"
 )
 
-// NewDB creates a new bigquery db client
+// NewDB creates a new bigquery db client.
 func NewDB(configJSON json.RawMessage) (*DB, error) {
+	return NewDBWithClientOptions(configJSON)
+}
+
+// NewDBWithClientOptions creates a new bigquery db client with caller-supplied
+// Google client options. Supplying options replaces the default service account
+// credentials option.
+func NewDBWithClientOptions(configJSON json.RawMessage, clientOptions ...option.ClientOption) (*DB, error) {
 	var config Config
-	err := config.Parse(configJSON)
-	if err != nil {
+	if err := config.parse(configJSON, len(clientOptions) == 0); err != nil {
 		return nil, err
 	}
 
-	db := sql.OpenDB(driver.NewConnector(
-		config.ProjectID,
-		option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(config.CredentialsJSON)),
-	))
+	db := sql.OpenDB(driver.NewConnector(config.ProjectID, getClientOptions(config, clientOptions)...))
 
 	return &DB{
 		DB: base.NewDB(
@@ -79,9 +82,18 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 }
 
 func init() {
-	sqlconnect.RegisterDBFactory(DatabaseType, func(credentialsJSON json.RawMessage) (sqlconnect.DB, error) {
-		return NewDB(credentialsJSON)
+	sqlconnect.RegisterDBFactoryWithGoogleClientOptions(DatabaseType, func(credentialsJSON json.RawMessage, opts ...option.ClientOption) (sqlconnect.DB, error) {
+		return NewDBWithClientOptions(credentialsJSON, opts...)
 	})
+}
+
+func getClientOptions(config Config, clientOptions []option.ClientOption) []option.ClientOption {
+	if len(clientOptions) > 0 {
+		return clientOptions
+	}
+	return []option.ClientOption{
+		option.WithAuthCredentialsJSON(option.ServiceAccount, []byte(config.CredentialsJSON)),
+	}
 }
 
 type DB struct {

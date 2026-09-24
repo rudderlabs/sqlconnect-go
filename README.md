@@ -44,6 +44,17 @@ if err != nil {
 }
 ```
 
+**Creating a BigQuery client with caller-provided Google authentication**
+```go
+db, err := sqlconnect.NewDB("bigquery", []byte(`{
+    "project": "project-id"
+}`), sqlconnect.WithGoogleClientOptions(
+    option.WithTokenSource(tokenSource),
+))
+```
+
+When Google client options are provided, they replace BigQuery's default service-account JSON option. This supports token sources such as Workload Identity Federation without accepting an external-account document in the database configuration.
+
 **Creating a new DB client using legacy mappings for backwards compatibility**
 ```go
 db, err := sqlconnect.NewDB("postgres", []byte(`{
