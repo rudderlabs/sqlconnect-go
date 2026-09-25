@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"cloud.google.com/go/bigquery"
@@ -21,20 +22,25 @@ const (
 	DatabaseType = "bigquery"
 )
 
+var errCredentialsWithTokenSource = errors.New("bigquery config has both credentials and a token source")
+
 // NewDB creates a new BigQuery database client.
 func NewDB(configJSON json.RawMessage) (*DB, error) {
 	return NewDBWithTokenSource(configJSON, nil)
 }
 
-// NewDBWithTokenSource creates a new BigQuery database client using tokenSource
-// instead of the configured service account JSON credentials when tokenSource is
-// non-nil. The config credentials JSON is still parsed and validated before the
-// token source is used.
+// NewDBWithTokenSource creates a new BigQuery database client that authenticates
+// with tokenSource when it is non-nil, and with the configured service account JSON
+// credentials otherwise. A config carrying credentials alongside a token source is
+// rejected, because one of the two would otherwise be silently ignored.
 func NewDBWithTokenSource(configJSON json.RawMessage, tokenSource oauth2.TokenSource) (*DB, error) {
 	var config Config
 	err := config.Parse(configJSON)
 	if err != nil {
 		return nil, err
+	}
+	if tokenSource != nil && !isEmptyCredentials([]byte(config.CredentialsJSON)) {
+		return nil, errCredentialsWithTokenSource
 	}
 
 	db := sql.OpenDB(driver.NewConnector(config.ProjectID, selectClientOptions(config, tokenSource)...))

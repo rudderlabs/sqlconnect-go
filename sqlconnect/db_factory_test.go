@@ -50,6 +50,45 @@ func TestNewDBWithBigQueryTokenSource(t *testing.T) {
 		"it should pass the BigQuery token source to an option-aware factory")
 }
 
+func TestNewDBRejectsOptionsForFactoryWithoutOptions(t *testing.T) {
+	const factoryName = "test-rejects-options"
+	sqlconnect.RegisterDBFactory(factoryName, func(json.RawMessage) (sqlconnect.DB, error) {
+		t.Fatal("it should not call a factory that cannot honour the supplied options")
+		return nil, nil
+	})
+
+	_, err := sqlconnect.NewDB(factoryName, nil, sqlconnect.WithBigQueryTokenSource(&staticTokenSource{}))
+	require.ErrorContains(t, err, "does not support options",
+		"it should refuse options instead of silently ignoring them")
+}
+
+func TestNewDBRejectsNilBigQueryTokenSource(t *testing.T) {
+	const factoryName = "test-nil-token-source"
+	sqlconnect.RegisterDBFactoryWithOptions(factoryName, func(json.RawMessage, sqlconnect.DBFactoryOptions) (sqlconnect.DB, error) {
+		t.Fatal("it should not call the factory with a nil token source")
+		return nil, nil
+	})
+
+	_, err := sqlconnect.NewDB(factoryName, nil, sqlconnect.WithBigQueryTokenSource(nil))
+	require.ErrorContains(t, err, "token source is nil",
+		"it should reject a nil token source instead of falling back to other credentials")
+}
+
+func TestRegisterDBFactoryReplacesFactoryWithOptions(t *testing.T) {
+	const factoryName = "test-replaced-factory"
+	sqlconnect.RegisterDBFactoryWithOptions(factoryName, func(json.RawMessage, sqlconnect.DBFactoryOptions) (sqlconnect.DB, error) {
+		t.Fatal("it should not call a factory that was replaced")
+		return nil, nil
+	})
+	sentinelErr := errors.New("replacement factory called")
+	sqlconnect.RegisterDBFactory(factoryName, func(json.RawMessage) (sqlconnect.DB, error) {
+		return nil, sentinelErr
+	})
+
+	_, err := sqlconnect.NewDB(factoryName, nil)
+	require.ErrorIs(t, err, sentinelErr, "it should use the most recently registered factory")
+}
+
 type staticTokenSource struct{}
 
 func (staticTokenSource) Token() (*oauth2.Token, error) {

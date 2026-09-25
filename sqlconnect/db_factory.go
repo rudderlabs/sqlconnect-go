@@ -2,18 +2,25 @@ package sqlconnect
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"golang.org/x/oauth2"
 )
 
-// NewDB creates a new database client for the provided name.
+var errNilBigQueryTokenSource = errors.New("bigquery token source is nil")
+
+// NewDB creates a new database client for the provided name. It returns an error
+// if options are supplied for a factory that does not support them.
 func NewDB(name string, credentialsJSON json.RawMessage, opts ...DBOption) (DB, error) {
-	if factory, ok := dbFactoriesWithOptions[name]; ok {
-		factoryOptions := dbOptions{}
-		for _, opt := range opts {
-			opt.apply(&factoryOptions)
+	factoryOptions := dbOptions{}
+	for _, opt := range opts {
+		if err := opt.apply(&factoryOptions); err != nil {
+			return nil, err
 		}
+	}
+
+	if factory, ok := dbFactoriesWithOptions[name]; ok {
 		return factory(credentialsJSON, DBFactoryOptions(factoryOptions))
 	}
 
@@ -21,12 +28,15 @@ func NewDB(name string, credentialsJSON json.RawMessage, opts ...DBOption) (DB, 
 	if !ok {
 		return nil, fmt.Errorf("unknown client factory: %s", name)
 	}
+	if len(opts) > 0 {
+		return nil, fmt.Errorf("client factory %s does not support options", name)
+	}
 	return factory(credentialsJSON)
 }
 
 // DBOption configures database client construction.
 type DBOption interface {
-	apply(*dbOptions)
+	apply(*dbOptions) error
 }
 
 type dbOptions struct {
@@ -37,14 +47,18 @@ type withBigQueryTokenSource struct {
 	tokenSource oauth2.TokenSource
 }
 
-func (o withBigQueryTokenSource) apply(opts *dbOptions) {
+func (o withBigQueryTokenSource) apply(opts *dbOptions) error {
+	if o.tokenSource == nil {
+		return errNilBigQueryTokenSource
+	}
 	opts.bigQueryTokenSource = o.tokenSource
+	return nil
 }
 
 // WithBigQueryTokenSource configures BigQuery clients to authenticate with the
-// provided OAuth2 token source. When supplied, it replaces the default service
-// account JSON credentials option. Credentials JSON in the database config is
-// still validated as service-account-only before this token source is used.
+// provided OAuth2 token source instead of service account JSON credentials. The
+// database config must then carry no credentials: NewDB returns an error rather
+// than silently discarding a configured key. A nil token source is rejected.
 func WithBigQueryTokenSource(tokenSource oauth2.TokenSource) DBOption {
 	return withBigQueryTokenSource{tokenSource: tokenSource}
 }

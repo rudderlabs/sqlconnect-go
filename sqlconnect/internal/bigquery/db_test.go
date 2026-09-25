@@ -1,6 +1,7 @@
 package bigquery
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -41,6 +42,30 @@ func TestNewDBWithTokenSourceStillValidatesCredentialsJSON(t *testing.T) {
 
 	_, err = NewDBWithTokenSource(configJSON, staticTokenSource{})
 	require.ErrorContains(t, err, "unsupported credential type")
+}
+
+func TestNewDBWithTokenSourceRejectsCredentialsJSON(t *testing.T) {
+	configJSON, err := json.Marshal(map[string]string{
+		"project":     "test-project",
+		"credentials": `{"type":"service_account","project_id":"test-project"}`,
+	})
+	require.NoError(t, err, "it should marshal the config")
+
+	_, err = NewDBWithTokenSource(configJSON, staticTokenSource{})
+	require.ErrorIs(t, err, errCredentialsWithTokenSource,
+		"it should refuse to silently drop a configured service account key in favour of the token source")
+}
+
+func TestNewDBWithTokenSourceAuthenticatesWithTokenSource(t *testing.T) {
+	db, err := NewDBWithTokenSource(json.RawMessage(`{"project":"test-project"}`), staticTokenSource{})
+	require.NoError(t, err, "it should create the db")
+	t.Cleanup(func() { _ = db.Close() })
+
+	// Conn builds the BigQuery client, which rejects conflicting credential options
+	// and fails without any credentials, so this proves the token source alone reaches it.
+	conn, err := db.Conn(context.Background())
+	require.NoError(t, err, "it should build the bigquery client with only the token source")
+	require.NoError(t, conn.Close(), "it should close the connection")
 }
 
 type staticTokenSource struct{}
