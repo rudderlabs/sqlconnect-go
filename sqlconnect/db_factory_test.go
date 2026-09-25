@@ -52,9 +52,10 @@ func TestNewDBWithBigQueryTokenSource(t *testing.T) {
 
 func TestNewDBRejectsOptionsForFactoryWithoutOptions(t *testing.T) {
 	const factoryName = "test-rejects-options"
+	unexpectedCallErr := errors.New("unexpected factory call")
 	sqlconnect.RegisterDBFactory(factoryName, func(json.RawMessage) (sqlconnect.DB, error) {
 		t.Fatal("it should not call a factory that cannot honour the supplied options")
-		return nil, nil
+		return nil, unexpectedCallErr
 	})
 
 	_, err := sqlconnect.NewDB(factoryName, nil, sqlconnect.WithBigQueryTokenSource(&staticTokenSource{}))
@@ -64,9 +65,10 @@ func TestNewDBRejectsOptionsForFactoryWithoutOptions(t *testing.T) {
 
 func TestNewDBRejectsNilBigQueryTokenSource(t *testing.T) {
 	const factoryName = "test-nil-token-source"
+	unexpectedCallErr := errors.New("unexpected factory call")
 	sqlconnect.RegisterDBFactoryWithOptions(factoryName, func(json.RawMessage, sqlconnect.DBFactoryOptions) (sqlconnect.DB, error) {
 		t.Fatal("it should not call the factory with a nil token source")
-		return nil, nil
+		return nil, unexpectedCallErr
 	})
 
 	_, err := sqlconnect.NewDB(factoryName, nil, sqlconnect.WithBigQueryTokenSource(nil))
@@ -76,9 +78,10 @@ func TestNewDBRejectsNilBigQueryTokenSource(t *testing.T) {
 
 func TestRegisterDBFactoryReplacesFactoryWithOptions(t *testing.T) {
 	const factoryName = "test-replaced-factory"
+	unexpectedCallErr := errors.New("unexpected factory call")
 	sqlconnect.RegisterDBFactoryWithOptions(factoryName, func(json.RawMessage, sqlconnect.DBFactoryOptions) (sqlconnect.DB, error) {
 		t.Fatal("it should not call a factory that was replaced")
-		return nil, nil
+		return nil, unexpectedCallErr
 	})
 	sentinelErr := errors.New("replacement factory called")
 	sqlconnect.RegisterDBFactory(factoryName, func(json.RawMessage) (sqlconnect.DB, error) {
