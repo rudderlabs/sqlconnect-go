@@ -31,6 +31,7 @@ require (
 	github.com/trinodb/trino-go-client v0.323.0
 	github.com/youmark/pkcs8 v0.0.0-20240424034433-3c2c7870ae76
 	golang.org/x/crypto v0.52.0
+	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
 	google.golang.org/api v0.280.0
 )
@@ -151,7 +152,6 @@ require (
 	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/net v0.54.0 // indirect
-	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260409153401-be6f6cb8b1fa // indirect
 	golang.org/x/term v0.43.0 // indirect

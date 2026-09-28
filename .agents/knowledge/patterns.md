@@ -34,3 +34,7 @@
 - Dialect behavior is validated through broad, shared scenarios that cover admin operations, SQL expressions, mapping, and cancellation in one harness (`sqlconnect/internal/integration_test/db_integration_test_scenario.go::TestDatabaseScenarios`).
 - SSH behavior is tested with an in-process SSH server and dynamic credentials mutation, rather than mocking tunnel APIs (`sqlconnect/internal/integration_test/sshtunnel_integration_test_scenario.go::newSshServer`, `sqlconnect/internal/integration_test/sshtunnel_integration_test_scenario.go::TestSshTunnelScenarios`).
 - CI toggles integration-heavy coverage by forcing integration execution in matrix jobs and passing many per-warehouse secrets (`.github/workflows/test.yaml`).
+
+## ACT2-859 — Compatible factory registry extension
+
+- Legacy and option-aware factory registrations are mutually exclusive for each warehouse key: registering either form removes the previous entry of the other form, preserving the registry's last-registration-wins semantics even though construction uses two maps (`sqlconnect/db_factory.go`).
