@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.31.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.30.3...v1.31.0) (2026-09-28)
+
+
+### Features
+
+* **bigquery:** allow caller-supplied client options ([#569](https://github.com/rudderlabs/sqlconnect-go/issues/569)) ([46670cb](https://github.com/rudderlabs/sqlconnect-go/commit/46670cb0331d2e618fa0b021e74fe8fea87247e0))
+
 ## [1.30.3](https://github.com/rudderlabs/sqlconnect-go/compare/v1.30.2...v1.30.3) (2026-09-02)
 
 
