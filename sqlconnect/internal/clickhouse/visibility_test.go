@@ -43,6 +43,14 @@ func TestVisibility_Await(t *testing.T) {
 		withDefaults(sqlconnect.VisibilityPolicy{}))
 }
 
+func TestVisibility_MaxBackoffCapsTheFirstSleep(t *testing.T) {
+	slept := recordSleep(t)
+	p := sqlconnect.VisibilityPolicy{MaxBackoff: 10 * time.Millisecond, Deadline: 100 * time.Millisecond}
+	uuid, err := unitDB(t).AwaitTable(context.Background(), scripted(t, noRow, row("u")), sqlconnect.NewRelationRef("t"), "", p)
+	require.Equal(t, []any{"u", nil}, []any{uuid, err}, "the default initial backoff must not skip the second read")
+	require.Equal(t, []time.Duration{10 * time.Millisecond}, *slept)
+}
+
 func TestVisibility_ReadErrorsAndReferences(t *testing.T) {
 	db := unitDB(t)
 	p := sqlconnect.VisibilityPolicy{InitialBackoff: time.Millisecond, Deadline: time.Second}

@@ -141,7 +141,7 @@ func poll(ctx context.Context, p sqlconnect.VisibilityPolicy, done func(ctx cont
 	p = withDefaults(p)
 	vctx, cancel := context.WithTimeout(ctx, p.Deadline)
 	defer cancel()
-	backoff := p.InitialBackoff
+	backoff := min(p.InitialBackoff, p.MaxBackoff)
 	for {
 		ok, err := done(vctx)
 		switch {
