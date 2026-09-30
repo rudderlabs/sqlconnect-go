@@ -70,12 +70,12 @@ func drainClose(b io.ReadCloser) {
 func parseRetryAfter(v string, now time.Time) time.Duration {
 	v = strings.TrimSpace(v)
 	var d time.Duration
-	if s, err := strconv.ParseInt(v, 10, 64); err == nil {
-		if s > 0 {
+	if v != "" && strings.Trim(v, "0123456789") == "" {
+		if s, err := strconv.ParseInt(v, 10, 64); err == nil {
 			d = time.Duration(min(s, int64(maxRetryAfter/time.Second))) * time.Second
+		} else if errors.Is(err, strconv.ErrRange) {
+			d = maxRetryAfter
 		}
-	} else if errors.Is(err, strconv.ErrRange) && !strings.HasPrefix(v, "-") {
-		d = maxRetryAfter
 	} else if t, err := http.ParseTime(v); err == nil && t.After(now) {
 		d = t.Sub(now)
 	}

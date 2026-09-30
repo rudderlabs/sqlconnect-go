@@ -49,7 +49,7 @@ func TestSQ30_RedirectRefusedUnit(t *testing.T) {
 func TestSQ22_RateLimited(t *testing.T) {
 	for header, want := range map[string]time.Duration{
 		"30": 30 * time.Second, "": 0, "100000000": 5 * time.Minute, "-3": 0, " 7 ": 7 * time.Second,
-		"99999999999999999999999": 5 * time.Minute, "soon": 0,
+		"99999999999999999999999": 5 * time.Minute, "99999999999999999999999garbage": 0, "+7": 0, "soon": 0,
 		time.Unix(1_000_060, 0).UTC().Format(http.TimeFormat): 60 * time.Second,
 		time.Unix(999_000, 0).UTC().Format(http.TimeFormat):   0,
 		time.Unix(9_000_000, 0).UTC().Format(http.TimeFormat): 5 * time.Minute,
