@@ -125,6 +125,11 @@ func TestTrimTerminalSemicolon_Cases(t *testing.T) {
 		"SELECT 1 -- c\n;\n":     "SELECT 1 -- c",
 		"SELECT 1 /* ; */":       "SELECT 1 /* ; */",
 		"SELECT $$;$$ FROM t ; ": "SELECT $$;$$ FROM t",
+		"SELECT 1\ufeff;":        "SELECT 1",
+		"SELECT 1\u200b;\u200b":  "SELECT 1",
+		"SELECT 1\ufeff":         "SELECT 1",
+		"SELECT 1\u200b":         "SELECT 1",
+		" ; ":                    "",
 	} {
 		got, err := chsql.TrimTerminalSemicolon(in)
 		require.NoError(t, err, in)

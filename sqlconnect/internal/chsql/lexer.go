@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"unicode"
 )
 
 type TokenKind int
@@ -414,9 +413,17 @@ func TrimTerminalSemicolon(s string) (string, error) {
 		}
 	}
 	if last >= 0 && toks[last].Kind == Punct && toks[last].Text == ";" {
-		return strings.TrimRightFunc(s[:toks[last].Pos], unicode.IsSpace), nil
+		last--
+		for last >= 0 && toks[last].Kind == Space {
+			last--
+		}
 	}
-	return strings.TrimRightFunc(s, unicode.IsSpace), nil
+	if last < 0 {
+		return "", nil
+	}
+	// Cut at the end of the last token that is not Space, so the trim uses
+	// the lexer's whitespace set, U+FEFF and U+200B included.
+	return s[:toks[last].Pos+len(toks[last].Text)], nil
 }
 
 func isDigit(c byte) bool    { return c >= '0' && c <= '9' }
