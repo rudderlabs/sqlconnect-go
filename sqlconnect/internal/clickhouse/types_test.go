@@ -22,6 +22,7 @@ func TestSQ20_CanonicalLabels(t *testing.T) {
 		"SimpleAggregateFunction(sum, UInt64)": "string", "SimpleAggregateFunction(max, Int32)": "int",
 		"AggregateFunction(uniq, String)": "unsupported", "Variant(String, UInt8)": "unsupported",
 		"Dynamic": "unsupported", "Mystery(1)": "unsupported",
+		"SimpleAggregateFunction": "unsupported", "Nullable": "unsupported", "Array": "unsupported",
 		// Additional cases beyond the plan list.
 		"Array(Tuple(a Map(String, UInt8)))": "unsupported", "Array(Tuple(`a b` UInt8))": "unsupported",
 		"Nullable(Tuple(a UInt8))": "json", "Enum16('a' = -1)": "string", "Decimal(38,10)": "string",
@@ -57,7 +58,9 @@ func TestSQ20_TupleDeclarations(t *testing.T) {
 		"Enum8($$'$$ = 1) ENGINE = Log; --')", "Decimal(18 # c, 4)", "Decimal(18 -- c\n, 4)", "Decimal(18 /* c */, 4)",
 		"Nullable(UInt8 DEFAULT 1)", "Array(UInt8, UInt8)", "Map(String)", "Nullable(Int8, Int8)",
 		"SimpleAggregateFunction(sum)", "", "   ", "8Int", "Tuple()", "Tuple(a)x", "Tuple(`a` )",
-		"Enum8('a\\", "Int8\x00", "Array(Int8)Int8", "Decimal(18,)", "Decimal(,4)", "Tuple(a UInt8 b)",
+		"Enum8('a\\", "Int8\x00", "Enum8('a\\\x00' = 1)",
+		// A container type without its argument list.
+		"SimpleAggregateFunction", "Nullable", "LowCardinality", "Array", "Map", "Tuple", "Nested", "Array(Nullable)", "Array(Int8)Int8", "Decimal(18,)", "Decimal(,4)", "Tuple(a UInt8 b)",
 	} {
 		_, err := parseType(bad)
 		require.Error(t, err, bad)

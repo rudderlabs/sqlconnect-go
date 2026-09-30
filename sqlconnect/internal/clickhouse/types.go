@@ -180,6 +180,10 @@ func (p *typeParser) typeExpr() (chType, error) {
 	p.skipSpace()
 	if p.eof() || p.s[p.i] != '(' {
 		p.i = save
+		switch t.Name {
+		case "Nullable", "LowCardinality", "Array", "Map", "SimpleAggregateFunction", "Tuple", "Nested":
+			return chType{}, errTypeSyntax(t.Name + " needs an argument list")
+		}
 		return t, nil
 	}
 	p.i++
@@ -271,6 +275,9 @@ func (p *typeParser) quoted() (string, error) {
 		case r == '\\':
 			if p.i+1 >= len(p.s) {
 				return "", errTypeSyntax("an unclosed quote")
+			}
+			if p.s[p.i+1] == 0 {
+				return "", errTypeSyntax("NUL in quoted text")
 			}
 			b.WriteRune(p.s[p.i+1])
 			p.i += 2
