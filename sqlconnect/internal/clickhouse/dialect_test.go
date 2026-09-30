@@ -1,6 +1,8 @@
 package clickhouse
 
 import (
+	"database/sql/driver"
+	"errors"
 	"fmt"
 	"math"
 	"testing"
@@ -9,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/goqu/v10"
+	"github.com/rudderlabs/goqu/v10/exp"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
@@ -176,4 +179,57 @@ func TestExpressions_SharedLiteralsAndWeekOverflow(t *testing.T) {
 		_, err := bad()
 		require.Error(t, err)
 	}
+}
+
+type failingValuer struct{}
+
+func (failingValuer) Value() (driver.Value, error) { return nil, errors.New("sentinel-secret") }
+
+// TestWalkIdentifiers_PointersAndBoundedErrors checks that pointers never hide
+// a node from the walker and that no error echoes a caller value.
+func TestWalkIdentifiers_PointersAndBoundedErrors(t *testing.T) {
+	d, _ := sqlconnect.NewDialect("clickhouse", nil)
+	x := d.Expressions()
+	bad := goqu.C("a`b")
+	ptrSlice := &[]any{bad}
+	ptrPtr := &ptrSlice
+	for name, call := range map[string]func() error{
+		"condition":      func() error { _, err := d.QueryCondition("c", "in", ptrSlice); return err },
+		"conditionPtr2":  func() error { _, err := d.QueryCondition("c", "eq", ptrPtr); return err },
+		"conditionArray": func() error { _, err := d.QueryCondition("c", "in", [1]any{bad}); return err },
+		"parse":          func() error { _, err := d.ParseGoquExpression(goqu.C("ok").In(ptrSlice)); return err },
+		"literal":        func() error { _, err := x.Literal("?", ptrSlice); return err },
+		"timestampAdd":   func() error { _, err := x.TimestampAdd(ptrSlice, 1, "day"); return err },
+		"dateAdd":        func() error { _, err := x.DateAdd(ptrSlice, 1, "day"); return err },
+		"opKey":          func() error { _, err := d.ParseGoquExpression(goqu.Ex{"ok": exp.Op{"a`b": 1}}); return err },
+		"funcName":       func() error { _, err := d.ParseGoquExpression(goqu.Func("f(1) FROM t --", 1)); return err },
+	} {
+		err := call()
+		require.Error(t, err, name)
+		requireCode(t, err, "CH_INVALID_IDENTIFIER")
+	}
+	for name, call := range map[string]func() error{
+		"struct": func() error {
+			_, err := d.QueryCondition("c", "eq", struct{ Password string }{"sentinel-secret"})
+			return err
+		},
+		"map": func() error {
+			_, err := d.QueryCondition("c", "eq", map[string]string{"k": "sentinel-secret"})
+			return err
+		},
+		"valuer":      func() error { _, err := d.QueryCondition("c", "eq", failingValuer{}); return err },
+		"valuerParse": func() error { _, err := d.ParseGoquExpression(goqu.C("c").Eq(failingValuer{})); return err },
+		"operator":    func() error { _, err := d.QueryCondition("c", "sentinel-secret", 1); return err },
+		"unit":        func() error { _, err := d.QueryCondition("c", "inlast", 1, "sentinel-secret"); return err },
+		"tsUnit":      func() error { _, err := x.TimestampAdd("now()", 1, "sentinel-secret"); return err },
+	} {
+		err := call()
+		require.Error(t, err, name)
+		requireCode(t, err, "CH_QUERY_INVALID")
+		require.NotContains(t, fmt.Sprintf("%+v", err), "sentinel", name)
+	}
+	var nilTime *time.Time
+	e, err := d.QueryCondition("c", "in", &[]any{1, "x"}, nilTime)
+	require.NoError(t, err)
+	require.Equal(t, "(`c` IN ((1, 'x'), NULL))", e.String())
 }

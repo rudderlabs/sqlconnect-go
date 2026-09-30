@@ -1,12 +1,15 @@
 package clickhouse
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"reflect"
+	"regexp"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/rudderlabs/goqu/v10"
@@ -32,6 +35,8 @@ type dialect struct{ *base.GoquDialect }
 func newDialect() dialect {
 	return dialect{base.NewGoquDialect(DatabaseType, GoquDialectOptions(), GoquExpressions())}
 }
+
+var functionName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 var identEscaper = strings.NewReplacer(`\`, `\\`, "`", "\\`")
 
@@ -215,6 +220,10 @@ func walkIdentifiers(e any, check func(string) error) error {
 	case exp.LiteralExpression:
 		return walkIdentifiers(v.Args(), check)
 	case exp.SQLFunctionExpression:
+		// Goqu writes the function name without quotes or escaping.
+		if !functionName.MatchString(v.Name()) {
+			return cherr.New(cherr.CodeInvalidIdentifier, "function", "a function name must use letters, digits and underscores")
+		}
 		return walkIdentifiers(v.Args(), check)
 	case exp.SQLWindowFunctionExpression:
 		if err := walkIdentifiers(v.Func(), check); err != nil {
@@ -276,7 +285,10 @@ func walkIdentifiers(e any, check func(string) error) error {
 	case exp.ExOr:
 		return walkExMap(v, check)
 	case exp.Op:
-		for _, val := range v {
+		for k, val := range v {
+			if err := check(k); err != nil {
+				return err
+			}
 			if err := walkIdentifiers(val, check); err != nil {
 				return err
 			}
@@ -295,19 +307,42 @@ func walkIdentifiers(e any, check func(string) error) error {
 	case exp.Expression:
 		return cherr.New(cherr.CodeQueryInvalid, "expression", fmt.Sprintf("the driver cannot check a %T node", v))
 	}
-	// Plain values render as escaped literals. Slices can carry nested nodes.
+	return walkValue(e, check)
+}
+
+// walkValue admits the plain values that Goqu renders as escaped literals and
+// walks through pointers, slices and arrays, which can carry nested nodes.
+// Any other kind, such as a struct or a map, is refused: Goqu would format it
+// with its field values, and the walker cannot see inside it.
+func walkValue(e any, check func(string) error) error {
+	switch e.(type) {
+	case time.Time, *time.Time, driver.Valuer:
+		return nil
+	}
 	rv := reflect.ValueOf(e)
-	if rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
-		if rv.Kind() == reflect.Slice && rv.Type().Elem().Kind() == reflect.Uint8 {
-			return nil // []byte
+	switch rv.Kind() {
+	case reflect.Bool, reflect.String,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return nil
+	case reflect.Pointer:
+		if rv.IsNil() {
+			return nil
+		}
+		return walkIdentifiers(rv.Elem().Interface(), check)
+	case reflect.Slice, reflect.Array:
+		if rv.Type().Elem().Kind() == reflect.Uint8 {
+			return nil // []byte and byte arrays
 		}
 		for i := range rv.Len() {
 			if err := walkIdentifiers(rv.Index(i).Interface(), check); err != nil {
 				return err
 			}
 		}
+		return nil
 	}
-	return nil
+	return cherr.New(cherr.CodeQueryInvalid, "expression", "the driver cannot render a value of kind "+rv.Kind().String())
 }
 
 // walkExMap checks the column keys and values of a goqu.Ex or goqu.ExOr map.
@@ -335,19 +370,19 @@ func (d dialect) QueryCondition(identifier, operator string, args ...any) (sqlco
 	if strings.EqualFold(operator, "inlast") {
 		return d.inlast(identifier, args...)
 	}
-	return d.GoquDialect.QueryCondition(identifier, operator, args...)
+	return bounded(d.GoquDialect.QueryCondition(identifier, operator, args...))
 }
 
 // inlast checks the negation and the week multiplication that the base engine
 // performs unchecked.
 func (d dialect) inlast(identifier string, args ...any) (sqlconnect.Expression, error) {
 	if len(args) != 2 {
-		return nil, fmt.Errorf("inlast operator requires exactly two arguments, got %d", len(args))
+		return nil, cherr.New(cherr.CodeQueryInvalid, "inlast", "inlast takes exactly two arguments")
 	}
 	n, ok1 := args[0].(int)
 	unit, ok2 := args[1].(string)
 	if !ok1 || !ok2 {
-		return nil, errors.New("inlast operator requires an integer interval and a string unit")
+		return nil, cherr.New(cherr.CodeQueryInvalid, "inlast", "inlast takes an integer interval and a string unit")
 	}
 	if n == math.MinInt {
 		return nil, errIntervalOverflow()
@@ -360,9 +395,9 @@ func (d dialect) inlast(identifier string, args ...any) (sqlconnect.Expression, 
 		}
 		n, unit = n*7, "day"
 	default:
-		return nil, fmt.Errorf("unsupported unit: %s", unit)
+		return nil, cherr.New(cherr.CodeQueryInvalid, "inlast", "inlast accepts the units day, week, month and year")
 	}
-	return d.GoquDialect.ParseGoquExpression(goqu.C(identifier).Gte(goqu.L(fmt.Sprintf("dateAdd(%s, %d, today())", unit, -n))))
+	return bounded(d.GoquDialect.ParseGoquExpression(goqu.C(identifier).Gte(goqu.L(fmt.Sprintf("dateAdd(%s, %d, today())", unit, -n)))))
 }
 
 func errIntervalOverflow() error {
@@ -382,7 +417,20 @@ func (d dialect) ParseGoquExpression(e sqlconnect.GoquExpression) (sqlconnect.Ex
 	if err := walkIdentifiers(e, validateIdentifier); err != nil {
 		return nil, err
 	}
-	return d.GoquDialect.ParseGoquExpression(e)
+	return bounded(d.GoquDialect.ParseGoquExpression(e))
+}
+
+// bounded replaces a base or Goqu error with a fixed adapter error. Their text
+// can hold the caller's values, for example a struct formatted with %+v.
+func bounded(e sqlconnect.Expression, err error) (sqlconnect.Expression, error) {
+	if err == nil {
+		return e, nil
+	}
+	var ce *cherr.Error
+	if errors.As(err, &ce) {
+		return nil, err
+	}
+	return nil, cherr.New(cherr.CodeQueryInvalid, "expression", "the expression cannot be rendered: check the operator, the argument count, the unit and the value types")
 }
 
 // Expressions returns the dialect itself so that the checked methods apply.
@@ -396,7 +444,7 @@ func (d dialect) TimestampAdd(timeValue any, interval int, unit string) (sqlconn
 	if err := walkIdentifiers(timeValue, validateIdentifier); err != nil {
 		return nil, err
 	}
-	return d.GoquDialect.TimestampAdd(timeValue, interval, unit)
+	return bounded(d.GoquDialect.TimestampAdd(timeValue, interval, unit))
 }
 
 // DateAdd checks the week conversion and the Goqu nodes in the value.
@@ -407,7 +455,7 @@ func (d dialect) DateAdd(dateValue any, interval int, unit string) (sqlconnect.E
 	if err := walkIdentifiers(dateValue, validateIdentifier); err != nil {
 		return nil, err
 	}
-	return d.GoquDialect.DateAdd(dateValue, interval, unit)
+	return bounded(d.GoquDialect.DateAdd(dateValue, interval, unit))
 }
 
 // Literal checks the Goqu nodes in the arguments. The SQL text itself is raw by contract.
@@ -415,5 +463,5 @@ func (d dialect) Literal(sql string, args ...any) (sqlconnect.Expression, error)
 	if err := walkIdentifiers(args, validateIdentifier); err != nil {
 		return nil, err
 	}
-	return d.GoquDialect.Literal(sql, args...)
+	return bounded(d.GoquDialect.Literal(sql, args...))
 }
