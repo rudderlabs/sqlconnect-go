@@ -1,0 +1,527 @@
+{
+  "$comment": "Shared ClickHouse account field cases, catalog LLD section 3.8. rudder-integrations-config owns this file. sqlconnect-go, rudder-sources and rudder-config-backend keep byte-identical copies. Inputs use JSON escapes.",
+  "cases": [
+    {
+      "id": "H01",
+      "field": "host",
+      "input": "ch.example.com",
+      "verdict": "pass"
+    },
+    {
+      "id": "H02",
+      "field": "host",
+      "input": "1password.com",
+      "verdict": "pass"
+    },
+    {
+      "id": "H03",
+      "field": "host",
+      "input": "127.0.0.1",
+      "verdict": "pass"
+    },
+    {
+      "id": "H04",
+      "field": "host",
+      "input": "10.0.0.5",
+      "verdict": "pass"
+    },
+    {
+      "id": "H05",
+      "field": "host",
+      "input": "192.168.1.1",
+      "verdict": "pass"
+    },
+    {
+      "id": "H06",
+      "field": "host",
+      "input": "localhost",
+      "verdict": "pass"
+    },
+    {
+      "id": "H07",
+      "field": "host",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com",
+      "verdict": "pass"
+    },
+    {
+      "id": "H08",
+      "field": "host",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "verdict": "pass"
+    },
+    {
+      "id": "H20",
+      "field": "host",
+      "input": "1.2.3",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H21",
+      "field": "host",
+      "input": "0x7f000001",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H22",
+      "field": "host",
+      "input": "010.0.0.1",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H23",
+      "field": "host",
+      "input": "256.1.1.1",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H24",
+      "field": "host",
+      "input": "::1",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H25",
+      "field": "host",
+      "input": "https://ch.example.com",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H26",
+      "field": "host",
+      "input": "ch.example.com:8443",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H27",
+      "field": "host",
+      "input": "ch.example.com/path",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H28",
+      "field": "host",
+      "input": "user:pw@ch.example.com",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H29",
+      "field": "host",
+      "input": "ch.example.com.",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H30",
+      "field": "host",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example.com",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H31",
+      "field": "host",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H32",
+      "field": "host",
+      "input": "",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H33",
+      "field": "host",
+      "input": "-ch.example.com",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "H34",
+      "field": "host",
+      "input": "1.2.3.4.5",
+      "verdict": "fail",
+      "error": "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
+    },
+    {
+      "id": "N01",
+      "field": "name",
+      "input": "analytics",
+      "verdict": "pass"
+    },
+    {
+      "id": "N02",
+      "field": "name",
+      "input": "_scratch",
+      "verdict": "pass"
+    },
+    {
+      "id": "N03",
+      "field": "name",
+      "input": "Mixed_Case_1",
+      "verdict": "pass"
+    },
+    {
+      "id": "N04",
+      "field": "name",
+      "input": "_rudderstack_ws1",
+      "verdict": "pass"
+    },
+    {
+      "id": "N05",
+      "field": "name",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "verdict": "pass"
+    },
+    {
+      "id": "N20",
+      "field": "name",
+      "input": "my-db",
+      "verdict": "fail",
+      "error": "Use letters, digits and underscores, start with a letter or underscore, at most 128 characters."
+    },
+    {
+      "id": "N21",
+      "field": "name",
+      "input": "analytics.v2",
+      "verdict": "fail",
+      "error": "Use letters, digits and underscores, start with a letter or underscore, at most 128 characters."
+    },
+    {
+      "id": "N22",
+      "field": "name",
+      "input": "1db",
+      "verdict": "fail",
+      "error": "Use letters, digits and underscores, start with a letter or underscore, at most 128 characters."
+    },
+    {
+      "id": "N23",
+      "field": "name",
+      "input": "analyst@example.com",
+      "verdict": "fail",
+      "error": "Use letters, digits and underscores, start with a letter or underscore, at most 128 characters."
+    },
+    {
+      "id": "N24",
+      "field": "name",
+      "input": "a`b",
+      "verdict": "fail",
+      "error": "Use letters, digits and underscores, start with a letter or underscore, at most 128 characters."
+    },
+    {
+      "id": "N25",
+      "field": "name",
+      "input": "a b",
+      "verdict": "fail",
+      "error": "Use letters, digits and underscores, start with a letter or underscore, at most 128 characters."
+    },
+    {
+      "id": "N26",
+      "field": "name",
+      "input": "",
+      "verdict": "fail",
+      "error": "Use letters, digits and underscores, start with a letter or underscore, at most 128 characters."
+    },
+    {
+      "id": "N27",
+      "field": "name",
+      "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "verdict": "fail",
+      "error": "Use letters, digits and underscores, start with a letter or underscore, at most 128 characters."
+    },
+    {
+      "id": "S01",
+      "field": "scratchDatabase",
+      "input": "_rudderstack_ws1",
+      "verdict": "pass",
+      "database": "analytics"
+    },
+    {
+      "id": "S02",
+      "field": "scratchDatabase",
+      "input": "analytics_scratch",
+      "verdict": "pass",
+      "database": "analytics"
+    },
+    {
+      "id": "S20",
+      "field": "scratchDatabase",
+      "input": "analytics",
+      "verdict": "fail",
+      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
+      "database": "analytics",
+      "schemaVerdict": "pass"
+    },
+    {
+      "id": "S21",
+      "field": "scratchDatabase",
+      "input": "ANALYTICS",
+      "verdict": "fail",
+      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
+      "database": "analytics",
+      "schemaVerdict": "pass"
+    },
+    {
+      "id": "S22",
+      "field": "scratchDatabase",
+      "input": "default",
+      "verdict": "fail",
+      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
+      "database": "analytics",
+      "schemaVerdict": "pass"
+    },
+    {
+      "id": "S23",
+      "field": "scratchDatabase",
+      "input": "DEFAULT",
+      "verdict": "fail",
+      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
+      "database": "analytics",
+      "schemaVerdict": "pass"
+    },
+    {
+      "id": "S24",
+      "field": "scratchDatabase",
+      "input": "system",
+      "verdict": "fail",
+      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
+      "database": "analytics",
+      "schemaVerdict": "pass"
+    },
+    {
+      "id": "S25",
+      "field": "scratchDatabase",
+      "input": "System",
+      "verdict": "fail",
+      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
+      "database": "analytics",
+      "schemaVerdict": "pass"
+    },
+    {
+      "id": "S26",
+      "field": "scratchDatabase",
+      "input": "information_schema",
+      "verdict": "fail",
+      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
+      "database": "analytics",
+      "schemaVerdict": "pass"
+    },
+    {
+      "id": "S27",
+      "field": "scratchDatabase",
+      "input": "INFORMATION_SCHEMA",
+      "verdict": "fail",
+      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
+      "database": "analytics",
+      "schemaVerdict": "pass"
+    },
+    {
+      "id": "P01",
+      "field": "password",
+      "input": "p w",
+      "verdict": "pass"
+    },
+    {
+      "id": "P02",
+      "field": "password",
+      "input": "p\u00a0w",
+      "verdict": "pass"
+    },
+    {
+      "id": "P03",
+      "field": "password",
+      "input": "p\u00e4ssw\u00f6rd",
+      "verdict": "pass"
+    },
+    {
+      "id": "P04",
+      "field": "password",
+      "input": "p\ud83d\ude00w",
+      "verdict": "pass"
+    },
+    {
+      "id": "P05",
+      "field": "password",
+      "input": "\ud83d\ude00",
+      "verdict": "pass"
+    },
+    {
+      "id": "P06",
+      "field": "password",
+      "input": "p\u2003w",
+      "verdict": "pass"
+    },
+    {
+      "id": "P07",
+      "field": "password",
+      "input": "\u200bpw",
+      "verdict": "pass"
+    },
+    {
+      "id": "P08",
+      "field": "password",
+      "input": "p\u2028w",
+      "verdict": "pass"
+    },
+    {
+      "id": "P09",
+      "field": "password",
+      "input": "a",
+      "verdict": "pass"
+    },
+    {
+      "id": "P20",
+      "field": "password",
+      "input": "\u00a0pw",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P21",
+      "field": "password",
+      "input": "pw\u00a0",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P22",
+      "field": "password",
+      "input": "\u2003pw",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P23",
+      "field": "password",
+      "input": "pw\u3000",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P24",
+      "field": "password",
+      "input": "\ufeffpw",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P25",
+      "field": "password",
+      "input": " pw",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P26",
+      "field": "password",
+      "input": "pw ",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P27",
+      "field": "password",
+      "input": "p\u0085w",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P28",
+      "field": "password",
+      "input": "p\u009fw",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P29",
+      "field": "password",
+      "input": "p\tw",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P30",
+      "field": "password",
+      "input": "p\u0000w",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P31",
+      "field": "password",
+      "input": "p\u007fw",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P32",
+      "field": "password",
+      "input": "p\rw",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P33",
+      "field": "password",
+      "input": "p\nw",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P34",
+      "field": "password",
+      "input": "",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P35",
+      "field": "password",
+      "input": "\u1680pw",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P36",
+      "field": "password",
+      "input": "pw\u2028",
+      "verdict": "fail",
+      "error": "The password cannot contain control characters or start or end with whitespace."
+    },
+    {
+      "id": "P40",
+      "field": "password",
+      "input": "ab{{cd",
+      "verdict": "pass",
+      "configBackendVerdict": "fail",
+      "configBackendErrorPrefix": "Configuration contains syntax errors"
+    },
+    {
+      "id": "P41",
+      "field": "password",
+      "input": "{{}}",
+      "verdict": "pass",
+      "configBackendVerdict": "fail",
+      "configBackendErrorPrefix": "Configuration contains syntax errors"
+    },
+    {
+      "id": "P42",
+      "field": "password",
+      "input": "env.",
+      "verdict": "pass",
+      "configBackendVerdict": "fail",
+      "configBackendErrorPrefix": "Configuration contains syntax errors"
+    }
+  ]
+}
