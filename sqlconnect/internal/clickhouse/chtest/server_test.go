@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"syscall"
 	"testing"
@@ -24,27 +26,71 @@ func TestFixture_Image(t *testing.T) {
 	require.Panics(t, func() { chtest.Image("latest") }, "an unpinned tag has no image")
 }
 
+func TestFixture_ProxyUpstreamErrorHidesURL(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	closedPort := l.Addr().(*net.TCPAddr).Port
+	require.NoError(t, l.Close())
+
+	p := chtest.NewProxy(t, &chtest.Server{HTTPPort: closedPort}, chtest.ProxyOptions{PlainHTTP: true})
+	q := url.Values{"password": {"pw_Sentinel_1"}, "query": {"SELECT 'lit_Sentinel_2'"}}
+	resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%d/?%s", p.Port(), q.Encode()), "text/plain", strings.NewReader(""))
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadGateway, resp.StatusCode)
+	require.Contains(t, string(b), "upstream request failed")
+	require.NotContains(t, string(b), "Sentinel", "the answer holds no query string")
+	require.Equal(t, "[redacted]", p.Requests()[0].Query.Get("password"))
+}
+
 func TestFixture_ProxyResetModes(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
 	for _, plain := range []bool{true, false} {
 		p := chtest.NewProxy(t, srv, chtest.ProxyOptions{PlainHTTP: plain})
 		scheme := map[bool]string{true: "http", false: "https"}[plain]
 		c := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: srv.CA}}}
-		post := func(body string) error {
-			resp, err := c.Post(fmt.Sprintf("%s://localhost:%d/?query_id=q1", scheme, p.Port()), "text/plain", strings.NewReader(body))
-			if err == nil {
-				_, err = io.ReadAll(resp.Body)
-				_ = resp.Body.Close()
+		post := func(queryID, body string) (string, error) {
+			req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s://localhost:%d/?query_id=%s", scheme, p.Port(), queryID), strings.NewReader(body))
+			require.NoError(t, err)
+			req.SetBasicAuth(srv.AdminUser, srv.AdminPassword)
+			resp, err := c.Do(req)
+			if err != nil {
+				return "", err
 			}
-			return err
+			defer func() { _ = resp.Body.Close() }()
+			b, err := io.ReadAll(resp.Body)
+			if err == nil && resp.StatusCode != http.StatusOK {
+				err = fmt.Errorf("status %d: %s", resp.StatusCode, b)
+			}
+			return string(b), err
 		}
+		// finished counts the server-side completions of a query id.
+		finished := func(queryID string) string {
+			srv.FlushLogs(t)
+			return srv.AdminQuery(t, fmt.Sprintf("SELECT count() FROM system.query_log WHERE query_id = '%s' AND type = 'QueryFinish'", queryID))[0][0]
+		}
+
+		afterID, againID, beforeID := "af-"+scheme, "ok-"+scheme, "bb-"+scheme
 		p.ResetAfterForwardOnce(func(chtest.Request) bool { return true })
-		require.ErrorIs(t, post("SELECT 1"), syscall.ECONNRESET, "%s: reset after the server answered", scheme)
-		require.NoError(t, post("SELECT 1"), "one-shot rules fire once")
-		p.ResetBeforeBodyOnce(func(r chtest.Request) bool { return r.Query.Get("query_id") == "q1" })
-		err := post("SELECT 1 -- " + strings.Repeat("x", 4<<20))
-		require.True(t, errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE), "%s: observed %v", scheme, err)
+		_, err := post(afterID, "SELECT 1")
+		require.ErrorIs(t, err, syscall.ECONNRESET, "%s: reset after the server answered", scheme)
+		require.Equal(t, "1", finished(afterID), "%s: the server ran the statement once before the reset", scheme)
+		body, err := post(againID, "SELECT 1")
+		require.NoError(t, err, "one-shot rules fire once")
+		require.Equal(t, "1\n", body)
+
+		p.ResetBeforeBodyOnce(func(r chtest.Request) bool { return r.Path == "/" && r.Query.Get("query_id") == beforeID })
+		_, err = post(beforeID, "SELECT 1 -- "+strings.Repeat("x", 4<<20))
+		// The client's read loop can see the RST first and close the socket
+		// under the body writer, which then fails with net.ErrClosed.
+		require.True(t, errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) || errors.Is(err, net.ErrClosed), "%s: observed %v", scheme, err)
 		t.Logf("%s reset-before-body observed: %v", scheme, err)
+		require.Equal(t, "0", finished(beforeID), "%s: the server never saw the statement", scheme)
+		body, err = post(beforeID, "SELECT 2")
+		require.NoError(t, err, "%s: the reset-before-body rule fires once", scheme)
+		require.Equal(t, "2\n", body)
 	}
 
 	t.Run("scoped user, injected answers, dropped responses and redacted records", func(t *testing.T) {

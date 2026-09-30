@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
 	"io"
 	"maps"
 	"net"
@@ -26,9 +27,12 @@ type ProxyOptions struct {
 
 // Request is one request the proxy received. Credentials are redacted.
 type Request struct {
-	ConnID     int
-	Query      url.Values
-	SQL        string // the "query" parameter when present, else the body; empty for ResetBeforeBodyOnce matches
+	ConnID int
+	Path   string
+	Query  url.Values
+	// SQL is the "query" parameter when present, else the body; empty for
+	// ResetBeforeBodyOnce matches. It is not redacted, so tests must not log it.
+	SQL        string
 	At         time.Time
 	IdleBefore time.Duration // the idle gap on this connection before the request, 0 for the first one
 	Header     http.Header
@@ -180,7 +184,7 @@ func (p *Proxy) record(req Request) {
 func (p *Proxy) serve(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	ci, _ := r.Context().Value(connKey{}).(*connInfo)
-	req := Request{Query: redactQuery(r.URL.Query()), At: now, Header: redactHeader(r.Header)}
+	req := Request{Path: r.URL.Path, Query: redactQuery(r.URL.Query()), At: now, Header: redactHeader(r.Header)}
 	if ci != nil {
 		req.ConnID = ci.id
 		ci.mu.Lock()
@@ -202,9 +206,9 @@ func (p *Proxy) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBody))
 	if err != nil {
-		http.Error(w, "chtest proxy: read body: "+err.Error(), http.StatusBadGateway)
+		http.Error(w, "chtest proxy: read body failed", http.StatusRequestEntityTooLarge)
 		return
 	}
 	req.SQL = r.URL.Query().Get("query")
@@ -229,7 +233,13 @@ func (p *Proxy) serve(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := p.forward(r, body)
 	if err != nil {
-		http.Error(w, "chtest proxy: upstream: "+err.Error(), http.StatusBadGateway)
+		// The *url.Error text holds the upstream URL with the query string
+		// (password, SQL), so the answer carries only the inner cause.
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			err = ue.Err
+		}
+		http.Error(w, "chtest proxy: upstream request failed: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -270,7 +280,13 @@ func (p *Proxy) serve(w http.ResponseWriter, r *http.Request) {
 var forwardedHeaders = []string{"Authorization", "Content-Type", "Content-Encoding", "Accept-Encoding", "User-Agent"}
 
 func (p *Proxy) forward(r *http.Request, body []byte) (*http.Response, error) {
-	up, err := http.NewRequestWithContext(r.Context(), r.Method, p.upstream+r.URL.RequestURI(), bytes.NewReader(body))
+	// Build the target from the path and query only, so an absolute-form
+	// request line cannot change the upstream host.
+	target := p.upstream + "/" + strings.TrimLeft(r.URL.EscapedPath(), "/")
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	up, err := http.NewRequestWithContext(r.Context(), r.Method, target, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -321,6 +337,9 @@ func tcpOf(c net.Conn) *net.TCPConn {
 }
 
 const redacted = "[redacted]"
+
+// maxBody caps the request body the proxy buffers.
+const maxBody = 256 << 20
 
 // secretHeaders hold credentials; the proxy never records or logs their values.
 var secretHeaders = []string{"Authorization", "X-Clickhouse-Key", "Proxy-Authorization"}
