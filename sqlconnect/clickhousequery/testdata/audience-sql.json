@@ -1,0 +1,257 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "accept_array_join_function_known_limit",
+      "sql": "SELECT arrayJoin(tags) AS t FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT arrayJoin(tags) AS t FROM db.users"
+    },
+    {
+      "name": "accept_array_join_function_name_in_literal",
+      "sql": "SELECT 'ARRAY JOIN' AS s FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT 'ARRAY JOIN' AS s FROM db.users"
+    },
+    {
+      "name": "accept_array_literal_predicate",
+      "sql": "SELECT id FROM db.users WHERE tags = ['a', 'b']",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE tags = ['a', 'b']"
+    },
+    {
+      "name": "accept_ends_in_line_comment",
+      "sql": "SELECT id FROM db.users -- members",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users -- members"
+    },
+    {
+      "name": "accept_final_quoted_column",
+      "sql": "SELECT `FINAL` FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT `FINAL` FROM db.users"
+    },
+    {
+      "name": "accept_format_in_literal",
+      "sql": "SELECT 'FORMAT JSON' AS f FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT 'FORMAT JSON' AS f FROM db.users"
+    },
+    {
+      "name": "accept_function_in_select",
+      "sql": "SELECT lower(email) FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT lower(email) FROM db.users"
+    },
+    {
+      "name": "accept_group_order_partition_by",
+      "sql": "SELECT id, row_number() OVER (PARTITION BY c ORDER BY id) FROM db.users GROUP BY id, c ORDER BY id",
+      "verdict": "accept",
+      "normalized": "SELECT id, row_number() OVER (PARTITION BY c ORDER BY id) FROM db.users GROUP BY id, c ORDER BY id"
+    },
+    {
+      "name": "accept_has_array_function",
+      "sql": "SELECT id FROM db.users WHERE has(tags, 'x')",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE has(tags, 'x')"
+    },
+    {
+      "name": "accept_in_list",
+      "sql": "SELECT id FROM db.users WHERE id IN (1, 2, 3)",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE id IN (1, 2, 3)"
+    },
+    {
+      "name": "accept_in_subquery",
+      "sql": "SELECT id FROM db.users WHERE id IN (SELECT id FROM db.vip)",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE id IN (SELECT id FROM db.vip)"
+    },
+    {
+      "name": "accept_in_table_name",
+      "sql": "SELECT id FROM db.users WHERE id IN db.vip",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE id IN db.vip"
+    },
+    {
+      "name": "accept_plain_limit",
+      "sql": "SELECT id FROM db.users LIMIT 10",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users LIMIT 10"
+    },
+    {
+      "name": "accept_subquery_in_from",
+      "sql": "SELECT s.id FROM (SELECT id FROM db.users) AS s, db.orders AS o",
+      "verdict": "accept",
+      "normalized": "SELECT s.id FROM (SELECT id FROM db.users) AS s, db.orders AS o"
+    },
+    {
+      "name": "accept_trailing_semicolon",
+      "sql": "SELECT id AS member_id FROM db.users;\n",
+      "verdict": "accept",
+      "normalized": "SELECT id AS member_id FROM db.users"
+    },
+    {
+      "name": "refuse_array_join_left_in_cte",
+      "sql": "WITH a AS (SELECT id FROM db.users LEFT ARRAY JOIN tags) SELECT id FROM a",
+      "verdict": "refuse",
+      "clause": "ARRAY JOIN"
+    },
+    {
+      "name": "refuse_array_join_top",
+      "sql": "SELECT id FROM db.users ARRAY JOIN tags",
+      "verdict": "refuse",
+      "clause": "ARRAY JOIN"
+    },
+    {
+      "name": "refuse_final_in_subquery",
+      "sql": "SELECT id FROM (SELECT id FROM db.users FINAL)",
+      "verdict": "refuse",
+      "clause": "FINAL"
+    },
+    {
+      "name": "refuse_final_top",
+      "sql": "SELECT id FROM db.users FINAL",
+      "verdict": "refuse",
+      "clause": "FINAL"
+    },
+    {
+      "name": "refuse_format_in_subquery",
+      "sql": "SELECT id FROM (SELECT id FROM db.users FORMAT JSON)",
+      "verdict": "refuse",
+      "clause": "FORMAT"
+    },
+    {
+      "name": "refuse_format_top",
+      "sql": "SELECT id FROM db.users FORMAT JSON",
+      "verdict": "refuse",
+      "clause": "FORMAT"
+    },
+    {
+      "name": "refuse_into_outfile",
+      "sql": "SELECT id FROM db.users INTO OUTFILE 'x.csv'",
+      "verdict": "refuse",
+      "clause": "INTO OUTFILE"
+    },
+    {
+      "name": "refuse_limit_by_offset_in_subquery",
+      "sql": "SELECT * FROM (SELECT id FROM db.users LIMIT 1 OFFSET 0 BY id)",
+      "verdict": "refuse",
+      "clause": "LIMIT BY"
+    },
+    {
+      "name": "refuse_limit_by_parenthesised_count",
+      "sql": "SELECT id FROM db.users LIMIT (1) BY id",
+      "verdict": "refuse",
+      "clause": "LIMIT BY"
+    },
+    {
+      "name": "refuse_limit_by_top",
+      "sql": "SELECT id FROM db.users LIMIT 1 BY id",
+      "verdict": "refuse",
+      "clause": "LIMIT BY"
+    },
+    {
+      "name": "refuse_multiple_statements",
+      "sql": "SELECT 1; SELECT 2",
+      "verdict": "refuse",
+      "clause": "MULTIPLE STATEMENTS"
+    },
+    {
+      "name": "refuse_prewhere",
+      "sql": "SELECT id FROM db.users PREWHERE id > 1",
+      "verdict": "refuse",
+      "clause": "PREWHERE"
+    },
+    {
+      "name": "refuse_sample",
+      "sql": "SELECT id FROM db.users SAMPLE 0.1",
+      "verdict": "refuse",
+      "clause": "SAMPLE"
+    },
+    {
+      "name": "refuse_settings_in_cte",
+      "sql": "WITH a AS (SELECT id FROM db.users SETTINGS final = 0) SELECT id FROM a",
+      "verdict": "refuse",
+      "clause": "SETTINGS"
+    },
+    {
+      "name": "refuse_settings_in_subquery",
+      "sql": "SELECT * FROM (SELECT id FROM db.users SETTINGS max_threads = 1) s",
+      "verdict": "refuse",
+      "clause": "SETTINGS"
+    },
+    {
+      "name": "refuse_table_function_comma_cte",
+      "sql": "WITH a AS (SELECT u.id FROM db.users AS u, url('https://example.test/x', CSV, 'id UInt64') AS b) SELECT id FROM a",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_comma_subquery",
+      "sql": "SELECT id FROM (SELECT u.id FROM db.users u, s3('https://example.test/x')) s",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_comma_top",
+      "sql": "SELECT a.id FROM db.users AS a, url('https://example.test/', CSV, 'id UInt64') AS b",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_file",
+      "sql": "SELECT id FROM db.users WHERE id IN file('/etc/passwd', CSV, 'id UInt64')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_input",
+      "sql": "SELECT id FROM db.users WHERE id IN input('id UInt64')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_remote",
+      "sql": "SELECT id FROM db.users WHERE id IN remote('h', db.t)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_s3",
+      "sql": "SELECT id FROM db.users WHERE id IN s3('https://attacker.example/x')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_subquery_predicate",
+      "sql": "SELECT id FROM (SELECT id FROM db.users WHERE id IN file('x', CSV, 'id UInt64'))",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_join",
+      "sql": "SELECT a.id FROM db.users a JOIN s3('x') b ON a.id = b.id",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_not_in_url",
+      "sql": "SELECT id FROM db.users WHERE id GLOBAL NOT IN url('https://example.test/x', CSV, 'id UInt64')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_quoted_name",
+      "sql": "SELECT * FROM `remote`('h', db.t)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_url",
+      "sql": "SELECT * FROM url('https://example.test/x', CSV)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    }
+  ]
+}
