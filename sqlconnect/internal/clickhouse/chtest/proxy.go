@@ -85,7 +85,7 @@ func NewProxy(t *testing.T, srv *Server, o ProxyOptions) *Proxy {
 	p := &Proxy{
 		t:        t,
 		upstream: "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(srv.HTTPPort)),
-		client:   &http.Client{Transport: &http.Transport{Proxy: nil, DisableCompression: true}},
+		client:   newLoopbackClient(),
 	}
 	p.srv = httptest.NewUnstartedServer(http.HandlerFunc(p.serve))
 	p.srv.Config.IdleTimeout = o.IdleTimeout

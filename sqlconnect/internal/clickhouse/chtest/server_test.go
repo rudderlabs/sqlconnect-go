@@ -8,8 +8,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 
@@ -43,6 +45,27 @@ func TestFixture_ProxyUpstreamErrorHidesURL(t *testing.T) {
 	require.Contains(t, string(b), "upstream request failed")
 	require.NotContains(t, string(b), "Sentinel", "the answer holds no query string")
 	require.Equal(t, "[redacted]", p.Requests()[0].Query.Get("password"))
+}
+
+func TestFixture_ProxyDoesNotFollowRedirects(t *testing.T) {
+	var elsewhere atomic.Int32
+	other := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { elsewhere.Add(1) }))
+	defer other.Close()
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, other.URL+"/steal", http.StatusTemporaryRedirect)
+	}))
+	defer upstream.Close()
+
+	p := chtest.NewProxy(t, &chtest.Server{HTTPPort: upstream.Listener.Addr().(*net.TCPAddr).Port}, chtest.ProxyOptions{PlainHTTP: true})
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:%d/", p.Port()), strings.NewReader("SELECT 1"))
+	require.NoError(t, err)
+	req.SetBasicAuth("u", "p")
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode, "the proxy passes the redirect back unfollowed")
+	require.Zero(t, elsewhere.Load(), "the redirect target receives no request")
 }
 
 func TestFixture_ProxyResetModes(t *testing.T) {

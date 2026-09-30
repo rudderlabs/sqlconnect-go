@@ -3,7 +3,6 @@
 package chtest
 
 import (
-	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -22,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -184,7 +184,7 @@ func Start(t *testing.T, o Options) *Server {
 		serverCert:    serverCert,
 		pool:          pool,
 		containerID:   res.Container.ID,
-		httpClient:    &http.Client{Transport: &http.Transport{Proxy: nil, DisableCompression: true}},
+		httpClient:    newLoopbackClient(),
 	}
 	t.Cleanup(s.httpClient.CloseIdleConnections)
 
@@ -258,13 +258,6 @@ func (s *Server) AdminExec(t *testing.T, sql string) {
 	_ = s.adminDo(t, sql)
 }
 
-// adminExecSecret is AdminExec for a statement that holds secret, which a
-// failure message must not show.
-func (s *Server) adminExecSecret(t *testing.T, sql, secret string) {
-	t.Helper()
-	_ = s.adminDo(t, sql, secret)
-}
-
 // AdminQuery runs one query as the admin and returns the TSV rows.
 func (s *Server) AdminQuery(t *testing.T, sql string) [][]string {
 	t.Helper()
@@ -283,7 +276,7 @@ func (s *Server) AdminQuery(t *testing.T, sql string) [][]string {
 	return rows
 }
 
-func (s *Server) adminDo(t *testing.T, sql string, secrets ...string) string {
+func (s *Server) adminDo(t *testing.T, sql string) string {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
@@ -296,7 +289,7 @@ func (s *Server) adminDo(t *testing.T, sql string, secrets ...string) string {
 	b, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	if resp.StatusCode != http.StatusOK {
-		require.FailNow(t, "admin statement failed", "status %d: %s", resp.StatusCode, scrub(string(bytes.TrimSpace(b)), append(secrets, s.AdminPassword)...))
+		require.FailNow(t, "admin statement failed", adminFailure(resp.StatusCode, string(b)))
 	}
 	return string(b)
 }
@@ -312,8 +305,8 @@ func (s *Server) FlushLogs(t *testing.T) {
 func (s *Server) CreateScopedUser(t *testing.T, name, password, customerDB, scratchDB string, pruning bool) {
 	t.Helper()
 	user, customer, scratch := quoteIdent(name), quoteIdent(customerDB), quoteIdent(scratchDB)
-	s.adminExecSecret(t, fmt.Sprintf("CREATE USER %s IDENTIFIED WITH sha256_password BY %s", user, quoteString(password)), password)
 	stmts := []string{
+		fmt.Sprintf("CREATE USER %s IDENTIFIED WITH sha256_password BY %s", user, quoteString(password)),
 		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", scratch),
 		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", customer),
 		fmt.Sprintf("GRANT SELECT ON %s.* TO %s", customer, user),
@@ -417,15 +410,32 @@ func randomString(t *testing.T, n int) string {
 	return string(b)
 }
 
-// scrub replaces every non-empty secret in s. ClickHouse error texts can echo
-// statement fragments, such as a password literal.
-func scrub(s string, secrets ...string) string {
-	for _, secret := range secrets {
-		if secret != "" {
-			s = strings.ReplaceAll(s, secret, redacted)
-		}
+var (
+	errorCodeRE = regexp.MustCompile(`Code: (\d+)\.`)
+	errorNameRE = regexp.MustCompile(`\(([A-Z][A-Z0-9_]*)\)`)
+)
+
+// adminFailure describes a failed admin statement by status, server error
+// code and error name only. The exception text can echo SQL literals, such as
+// a password, so it is never shown.
+func adminFailure(status int, body string) string {
+	msg := fmt.Sprintf("status %d", status)
+	if m := errorCodeRE.FindStringSubmatch(body); m != nil {
+		msg += ", code " + m[1]
 	}
-	return s
+	if m := errorNameRE.FindAllStringSubmatch(body, -1); m != nil {
+		msg += ", " + m[len(m)-1][1]
+	}
+	return msg
+}
+
+// newLoopbackClient never follows redirects, so a request and its
+// credentials reach only the address it names.
+func newLoopbackClient() *http.Client {
+	return &http.Client{
+		Transport:     &http.Transport{Proxy: nil, DisableCompression: true},
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
 }
 
 func quoteIdent(s string) string {
