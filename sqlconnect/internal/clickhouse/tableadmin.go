@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 )
 
@@ -121,6 +122,54 @@ ORDER BY position`, ref.Schema, ref.Name)
 	}
 	if len(res) == 0 {
 		return nil, cherr.New(cherr.CodeObjectNotFound, "table", fixedMessages[cherr.CodeObjectNotFound])
+	}
+	return res, nil
+}
+
+// ListColumnsForSqlQuery returns the result columns of an audience query
+// without running it. A zero-row HTTP answer carries no column metadata, so
+// the query goes through DESCRIBE. The query guard runs first and its error
+// returns unchanged, so a refused query sends no request.
+func (db *DB) ListColumnsForSqlQuery(ctx context.Context, q string) ([]sqlconnect.ColumnRef, error) {
+	normalized, err := clickhousequery.CheckAudienceSQL(q)
+	if err != nil {
+		return nil, err
+	}
+	return db.describe(db.readCtx(ctx), poolExec{db.DB.DB}, normalized)
+}
+
+// describe reads the result columns of q through DESCRIBE on ex. It runs no
+// guard: callers pass a query that CheckAudienceSQL accepted. The newlines
+// around q end a trailing line comment before the closing bracket.
+func (db *DB) describe(ctx context.Context, ex sqlconnect.QueryExecutor, q string) ([]sqlconnect.ColumnRef, error) {
+	rows, err := ex.QueryContext(ctx, "DESCRIBE (\n"+q+"\n)")
+	if err != nil {
+		return nil, bound("describe", "", err)
+	}
+	defer func() { _ = rows.Close() }()
+	names, err := rows.Columns()
+	if err != nil {
+		return nil, bound("describe", "", err)
+	}
+	if len(names) < 2 {
+		return nil, cherr.New(cherr.CodeQueryInvalid, "", "describe: the server answer has fewer than two columns")
+	}
+	var res []sqlconnect.ColumnRef
+	for rows.Next() {
+		var c sqlconnect.ColumnRef
+		// name and type, then the other DESCRIBE columns, which are ignored.
+		dest := []any{&c.Name, &c.RawType}
+		for range names[2:] {
+			dest = append(dest, new(sqlconnect.NilAny))
+		}
+		if err := rows.Scan(dest...); err != nil {
+			return nil, bound("describe", "", err)
+		}
+		c.Type = canonicalType(c.RawType)
+		res = append(res, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, bound("describe", "", err)
 	}
 	return res, nil
 }

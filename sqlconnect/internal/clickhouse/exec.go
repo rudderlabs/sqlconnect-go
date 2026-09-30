@@ -38,6 +38,24 @@ func (e driverExec) QueryRowContext(ctx context.Context, q string, args ...any) 
 	return e.conn.QueryRowContext(e.stmt(ctx), q, args...)
 }
 
+// poolExec runs reads on the pool. It refuses ExecContext, so a caller that
+// only needs to read cannot write through it.
+type poolExec struct{ db *sql.DB }
+
+var _ sqlconnect.QueryExecutor = poolExec{}
+
+func (e poolExec) ExecContext(context.Context, string, ...any) (sql.Result, error) {
+	return nil, wrap(cherr.CodeQueryInvalid, "", "the pool read adapter does not run writes", sqlconnect.ErrNotSupported)
+}
+
+func (e poolExec) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
+	return e.db.QueryContext(ctx, q, args...)
+}
+
+func (e poolExec) QueryRowContext(ctx context.Context, q string, args ...any) *sql.Row {
+	return e.db.QueryRowContext(ctx, q, args...)
+}
+
 // withConn runs fn on one connection from the pool under the driver scratch
 // map. Every driver write goes through it: database/sql replays a failed pool
 // statement, and a replayed write could apply twice.

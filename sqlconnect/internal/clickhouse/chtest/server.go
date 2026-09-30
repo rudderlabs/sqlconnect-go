@@ -279,12 +279,18 @@ func (s *Server) AdminQuery(t *testing.T, sql string) [][]string {
 
 func (s *Server) adminDo(t *testing.T, sql string) string {
 	t.Helper()
+	return s.post(t, s.httpClient, s.plainURL("/", url.Values{"default_format": {"TabSeparated"}}), sql)
+}
+
+// post sends sql as the admin to u and returns the body of a 200 answer.
+func (s *Server) post(t *testing.T, client *http.Client, u, sql string) string {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.plainURL("/", url.Values{"default_format": {"TabSeparated"}}), strings.NewReader(sql))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader(sql))
 	require.NoError(t, err)
 	req.SetBasicAuth(s.AdminUser, s.AdminPassword)
-	resp, err := s.httpClient.Do(req)
+	resp, err := client.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	b, err := io.ReadAll(resp.Body)
@@ -511,6 +517,40 @@ func (s *Server) QueryLogKind(t *testing.T, queryID string) string {
 func (s *Server) QueryLogSince(t *testing.T, since time.Time) []QueryLogRow {
 	t.Helper()
 	return s.queryLog(t, "event_time_microseconds >= fromUnixTimestamp64Micro("+strconv.FormatInt(since.UnixMicro(), 10)+")")
+}
+
+// QueryLogLike returns every finished driver statement whose text matches the
+// LIKE pattern.
+func (s *Server) QueryLogLike(t *testing.T, pattern string) []QueryLogRow {
+	t.Helper()
+	return s.queryLog(t, "query LIKE "+quoteString(pattern))
+}
+
+// QueryLogCountLike counts the finished driver statements of one query_kind
+// whose text matches the LIKE pattern.
+func (s *Server) QueryLogCountLike(t *testing.T, pattern, kind string) int {
+	t.Helper()
+	return len(s.queryLog(t, "query LIKE "+quoteString(pattern)+" AND toString(query_kind) = "+quoteString(kind)))
+}
+
+// RawHTTPS runs one statement as the admin over the HTTPS port with the
+// fixture CA and returns the raw response body. It sets no driver settings, so
+// a test can see what the server answers without the driver in between.
+func (s *Server) RawHTTPS(t *testing.T, sql string, q url.Values) string {
+	t.Helper()
+	tr := &http.Transport{
+		Proxy:              nil,
+		DisableCompression: true,
+		TLSClientConfig:    &tls.Config{RootCAs: s.CA, ServerName: s.Host, MinVersion: tls.VersionTLS12},
+		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, network, net.JoinHostPort("127.0.0.1", strconv.Itoa(s.HTTPSPort)))
+		},
+	}
+	defer tr.CloseIdleConnections()
+	client := &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	u := url.URL{Scheme: "https", Host: net.JoinHostPort(s.Host, strconv.Itoa(s.HTTPSPort)), Path: "/", RawQuery: q.Encode()}
+	return s.post(t, client, u.String(), sql)
 }
 
 // LatestHello returns the most recent connection-open query.
