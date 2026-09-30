@@ -257,7 +257,7 @@ func seedSchema(t *testing.T, db *clickhouse.DB, script string) sqlconnect.Schem
 	ctx := context.Background()
 	require.NoError(t, db.CreateSchema(ctx, schema))
 	t.Cleanup(func() { _ = db.DropSchema(context.Background(), schema) })
-	for stmt := range strings.SplitSeq(strings.ReplaceAll(script, "{{.schema}}", schema.Name), ";") {
+	for stmt := range strings.SplitSeq(strings.ReplaceAll(script, "{{.schema}}", db.QuoteIdentifier(schema.Name)), ";") {
 		if stmt = strings.TrimSpace(stmt); stmt != "" {
 			_, err := db.ExecContext(ctx, stmt)
 			require.NoError(t, err, stmt)

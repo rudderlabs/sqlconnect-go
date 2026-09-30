@@ -4,7 +4,14 @@ import (
 	"context"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 )
+
+// optionUnsupported replaces an option validation error, which quotes the
+// caller's value, with a fixed message.
+func optionUnsupported() error {
+	return cherr.New(cherr.CodeInvalidReference, "option", "the listing option is not supported")
+}
 
 // CreateSchema creates a database. The connector never calls it; it serves
 // the shared test suite.
@@ -24,7 +31,7 @@ func (db *DB) CreateSchema(ctx context.Context, schema sqlconnect.SchemaRef) err
 func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sqlconnect.SchemaRef, error) {
 	o, err := sqlconnect.NewFilterOptions(opts...)
 	if err != nil {
-		return nil, err
+		return nil, optionUnsupported()
 	}
 	if o.Catalog != "" {
 		return nil, nil
@@ -56,7 +63,7 @@ ORDER BY name`)
 func (db *DB) SchemaExists(ctx context.Context, schema sqlconnect.SchemaRef, opts ...sqlconnect.Option) (bool, error) {
 	o, err := sqlconnect.NewFilterOptions(opts...)
 	if err != nil {
-		return false, err
+		return false, optionUnsupported()
 	}
 	if o.Catalog != "" {
 		return false, nil

@@ -36,7 +36,7 @@ func (db *DB) CreateTestTable(ctx context.Context, table sqlconnect.RelationRef)
 func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef, opts ...sqlconnect.Option) ([]sqlconnect.RelationRef, error) {
 	o, err := sqlconnect.NewTableListOptions(opts...)
 	if err != nil {
-		return nil, err
+		return nil, optionUnsupported()
 	}
 	if o.Catalog != "" {
 		return nil, nil

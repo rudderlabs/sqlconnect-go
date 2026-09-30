@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +23,7 @@ import (
 )
 
 func stmtCtx(ctx context.Context, m map[string]any, id string) context.Context {
+	m = maps.Clone(m)
 	m["send_progress_in_http_headers"] = 0
 	return clickhousequery.WithStatement(ctx, m, id)
 }
@@ -48,6 +50,19 @@ func TestSQ13_SQ29_StatementSettings(t *testing.T) {
 	short, cancel2 := context.WithTimeout(ctx, 900*time.Millisecond)
 	defer cancel2()
 	sid := run(db, short, map[string]any{})
+	// A sub-second deadline with a map bound of 77 s: the fork keeps the map
+	// value, and the context still ends a slow statement on both paths.
+	for _, e := range []interface {
+		ExecContext(context.Context, string, ...any) (sql.Result, error)
+	}{db, conn} {
+		sctx, scancel := context.WithTimeout(ctx, 900*time.Millisecond)
+		start := time.Now()
+		_, err := e.ExecContext(stmtCtx(sctx, map[string]any{"max_execution_time": 77}, clickhousequery.NewQueryID()), "SELECT sleep(3)")
+		scancel()
+		require.Error(t, err)
+		require.Less(t, time.Since(start), 2500*time.Millisecond, "the deadline ends the request before the statement does")
+		require.Contains(t, []string{"CH_TIMEOUT", "CH_CANCELLED"}, db.ClassifyError(err).Code, "%v", err)
+	}
 	ids := make([]string, 20) // SQ13: concurrent maps do not leak
 	var wg sync.WaitGroup
 	for i := range ids {

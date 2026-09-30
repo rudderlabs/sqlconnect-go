@@ -2,6 +2,8 @@ package clickhouse
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"math"
 	"testing"
 
@@ -59,4 +61,19 @@ func TestReadCtx(t *testing.T) {
 	marked := clickhousequery.WithStatement(context.Background(), map[string]any{"max_threads": 3}, clickhousequery.NewQueryID())
 	require.Equal(t, marked, db.readCtx(marked), "a caller map stays")
 	require.True(t, chctx.Has(db.readCtx(context.Background())), "an unmarked context gets the read map")
+}
+
+func TestOptionErrorsHideCallerValues(t *testing.T) {
+	db := mustDBInternal(t)
+	ctx := context.Background()
+	const secret = "customer-secret"
+	_, e1 := db.ListSchemas(ctx, sqlconnect.WithSchema(secret))
+	_, e2 := db.SchemaExists(ctx, sqlconnect.SchemaRef{Name: "x"}, sqlconnect.WithSchema(secret))
+	_, e3 := db.ListTables(ctx, sqlconnect.SchemaRef{Name: "x"}, sqlconnect.WithSchema(secret))
+	_, e4 := db.ListSchemas(ctx, sqlconnect.WithRelationType(sqlconnect.RelationType(secret)))
+	for _, err := range []error{e1, e2, e3, e4} {
+		requireCode(t, err, "CH_INVALID_REFERENCE")
+		require.NotContains(t, fmt.Sprintf("%v %+v %#v", err, err, err), secret)
+		require.NoError(t, errors.Unwrap(err), "no cause is kept")
+	}
 }
