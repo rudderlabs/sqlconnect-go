@@ -77,3 +77,12 @@ func TestOptionErrorsHideCallerValues(t *testing.T) {
 		require.NoError(t, errors.Unwrap(err), "no cause is kept")
 	}
 }
+
+// An empty schema never defaults to the configured database in schema DDL:
+// DropSchema(SchemaRef{}) must not drop the customer database.
+func TestSchemaDDLRefusesEmptyName(t *testing.T) {
+	db := mustDBInternal(t)
+	ctx := context.Background()
+	requireCode(t, db.CreateSchema(ctx, sqlconnect.SchemaRef{}), "CH_INVALID_REFERENCE")
+	requireCode(t, db.DropSchema(ctx, sqlconnect.SchemaRef{}), "CH_INVALID_REFERENCE")
+}

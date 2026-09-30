@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -103,8 +104,19 @@ func TestSQ31_SQ11_InheritedAdminCarriesScratchMap(t *testing.T) {
 	marker := time.Now()
 	for _, step := range []func() error{
 		func() error { return db.CreateSchema(ctx, schema) },
-		func() error { _, err := db.SchemaExists(ctx, schema); return err },
-		func() error { _, err := db.ListSchemas(ctx); return err },
+		func() error {
+			if ok, err := db.SchemaExists(ctx, schema); err != nil || !ok {
+				return fmt.Errorf("SchemaExists = %v, %v", ok, err)
+			}
+			return nil
+		},
+		func() error {
+			all, err := db.ListSchemas(ctx)
+			if err == nil && !slices.Contains(all, schema) {
+				err = fmt.Errorf("ListSchemas misses %s", schema.Name)
+			}
+			return err
+		},
 		func() error { return db.CreateTestTable(ctx, tbl) },
 		func() error { return db.CreateTestTable(ctx, tbl) }, // SQ11: idempotent, engine checked below
 		func() error {

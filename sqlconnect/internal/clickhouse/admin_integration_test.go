@@ -2,6 +2,7 @@ package clickhouse_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -51,10 +52,13 @@ func TestSQ7_Catalogs(t *testing.T) {
 	s, err := db.ListSchemas(ctx, sqlconnect.WithCatalog(""))
 	require.NoError(t, err)
 	require.NotEmpty(t, s)
-	s, _ = db.ListSchemas(ctx, sqlconnect.WithCatalog("c"))
-	tables, _ := db.ListTables(ctx, sqlconnect.SchemaRef{Name: "default"}, sqlconnect.WithCatalog("c"))
+	s, errS := db.ListSchemas(ctx, sqlconnect.WithCatalog("c"))
+	tables, errT := db.ListTables(ctx, sqlconnect.SchemaRef{Name: "default"}, sqlconnect.WithCatalog("c"))
+	exists, errE := db.SchemaExists(ctx, sqlconnect.SchemaRef{Name: "default"}, sqlconnect.WithCatalog("c"))
+	require.NoError(t, errors.Join(errS, errT, errE))
 	require.Empty(t, s, "a non-empty discovery filter returns an empty result")
 	require.Empty(t, tables)
+	require.False(t, exists)
 	withCat := sqlconnect.RelationRef{Catalog: "c", Schema: "db", Name: "t"}
 	_, errExists := db.TableExists(ctx, withCat)
 	_, errCols := db.ListColumns(ctx, withCat)

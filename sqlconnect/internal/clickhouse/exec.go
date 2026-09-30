@@ -75,11 +75,9 @@ func (db *DB) resolve(ref sqlconnect.RelationRef) (sqlconnect.RelationRef, error
 	return ref, checkComponent(ref.Name)
 }
 
-// resolveSchema is resolve for a database name.
+// resolveSchema checks a database name for schema DDL. An empty name is
+// refused, never defaulted: DropSchema must not reach the customer database.
 func (db *DB) resolveSchema(schema sqlconnect.SchemaRef) (sqlconnect.SchemaRef, error) {
-	if schema.Name == "" {
-		schema.Name = db.cfg.Database
-	}
 	return schema, checkComponent(schema.Name)
 }
 

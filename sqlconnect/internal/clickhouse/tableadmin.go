@@ -41,6 +41,9 @@ func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef, opts 
 	if o.Catalog != "" {
 		return nil, nil
 	}
+	if schema.Name == "" {
+		schema.Name = db.cfg.Database
+	}
 	schema, err = db.resolveSchema(schema)
 	if err != nil {
 		return nil, err
