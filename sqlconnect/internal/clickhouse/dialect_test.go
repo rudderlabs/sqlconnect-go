@@ -283,3 +283,69 @@ func TestWalkIdentifiers_CastsValuersUnsigned(t *testing.T) {
 	require.NoError(t, err, "an invalid NullString resolves to NULL")
 	require.Equal(t, "(`c` IS NULL)", e.String())
 }
+
+type byteValuer uint8
+
+func (b byteValuer) Value() (driver.Value, error) { return goqu.C("a` OR 1=1 --"), nil }
+
+type countingValuer struct {
+	s     string
+	calls *int
+}
+
+func (c countingValuer) Value() (driver.Value, error) {
+	*c.calls++
+	return c.s, nil
+}
+
+// TestWalkIdentifiers_NamedByteSlices covers slices whose element kind is
+// uint8 but whose element type carries its own Value method.
+func TestWalkIdentifiers_NamedByteSlices(t *testing.T) {
+	d, _ := sqlconnect.NewDialect("clickhouse", nil)
+	_, err := d.QueryCondition("c", "in", []byteValuer{1})
+	require.Error(t, err)
+	requireCode(t, err, "CH_QUERY_INVALID")
+	_, err = d.QueryCondition("c", "in", [1]byteValuer{1})
+	require.Error(t, err)
+	requireCode(t, err, "CH_QUERY_INVALID")
+
+	e, err := d.QueryCondition("c", "eq", []byte("x"))
+	require.NoError(t, err, "a plain []byte stays a value")
+	require.Equal(t, "(`c` = 'x')", e.String())
+}
+
+// TestExpressions_ValuerStringsStayLiterals proves that a string produced by
+// a driver.Valuer renders as an escaped literal, not as raw SQL.
+func TestExpressions_ValuerStringsStayLiterals(t *testing.T) {
+	d, _ := sqlconnect.NewDialect("clickhouse", nil)
+	x := d.Expressions()
+	payload := "now()) + (SELECT 1"
+	for want, call := range map[string]func() (sqlconnect.Expression, error){
+		"dateAdd(day, 1, parseDateTime64BestEffort('now()) + (SELECT 1', 9, 'UTC'))": func() (sqlconnect.Expression, error) {
+			return x.TimestampAdd(sql.NullString{String: payload, Valid: true}, 1, "day")
+		},
+		"dateAdd(day, 1, toDate(parseDateTime64BestEffort('now()) + (SELECT 1', 9, 'UTC')))": func() (sqlconnect.Expression, error) {
+			return x.DateAdd(sql.NullString{String: payload, Valid: true}, 1, "day")
+		},
+		"dateAdd(day, 1, parseDateTime64BestEffort('it\\'s', 9, 'UTC'))": func() (sqlconnect.Expression, error) {
+			return x.TimestampAdd(sql.NullString{String: "it's", Valid: true}, 1, "day")
+		},
+		"dateAdd(minute, 2, now64(9, 'UTC'))": func() (sqlconnect.Expression, error) {
+			return x.TimestampAdd("now()", 2, "minute") // a direct string stays raw SQL by contract
+		},
+	} {
+		e, err := call()
+		require.NoError(t, err, want)
+		require.Equal(t, want, e.String())
+	}
+
+	for name, call := range map[string]func(v driver.Valuer) (sqlconnect.Expression, error){
+		"timestampAdd": func(v driver.Valuer) (sqlconnect.Expression, error) { return x.TimestampAdd(v, 1, "day") },
+		"dateAdd":      func(v driver.Valuer) (sqlconnect.Expression, error) { return x.DateAdd(v, 1, "day") },
+	} {
+		calls := 0
+		_, err := call(countingValuer{s: "2021-01-01", calls: &calls})
+		require.NoError(t, err, name)
+		require.Equal(t, 1, calls, name+": Value runs once")
+	}
+}

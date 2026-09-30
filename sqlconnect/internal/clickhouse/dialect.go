@@ -350,8 +350,8 @@ func walkValue(e any, check func(string) error) error {
 		}
 		return walkIdentifiers(rv.Elem().Interface(), check)
 	case reflect.Slice, reflect.Array:
-		if rv.Type().Elem().Kind() == reflect.Uint8 {
-			return nil // []byte and byte arrays
+		if rv.Type().Elem() == reflect.TypeFor[byte]() {
+			return nil // []byte and byte arrays; a named element type can carry a Value method
 		}
 		for i := range rv.Len() {
 			if err := walkIdentifiers(rv.Index(i).Interface(), check); err != nil {
@@ -515,12 +515,8 @@ func (d dialect) TimestampAdd(timeValue any, interval int, unit string) (sqlconn
 	if err := checkedWeeks(interval, unit); err != nil {
 		return nil, err
 	}
-	resolved, err := resolveValuers([]any{timeValue})
+	timeValue, err := resolveTimeValue(timeValue)
 	if err != nil {
-		return nil, err
-	}
-	timeValue = resolved[0]
-	if err := walkIdentifiers(timeValue, validateIdentifier); err != nil {
 		return nil, err
 	}
 	return bounded(d.GoquDialect.TimestampAdd(timeValue, interval, unit))
@@ -531,15 +527,31 @@ func (d dialect) DateAdd(dateValue any, interval int, unit string) (sqlconnect.E
 	if err := checkedWeeks(interval, unit); err != nil {
 		return nil, err
 	}
-	resolved, err := resolveValuers([]any{dateValue})
+	dateValue, err := resolveTimeValue(dateValue)
 	if err != nil {
 		return nil, err
 	}
-	dateValue = resolved[0]
-	if err := walkIdentifiers(dateValue, validateIdentifier); err != nil {
+	return bounded(d.GoquDialect.DateAdd(dateValue, interval, unit))
+}
+
+// resolveTimeValue resolves a driver.Valuer once and checks the Goqu nodes in
+// the result. The base engine renders a string argument as raw SQL, which is
+// the contract for a direct string. A string from a Valuer is data, so it
+// renders as an escaped literal that ClickHouse parses as a timestamp.
+func resolveTimeValue(v any) (any, error) {
+	_, fromValuer := v.(driver.Valuer)
+	resolved, err := resolveValuers([]any{v})
+	if err != nil {
 		return nil, err
 	}
-	return bounded(d.GoquDialect.DateAdd(dateValue, interval, unit))
+	v = resolved[0]
+	if err := walkIdentifiers(v, validateIdentifier); err != nil {
+		return nil, err
+	}
+	if s, ok := v.(string); ok && fromValuer {
+		return goqu.L("parseDateTime64BestEffort(?, 9, 'UTC')", s), nil
+	}
+	return v, nil
 }
 
 // Literal checks the Goqu nodes in the arguments. The SQL text itself is raw by contract.
