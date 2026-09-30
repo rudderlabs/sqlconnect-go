@@ -102,6 +102,18 @@ func TestSQ31_SQ11_InheritedAdminCarriesScratchMap(t *testing.T) {
 	tbl := sqlconnect.NewRelationRef("t", sqlconnect.WithSchema(schema.Name))
 	renamed := sqlconnect.NewRelationRef("t2", sqlconnect.WithSchema(schema.Name))
 	marker := time.Now()
+	wantCount := func(want int) error {
+		if n, err := db.CountTableRows(ctx, tbl); err != nil || n != want {
+			return fmt.Errorf("CountTableRows = %d, %v; want %d", n, err, want)
+		}
+		return nil
+	}
+	wantExists := func(ref sqlconnect.RelationRef, want bool) error {
+		if ok, err := db.TableExists(ctx, ref); err != nil || ok != want {
+			return fmt.Errorf("TableExists(%s) = %v, %v; want %v", ref.Name, ok, err, want)
+		}
+		return nil
+	}
 	for _, step := range []func() error{
 		func() error { return db.CreateSchema(ctx, schema) },
 		func() error {
@@ -128,12 +140,26 @@ func TestSQ31_SQ11_InheritedAdminCarriesScratchMap(t *testing.T) {
 		func() error { _, err := db.ListTables(ctx, schema); return err },
 		func() error { _, err := db.TableExists(ctx, tbl); return err },
 		func() error { _, err := db.ListColumns(ctx, tbl); return err },
-		func() error { _, err := db.CountTableRows(ctx, tbl); return err },
+		func() error {
+			_, err := db.ExecContext(ctx, "INSERT INTO "+db.QuoteTable(tbl)+" VALUES (1, 'a'), (2, 'b')")
+			return err
+		},
+		func() error { return wantCount(2) },
 		func() error { return db.TruncateTable(ctx, tbl) },
+		func() error { return wantCount(0) },
 		func() error { return db.RenameTable(ctx, tbl, renamed) },
+		func() error { return wantExists(tbl, false) },
+		func() error { return wantExists(renamed, true) },
 		func() error { return db.DropTable(ctx, renamed) },
+		func() error { return wantExists(renamed, false) },
 		func() error { _, err := db.GetRowCountForQuery(ctx, "SELECT 2"); return err },
 		func() error { return db.DropSchema(ctx, schema) },
+		func() error {
+			if ok, err := db.SchemaExists(ctx, schema); err != nil || ok {
+				return fmt.Errorf("SchemaExists after drop = %v, %v", ok, err)
+			}
+			return nil
+		},
 	} {
 		require.NoError(t, step())
 	}
