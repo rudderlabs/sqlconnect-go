@@ -20,6 +20,7 @@ import (
 	"github.com/rudderlabs/rudder-go-kit/testhelper/rand"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chpolicy"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/clickhouse"
@@ -272,4 +273,101 @@ func orDefault(v, def string) string {
 		return def
 	}
 	return v
+}
+
+// openFloorTZ opens an admin DB on a pinned 26.3 server that runs in tz.
+func openFloorTZ(t *testing.T, tz string) *clickhouse.DB {
+	t.Helper()
+	return openAdmin(t, chtest.Start(t, chtest.Options{Tag: "26.3", Timezone: tz}))
+}
+
+// queryJSONErr runs q through the JSON mapper and returns every row as JSON,
+// or the first error.
+func queryJSONErr(db *clickhouse.DB, q string) ([]json.RawMessage, error) {
+	ch, leave := sqlconnect.QueryJSONAsync(context.Background(), db, q)
+	defer leave()
+	var rows []json.RawMessage
+	for v := range ch {
+		if v.Err != nil {
+			return nil, v.Err
+		}
+		rows = append(rows, v.Value)
+	}
+	return rows, nil
+}
+
+// queryJSON is queryJSONErr that fails the test on an error.
+func queryJSON(t *testing.T, db *clickhouse.DB, q string) []json.RawMessage {
+	t.Helper()
+	rows, err := queryJSONErr(db, q)
+	require.NoError(t, err, q)
+	return rows
+}
+
+// queryJSONMaps decodes every row with UseNumber, so numbers keep their text.
+func queryJSONMaps(t *testing.T, db *clickhouse.DB, q string) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	for _, raw := range queryJSON(t, db, q) {
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.UseNumber()
+		m := map[string]any{}
+		require.NoError(t, dec.Decode(&m))
+		out = append(out, m)
+	}
+	return out
+}
+
+// queryJSONMap returns the only row of q.
+func queryJSONMap(t *testing.T, db *clickhouse.DB, q string) map[string]any {
+	t.Helper()
+	rows := queryJSONMaps(t, db, q)
+	require.Len(t, rows, 1, q)
+	return rows[0]
+}
+
+// createTable creates a MergeTree table with columns in a fresh schema and
+// runs each seed statement with {{t}} replaced by the quoted table name.
+func createTable(t *testing.T, db *clickhouse.DB, columns, orderBy string, seeds ...string) sqlconnect.RelationRef {
+	t.Helper()
+	ref := createTableWith(t, db, nil, "CREATE TABLE {{t}} ("+columns+") ENGINE = MergeTree ORDER BY "+orderBy)
+	for _, s := range seeds {
+		_, err := db.ExecContext(context.Background(), strings.ReplaceAll(s, "{{t}}", db.QuoteTable(ref)))
+		require.NoError(t, err, s)
+	}
+	return ref
+}
+
+// createNestedTable creates k UInt8, n Nested(id UInt256, label Nullable(String))
+// with flatten_nested on the CREATE. Row 1 holds (1,'x') and (big,NULL); row 2
+// is empty.
+func createNestedTable(t *testing.T, db *clickhouse.DB, flatten int, big string) sqlconnect.RelationRef {
+	t.Helper()
+	ref := createTableWith(t, db, map[string]any{"flatten_nested": flatten},
+		"CREATE TABLE {{t}} (k UInt8, n Nested(id UInt256, label Nullable(String))) ENGINE = MergeTree ORDER BY k")
+	insert := "INSERT INTO {{t}} VALUES (1, [(1, 'x'), (" + big + ", NULL)]), (2, [])"
+	if flatten == 1 {
+		insert = "INSERT INTO {{t}} (k, `n.id`, `n.label`) VALUES (1, [1, " + big + "], ['x', NULL]), (2, [], [])"
+	}
+	_, err := db.ExecContext(context.Background(), strings.ReplaceAll(insert, "{{t}}", db.QuoteTable(ref)))
+	require.NoError(t, err, insert)
+	return ref
+}
+
+// createTableWith runs create in a fresh schema, with settings on the
+// statement when settings is not nil.
+func createTableWith(t *testing.T, db *clickhouse.DB, settings map[string]any, create string) sqlconnect.RelationRef {
+	t.Helper()
+	schema := seedSchema(t, db, "")
+	ref := sqlconnect.NewRelationRef("t_"+strings.ToLower(rand.String(8)), sqlconnect.WithSchema(schema.Name))
+	ctx := context.Background()
+	if settings != nil {
+		ctx = stmtCtx(ctx, settings, clickhousequery.NewQueryID())
+	}
+	conn, err := db.Conn(ctx)
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
+	_, err = conn.ExecContext(ctx, strings.ReplaceAll(create, "{{t}}", db.QuoteTable(ref)))
+	require.NoError(t, err, create)
+	return ref
 }
