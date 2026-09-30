@@ -1,7 +1,6 @@
 package util
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 )
@@ -158,13 +157,16 @@ func EmbeddedIPv4(ip net.IP) []net.IP {
 	case nat64WellKnown.Contains(b):
 		return []net.IP{net.IPv4(b[12], b[13], b[14], b[15])}
 	case nat64Local.Contains(b):
-		// RFC 6052: a /96 translator prefix leaves bytes 6-11 zero and puts the
-		// address in bytes 12-15. The /48 layout uses bytes 6-7 and 9-10; byte 8
-		// is the reserved "u" octet.
-		if bytes.Equal(b[6:12], make([]byte, 6)) {
-			return []net.IP{net.IPv4(b[12], b[13], b[14], b[15])}
+		// RFC 8215 lets an operator use any RFC 6052 prefix length inside this
+		// /48, and the address alone does not say which one. Return the reading
+		// of every layout that fits (/48, /56, /64, /96); the caller refuses the
+		// address when any reading is refused. Byte 8 is the reserved "u" octet.
+		return []net.IP{
+			net.IPv4(b[6], b[7], b[9], b[10]),
+			net.IPv4(b[7], b[9], b[10], b[11]),
+			net.IPv4(b[9], b[10], b[11], b[12]),
+			net.IPv4(b[12], b[13], b[14], b[15]),
 		}
-		return []net.IP{net.IPv4(b[6], b[7], b[9], b[10])}
 	case sixToFour.Contains(b):
 		return []net.IP{net.IPv4(b[2], b[3], b[4], b[5])}
 	case teredo.Contains(b):
