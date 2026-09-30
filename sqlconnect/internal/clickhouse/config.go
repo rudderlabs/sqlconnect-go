@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"regexp"
 	"slices"
@@ -39,6 +40,8 @@ const (
 	documentErr = "the account configuration is not valid"
 )
 
+const redactedPassword = "[REDACTED]"
+
 // hostMaxLen is the account schema maxLength of host.
 const hostMaxLen = 253
 
@@ -50,11 +53,17 @@ var (
 	// The catalog LLD password pattern, character for character. It lists
 	// every character, because RE2 and JavaScript disagree on \s and \p{...}.
 	passwordPattern = regexp.MustCompile("^[^\\x00-\\x20\\x7F-\\xA0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]([^\\x00-\\x1F\\x7F-\\x9F]*[^\\x00-\\x20\\x7F-\\xA0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff])?$")
-	// keyPattern bounds an unknown key before it goes into an error field.
-	keyPattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)
 )
 
 var accountKeys = []string{"host", "port", "database", "user", "password", "secure", "skipVerify", "scratchDatabase"}
+
+// excludedKeys are options that other drivers or older drafts accept. An error
+// names one of them; any other unknown key stays unnamed, because a key can
+// carry a pasted secret.
+var excludedKeys = []string{
+	"protocol", "nativePort", "caCertificate", "tunnel_info", "sshHost", "cluster", "settings",
+	"timeout", "allowLoopback", "allowPlainHTTP", "skipHostValidation",
+}
 
 func invalid(field, detail string) error { return cherr.New(cherr.CodeConfigInvalid, field, detail) }
 
@@ -122,7 +131,7 @@ func checkKeys(raw json.RawMessage) (map[string]bool, error) {
 		}
 		key, _ := tok.(string)
 		if !slices.Contains(accountKeys, key) {
-			if !keyPattern.MatchString(key) {
+			if !slices.Contains(excludedKeys, key) {
 				key = ""
 			}
 			return nil, invalid(key, "unknown field")
@@ -146,6 +155,20 @@ func checkKeys(raw json.RawMessage) (map[string]bool, error) {
 		return nil, invalid("", documentErr)
 	}
 	return present, nil
+}
+
+// String redacts the password, so %v and %+v never print it.
+func (c Config) String() string {
+	c.Password = redactedPassword
+	type plain Config
+	return fmt.Sprintf("%+v", plain(c))
+}
+
+// GoString redacts the password, so %#v never prints it.
+func (c Config) GoString() string {
+	c.Password = redactedPassword
+	type plain Config
+	return fmt.Sprintf("%#v", plain(c))
 }
 
 // PortOrDefault maps an omitted port to DefaultPort, like the account schema default.

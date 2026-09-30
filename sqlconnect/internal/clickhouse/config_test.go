@@ -2,6 +2,7 @@ package clickhouse_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -73,8 +74,8 @@ func TestSQ2_CredentialContract(t *testing.T) {
 		"host with port":        {func(m map[string]any) { m["host"] = "h.example.com:8443" }, "host"},
 		"ipv6 literal":          {func(m map[string]any) { m["host"] = "::1" }, "host"},
 		"host 254 chars":        {func(m map[string]any) { m["host"] = strings.Repeat("a.", 126) + "ab" }, "host"},
-		"key case differs":      {func(m map[string]any) { m["Secure"] = false }, "Secure"},
-		"key case only":         {func(m map[string]any) { delete(m, "host"); m["HOST"] = "ch.example.com" }, "HOST"},
+		"key case differs":      {func(m map[string]any) { m["Secure"] = false }, ""},
+		"key case only":         {func(m map[string]any) { delete(m, "host"); m["HOST"] = "ch.example.com" }, ""},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := clickhouse.ParseConfigForTest(validJSON(tc.mut), false)
@@ -127,6 +128,7 @@ func TestSQ2_ErrorsNeverEchoValues(t *testing.T) {
 		"database":   func(m map[string]any) { m["database"] = sentinel + "-x" },
 		"long key":   func(m map[string]any) { m[strings.Repeat("k", 200)+sentinel] = "x" },
 		"odd key":    func(m map[string]any) { m["pw="+sentinel] = "x" },
+		"short key":  func(m map[string]any) { m[sentinel] = "x" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := clickhouse.ParseConfigForTest(validJSON(mut), false)
@@ -136,6 +138,19 @@ func TestSQ2_ErrorsNeverEchoValues(t *testing.T) {
 			require.NotContains(t, d.Field, sentinel)
 		})
 	}
+}
+
+func TestConfig_FormatRedactsPassword(t *testing.T) {
+	const sentinel = "Sentinel_Password_42"
+	cfg, err := clickhouse.ParseConfigForTest(validJSON(func(m map[string]any) { m["password"] = sentinel }), false)
+	require.NoError(t, err)
+	for _, verb := range []string{"%v", "%+v", "%#v", "%s"} {
+		out := fmt.Sprintf(verb, cfg)
+		require.NotContains(t, out, sentinel, verb)
+		require.Contains(t, out, "ch.example.com", verb)
+		require.NotContains(t, fmt.Sprintf(verb, &cfg), sentinel, verb)
+	}
+	require.Equal(t, sentinel, cfg.Password, "formatting never changes the value")
 }
 
 func TestSQ6_ExcludedConfiguration(t *testing.T) {
