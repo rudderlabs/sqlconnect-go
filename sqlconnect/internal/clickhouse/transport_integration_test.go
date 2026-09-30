@@ -178,8 +178,17 @@ func TestSQ27_TransportOptions(t *testing.T) {
 	t.Setenv("HTTPS_PROXY", fakeProxy.URL)
 	t.Setenv("HTTP_PROXY", fakeProxy.URL)
 	t.Setenv("NO_PROXY", "")
+	// Go never proxies localhost, so the test dials rebind.test (a SAN of the
+	// fixture certificate) through a loopback resolver. net/http reads the
+	// proxy variables once per process, so the Proxy == nil check below is the
+	// check that does not depend on test order.
 	p := chtest.NewProxy(t, srv, chtest.ProxyOptions{IdleTimeout: 10 * time.Second})
-	db := openVia(t, srv, p, true)
+	cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", "scratch_db", true), "rebind.test", p.Port())
+	db, err := clickhouse.NewDBForTestWith(cfg, clickhouse.TestEnv{
+		Policy: chpolicy.Policy{AllowLoopback: true}, Roots: srv.CA, Resolver: staticResolver{"rebind.test": "127.0.0.1"},
+	})
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
 	conn, err := db.Conn(context.Background())
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
