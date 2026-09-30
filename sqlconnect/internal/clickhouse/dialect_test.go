@@ -1,0 +1,179 @@
+package clickhouse
+
+import (
+	"fmt"
+	"math"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/goqu/v10"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+)
+
+func TestSQ8_QuoteAndParse(t *testing.T) {
+	d, err := sqlconnect.NewDialect("clickhouse", nil) // no credentials needed
+	require.NoError(t, err)
+	require.Equal(t, []string{"`a\\`b`", "`a\\\\b`", "`Ünï.cödé x`", "MixedCase", "`Db`.`T`"}, []string{
+		d.QuoteIdentifier("a`b"), d.QuoteIdentifier(`a\b`),
+		d.QuoteIdentifier("Ünï.cödé x"),
+		newDialect().FormatTableName("MixedCase"), // the interface method is deprecated
+		d.QuoteTable(sqlconnect.RelationRef{Catalog: "c", Schema: "Db", Name: "T"}),
+	})
+	require.Equal(t, "MixedCase", d.NormaliseIdentifier("MixedCase"))
+	for in, want := range map[string]sqlconnect.RelationRef{
+		"events": {Name: "events"}, "Analytics.Events": {Schema: "Analytics", Name: "Events"},
+		"`Analytics`.`Events`": {Schema: "Analytics", Name: "Events"}, `"Analytics"."Events"`: {Schema: "Analytics", Name: "Events"},
+		"`db.with.dot`.`t.dot`": {Schema: "db.with.dot", Name: "t.dot"}, "`a\\`b`.`c\\\\d`": {Schema: "a`b", Name: `c\d`},
+		"`a``b`": {Name: "a`b"}, `"x""y".z`: {Schema: `x"y`, Name: "z"}, "`Ünï cödé`": {Name: "Ünï cödé"},
+	} {
+		got, err := d.ParseRelationRef(in)
+		require.NoError(t, err, in)
+		require.Equal(t, []string{want.Schema, want.Name, ""}, []string{got.Schema, got.Name, got.Catalog}, in)
+		// A parsed reference quotes back to text that parses to the same reference.
+		again, err := d.ParseRelationRef(d.QuoteTable(got))
+		require.NoError(t, err, in)
+		require.Equal(t, got, again, in)
+	}
+	for _, bad := range []string{
+		"catalog.database.table", "a..b", "`open", "a.b c", ".a", "a.", "", "``", "`a`b", "a`b", `a"b`,
+		"`a\\", "a b", " a", "a\x00b", "`a\x00b`", "`a`.`b`.`c`",
+	} {
+		_, err := d.ParseRelationRef(bad)
+		requireCode(t, err, "CH_INVALID_REFERENCE")
+	}
+}
+
+func TestExpressions_Operators(t *testing.T) {
+	d, _ := sqlconnect.NewDialect("clickhouse", nil)
+	for _, c := range []struct {
+		op   string
+		args []any
+		want string
+	}{
+		{"eq", []any{"x"}, "(`c` = 'x')"},
+		{"neq", []any{1}, "(`c` != 1)"},
+		{"in", []any{1, 2}, "(`c` IN (1, 2))"},
+		{"nin", []any{1}, "(`c` NOT IN (1))"},
+		{"gt", []any{1}, "(`c` > 1)"},
+		{"gte", []any{1}, "(`c` >= 1)"},
+		{"lt", []any{1}, "(`c` < 1)"},
+		{"lte", []any{1}, "(`c` <= 1)"},
+		{"like", []any{"a%"}, "(`c` LIKE 'a%')"},
+		{"nlike", []any{"a%"}, "(`c` NOT LIKE 'a%')"},
+		{"btw", []any{1, 2}, "(`c` BETWEEN 1 AND 2)"},
+		{"nbtw", []any{1, 2}, "(`c` NOT BETWEEN 1 AND 2)"},
+		{"null", nil, "(`c` IS NULL)"},
+		{"nnull", nil, "(`c` IS NOT NULL)"},
+		{"inlast", []any{3, "day"}, "(`c` >= dateAdd(day, -3, today()))"},
+		{"inlast", []any{2, "week"}, "(`c` >= dateAdd(day, -14, today()))"},
+		{"eq", []any{`it's \ x`}, `(` + "`c`" + ` = 'it\'s \\ x')`},
+	} {
+		e, err := d.QueryCondition("c", c.op, c.args...)
+		require.NoError(t, err, c.op)
+		require.Equal(t, c.want, e.String(), c.op)
+	}
+	for _, bad := range []string{"a`b", `a\b`, "a\x00b", ""} {
+		_, err := d.QueryCondition(bad, "eq", 1)
+		requireCode(t, err, "CH_INVALID_IDENTIFIER")
+	}
+}
+
+func TestInlast_CheckedArithmeticAndUnsafeNodes(t *testing.T) {
+	d, _ := sqlconnect.NewDialect("clickhouse", nil)
+	for _, in := range []struct {
+		n    int
+		unit string
+	}{{math.MinInt, "day"}, {math.MaxInt/7 + 1, "week"}, {-(math.MaxInt/7 + 1), "week"}, {3, "hour"}} {
+		_, err := d.QueryCondition("c", "inlast", in.n, in.unit)
+		require.Error(t, err, "%d %s", in.n, in.unit)
+	}
+	e, err := d.QueryCondition("c", "inlast", math.MaxInt, "day")
+	require.NoError(t, err, "MaxInt negates safely")
+	require.Contains(t, e.String(), fmt.Sprintf("-%d", math.MaxInt))
+	x, _ := newDialect().GoquDialect.ParseGoquExpression(goqu.I("x`y")) // the base parser does not validate
+	_, err = d.QueryCondition("c", "eq", x)
+	requireCode(t, err, "CH_INVALID_IDENTIFIER")
+	_, err = d.ParseGoquExpression(goqu.I("db.t\\x"))
+	requireCode(t, err, "CH_INVALID_IDENTIFIER")
+}
+
+// TestWalkIdentifiers_NestedNodes checks that identifiers nested in every
+// supported goqu node are validated, and that nodes the walker cannot inspect
+// are refused rather than rendered unchecked.
+func TestWalkIdentifiers_NestedNodes(t *testing.T) {
+	d, _ := sqlconnect.NewDialect("clickhouse", nil)
+	bad := goqu.C("a`b")
+	for name, e := range map[string]goqu.Expression{
+		"and":       goqu.And(goqu.C("ok").Eq(1), bad.Eq(1)),
+		"alias":     goqu.C("ok").As("x`y"),
+		"func":      goqu.Func("lower", bad),
+		"cast":      goqu.Cast(bad, "String"),
+		"literal":   goqu.L("? + 1", bad),
+		"range":     goqu.C("ok").Between(goqu.Range(1, bad)),
+		"in":        goqu.C("ok").In(1, bad),
+		"ex":        goqu.Ex{"a`b": 1},
+		"exValue":   goqu.Ex{"ok": bad},
+		"exOr":      goqu.ExOr{"a\\b": 1},
+		"case":      goqu.Case().When(bad.Eq(1), 1),
+		"caseElse":  goqu.Case().When(goqu.C("ok").Eq(1), 1).Else(bad),
+		"order":     goqu.Func("f", bad.Asc()),
+		"table":     goqu.T("t`x").Col("c"),
+		"schema":    goqu.S("s\x00").Table("t"),
+		"bitwise":   bad.BitwiseAnd(1),
+		"window":    goqu.Func("row_number").Over(goqu.W().PartitionBy(bad)),
+		"windowOrd": goqu.Func("row_number").Over(goqu.W().OrderBy(bad.Asc())),
+	} {
+		_, err := d.ParseGoquExpression(e)
+		require.Error(t, err, name)
+		requireCode(t, err, "CH_INVALID_IDENTIFIER")
+		_, err = d.QueryCondition("c", "eq", e)
+		require.Error(t, err, name)
+	}
+	_, err := d.ParseGoquExpression(goqu.From("t").Select("a`b"))
+	requireCode(t, err, "CH_QUERY_INVALID")
+
+	ok, err := d.ParseGoquExpression(goqu.And(goqu.I("db.t.c").Eq(1), goqu.Func("lower", goqu.C("x")).Eq("y")))
+	require.NoError(t, err)
+	require.Equal(t, "((`db`.`t`.`c` = 1) AND (lower(`x`) = 'y'))", ok.String())
+
+	x := d.Expressions()
+	_, err = x.TimestampAdd(bad, 1, "day")
+	requireCode(t, err, "CH_INVALID_IDENTIFIER")
+	_, err = x.DateAdd(bad, 1, "day")
+	requireCode(t, err, "CH_INVALID_IDENTIFIER")
+	_, err = x.Literal("?", bad)
+	requireCode(t, err, "CH_INVALID_IDENTIFIER")
+}
+
+func TestExpressions_SharedLiteralsAndWeekOverflow(t *testing.T) {
+	x := sqlconnect.Expressions(newDialect())
+	ts := time.Date(2021, 1, 1, 0, 0, 0, 123456789, time.UTC)
+	for want, mk := range map[string]func() (sqlconnect.Expression, error){
+		"dateAdd(day, -1, now64(9, 'UTC'))": func() (sqlconnect.Expression, error) { return x.TimestampAdd("CURRENT_TIMESTAMP", -1, "day") },
+		"dateAdd(day, 14, today())":         func() (sqlconnect.Expression, error) { return x.DateAdd("CURRENT_DATE", 2, "week") },
+		"dateAdd(hour, 1, parseDateTime64BestEffort('2021-01-01T00:00:00.123456789Z', 9, 'UTC'))": func() (sqlconnect.Expression, error) { return x.TimestampAdd(ts, 1, "hour") },
+		"dateAdd(minute, 2, now64(9, 'UTC'))":                                                     func() (sqlconnect.Expression, error) { return x.TimestampAdd("now()", 2, "minute") },
+		"dateAdd(day, 1, toDate(now64(9, 'UTC')))":                                                func() (sqlconnect.Expression, error) { return x.DateAdd("CURRENT_TIMESTAMP", 1, "day") },
+		"dateAdd(month, 1, toDate(parseDateTime64BestEffort('2021-01-01', 9, 'UTC')))":            func() (sqlconnect.Expression, error) { return x.DateAdd("'2021-01-01'", 1, "month") },
+		"dateAdd(year, 1, toDate(parseDateTime64BestEffort('2021-01-01T00:00:00.123456789Z', 9, 'UTC')))": func() (sqlconnect.Expression, error) {
+			return x.DateAdd(ts, 1, "year")
+		},
+		"dateAdd(second, 5, `col`)": func() (sqlconnect.Expression, error) { return x.TimestampAdd("`col`", 5, "second") },
+	} {
+		e, err := mk()
+		require.NoError(t, err)
+		require.Equal(t, want, e.String())
+	}
+	for _, bad := range []func() (sqlconnect.Expression, error){
+		func() (sqlconnect.Expression, error) { return x.TimestampAdd(ts, math.MaxInt/7+1, "week") },
+		func() (sqlconnect.Expression, error) { return x.DateAdd(ts, math.MinInt/7-1, "week") },
+		func() (sqlconnect.Expression, error) { return x.DateAdd(ts, 1, "hour") }, // dates accept day, month, year
+		func() (sqlconnect.Expression, error) { return x.TimestampAdd(ts, 1, "fortnight") },
+	} {
+		_, err := bad()
+		require.Error(t, err)
+	}
+}
