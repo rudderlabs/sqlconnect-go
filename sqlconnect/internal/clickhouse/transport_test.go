@@ -119,12 +119,14 @@ func TestCloseIdleConnectionsForwarded(t *testing.T) {
 	}
 	srv.Start()
 	defer srv.Close()
-	rt, err := newTransportFunc()(&http.Transport{})
+	inner := &http.Transport{}
+	rt, err := newTransportFunc()(inner)
 	require.NoError(t, err)
+	inner.IdleConnTimeout = time.Hour // only the forwarded close can end the connection within the window
 	c := &http.Client{Transport: rt}
 	resp, err := c.Get(srv.URL)
 	require.NoError(t, err)
 	_ = resp.Body.Close()
 	c.CloseIdleConnections()
-	require.Eventually(t, func() bool { return closed.Load() == 1 }, 5*time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool { return closed.Load() == 1 }, 2*time.Second, 10*time.Millisecond)
 }
