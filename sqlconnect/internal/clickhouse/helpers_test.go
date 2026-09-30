@@ -17,6 +17,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-go-kit/testhelper/rand"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chpolicy"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/clickhouse"
@@ -209,3 +212,64 @@ func (r *recordingConn) Read(p []byte) (int, error) {
 }
 
 func (r *recordingConn) Write(p []byte) (int, error) { return len(p), nil }
+
+// openFloorWithServer starts the pinned 26.3 container and opens an admin DB
+// over HTTPS with the fixture CA.
+func openFloorWithServer(t *testing.T) (*chtest.Server, *clickhouse.DB) {
+	t.Helper()
+	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
+	return srv, openAdmin(t, srv)
+}
+
+// openFloor is openFloorWithServer without the server handle.
+func openFloor(t *testing.T) *clickhouse.DB {
+	t.Helper()
+	_, db := openFloorWithServer(t)
+	return db
+}
+
+// openAdmin opens a DB as the fixture admin on the database "default".
+func openAdmin(t *testing.T, srv *chtest.Server) *clickhouse.DB {
+	t.Helper()
+	return openWith(t, srv.Config(srv.AdminUser, srv.AdminPassword, "default", "scratch_db", true), srv)
+}
+
+// openScoped opens a DB as a user that CreateScopedUser made for customer_db
+// and scratch_db.
+func openScoped(t *testing.T, srv *chtest.Server, user, password string) *clickhouse.DB {
+	t.Helper()
+	return openWith(t, srv.Config(user, password, "customer_db", "scratch_db", true), srv)
+}
+
+func openWith(t *testing.T, cfg json.RawMessage, srv *chtest.Server) *clickhouse.DB {
+	t.Helper()
+	db, err := clickhouse.NewDBForTest(cfg, testPolicy, srv.CA)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	return db
+}
+
+// seedSchema creates a fresh database and runs each ";"-separated statement of
+// script through db, with {{.schema}} replaced by the database name.
+func seedSchema(t *testing.T, db *clickhouse.DB, script string) sqlconnect.SchemaRef {
+	t.Helper()
+	schema := sqlconnect.SchemaRef{Name: "seed_" + strings.ToLower(rand.String(8))}
+	ctx := context.Background()
+	require.NoError(t, db.CreateSchema(ctx, schema))
+	t.Cleanup(func() { _ = db.DropSchema(context.Background(), schema) })
+	for stmt := range strings.SplitSeq(strings.ReplaceAll(script, "{{.schema}}", schema.Name), ";") {
+		if stmt = strings.TrimSpace(stmt); stmt != "" {
+			_, err := db.ExecContext(ctx, stmt)
+			require.NoError(t, err, stmt)
+		}
+	}
+	return schema
+}
+
+// orDefault returns v, or def when v is empty.
+func orDefault(v, def string) string {
+	if v == "" {
+		return def
+	}
+	return v
+}

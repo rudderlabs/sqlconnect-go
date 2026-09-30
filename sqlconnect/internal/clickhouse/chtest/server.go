@@ -11,6 +11,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -445,4 +446,77 @@ func unescapeTSV(s string) string {
 		return s
 	}
 	return strings.NewReplacer(`\t`, "\t", `\n`, "\n", `\r`, "\r", `\0`, "\x00", `\'`, "'", `\\`, `\`).Replace(s)
+}
+
+// QueryLogRow is one finished statement in system.query_log.
+type QueryLogRow struct {
+	QueryID  string
+	Query    string
+	Kind     string            // query_kind, such as Select or Create
+	Settings map[string]string // only the settings the statement changed
+	IsHello  bool              // the query the driver sends when it opens a connection
+}
+
+// driverRows keeps finished statements that the Go driver sent. It leaves out
+// the admin statements this package sends, which carry the Go HTTP user agent.
+const driverRows = "type != 'QueryStart' AND http_user_agent LIKE '%clickhouse-go/%'"
+
+const helloPrefix = "SELECT displayName(), version(), revision(), timezone()"
+
+func (s *Server) queryLog(t *testing.T, where string) []QueryLogRow {
+	t.Helper()
+	rows := s.AdminQuery(t, "SELECT query_id, query_kind, toJSONString(Settings), base64Encode(query) FROM system.query_log WHERE "+
+		driverRows+" AND ("+where+") ORDER BY event_time_microseconds")
+	out := make([]QueryLogRow, 0, len(rows))
+	for _, r := range rows {
+		require.Len(t, r, 4, "query_log row shape")
+		settings := map[string]string{}
+		require.NoError(t, json.Unmarshal([]byte(r[2]), &settings))
+		q, err := base64.StdEncoding.DecodeString(r[3])
+		require.NoError(t, err)
+		query := string(q)
+		out = append(out, QueryLogRow{
+			QueryID: r[0], Kind: r[1], Settings: settings, Query: query,
+			IsHello: strings.HasPrefix(strings.TrimSpace(query), helloPrefix),
+		})
+	}
+	return out
+}
+
+// QueryLogSettings returns the settings of the finished statement with the
+// query id. Call FlushLogs first.
+func (s *Server) QueryLogSettings(t *testing.T, queryID string) map[string]string {
+	t.Helper()
+	rows := s.queryLog(t, "query_id = "+quoteString(queryID))
+	require.NotEmpty(t, rows, "no query_log row for %s", queryID)
+	return rows[0].Settings
+}
+
+// QueryLogCount returns the number of finished statements with the query id.
+func (s *Server) QueryLogCount(t *testing.T, queryID string) int {
+	t.Helper()
+	return len(s.queryLog(t, "query_id = "+quoteString(queryID)))
+}
+
+// QueryLogKind returns the query_kind of the finished statement with the query id.
+func (s *Server) QueryLogKind(t *testing.T, queryID string) string {
+	t.Helper()
+	rows := s.queryLog(t, "query_id = "+quoteString(queryID))
+	require.NotEmpty(t, rows, "no query_log row for %s", queryID)
+	return rows[0].Kind
+}
+
+// QueryLogSince returns every finished driver statement that started at or
+// after since.
+func (s *Server) QueryLogSince(t *testing.T, since time.Time) []QueryLogRow {
+	t.Helper()
+	return s.queryLog(t, "event_time_microseconds >= fromUnixTimestamp64Micro("+strconv.FormatInt(since.UnixMicro(), 10)+")")
+}
+
+// LatestHello returns the most recent connection-open query.
+func (s *Server) LatestHello(t *testing.T) QueryLogRow {
+	t.Helper()
+	rows := s.queryLog(t, "startsWith(trimLeft(query), "+quoteString(helloPrefix)+")")
+	require.NotEmpty(t, rows, "no connection-open query in query_log")
+	return rows[len(rows)-1]
 }
