@@ -410,21 +410,15 @@ func randomString(t *testing.T, n int) string {
 	return string(b)
 }
 
-var (
-	errorCodeRE = regexp.MustCompile(`Code: (\d+)\.`)
-	errorNameRE = regexp.MustCompile(`\(([A-Z][A-Z0-9_]*)\)`)
-)
+var errorCodeRE = regexp.MustCompile(`Code: (\d+)\.`)
 
-// adminFailure describes a failed admin statement by status, server error
-// code and error name only. The exception text can echo SQL literals, such as
+// adminFailure describes a failed admin statement by status and numeric server
+// error code only. The exception text can echo SQL literals, such as
 // a password, so it is never shown.
 func adminFailure(status int, body string) string {
 	msg := fmt.Sprintf("status %d", status)
 	if m := errorCodeRE.FindStringSubmatch(body); m != nil {
 		msg += ", code " + m[1]
-	}
-	if m := errorNameRE.FindAllStringSubmatch(body, -1); m != nil {
-		msg += ", " + m[len(m)-1][1]
 	}
 	return msg
 }

@@ -47,6 +47,33 @@ func TestFixture_ProxyUpstreamErrorHidesURL(t *testing.T) {
 	require.Equal(t, "[redacted]", p.Requests()[0].Query.Get("password"))
 }
 
+func TestFixture_ProxyUpstreamMalformedAnswerHidden(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = l.Close() }()
+	go func() {
+		for {
+			c, err := l.Accept()
+			if err != nil {
+				return
+			}
+			buf := make([]byte, 4096)
+			_, _ = c.Read(buf)
+			_, _ = io.WriteString(c, "HTTP/1.1 PASSWORD_SENTINEL bad\r\n\r\n")
+			_ = c.Close()
+		}
+	}()
+
+	p := chtest.NewProxy(t, &chtest.Server{HTTPPort: l.Addr().(*net.TCPAddr).Port}, chtest.ProxyOptions{PlainHTTP: true})
+	resp, err := http.Post(fmt.Sprintf("http://127.0.0.1:%d/", p.Port()), "text/plain", strings.NewReader("SELECT 1"))
+	require.NoError(t, err)
+	defer func() { _ = resp.Body.Close() }()
+	b, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadGateway, resp.StatusCode)
+	require.NotContains(t, string(b), "SENTINEL", "the answer holds no upstream bytes")
+}
+
 func TestFixture_ProxyDoesNotFollowRedirects(t *testing.T) {
 	var elsewhere atomic.Int32
 	other := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { elsewhere.Add(1) }))

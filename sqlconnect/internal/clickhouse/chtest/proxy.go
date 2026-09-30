@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"errors"
 	"io"
 	"maps"
 	"net"
@@ -233,13 +232,11 @@ func (p *Proxy) serve(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := p.forward(r, body)
 	if err != nil {
-		// The *url.Error text holds the upstream URL with the query string
-		// (password, SQL), so the answer carries only the inner cause.
-		var ue *url.Error
-		if errors.As(err, &ue) {
-			err = ue.Err
-		}
-		http.Error(w, "chtest proxy: upstream request failed: "+err.Error(), http.StatusBadGateway)
+		// The error text can hold the upstream URL with the query string
+		// (password, SQL) or raw bytes of a malformed upstream answer, so the
+		// answer is a fixed message.
+		p.t.Logf("chtest proxy: upstream request failed (%T)", err)
+		http.Error(w, "chtest proxy: upstream request failed", http.StatusBadGateway)
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
