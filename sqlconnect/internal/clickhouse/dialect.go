@@ -8,6 +8,7 @@ import (
 	"math"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -216,6 +217,13 @@ func walkIdentifiers(e any, check func(string) error) error {
 		}
 		return walkIdentifiers(v.End(), check)
 	case exp.CastExpression:
+		// Goqu writes the cast type text verbatim.
+		if !isCastType(v.Type().Literal()) {
+			return cherr.New(cherr.CodeQueryInvalid, "cast", "a cast type must use letters, digits, underscores, commas, spaces and balanced parentheses")
+		}
+		if err := walkIdentifiers(v.Type().Args(), check); err != nil {
+			return err
+		}
 		return walkIdentifiers(v.Casted(), check)
 	case exp.LiteralExpression:
 		return walkIdentifiers(v.Args(), check)
@@ -316,15 +324,25 @@ func walkIdentifiers(e any, check func(string) error) error {
 // with its field values, and the walker cannot see inside it.
 func walkValue(e any, check func(string) error) error {
 	switch e.(type) {
-	case time.Time, *time.Time, driver.Valuer:
+	case time.Time, *time.Time:
 		return nil
+	case driver.Valuer:
+		// Goqu calls Value again at render time, so a checked result could
+		// differ from the rendered one. The entry points resolve top-level
+		// arguments once (see resolveValuers); a nested Valuer is refused.
+		return cherr.New(cherr.CodeQueryInvalid, "expression", "resolve a driver.Valuer to a plain value before building the expression")
 	}
 	rv := reflect.ValueOf(e)
 	switch rv.Kind() {
 	case reflect.Bool, reflect.String,
 		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 		reflect.Float32, reflect.Float64:
+		return nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		// Goqu converts unsigned values through int64.
+		if rv.Uint() > math.MaxInt64 {
+			return cherr.New(cherr.CodeQueryInvalid, "expression", "an unsigned value exceeds the Int64 range: pass it as a string")
+		}
 		return nil
 	case reflect.Pointer:
 		if rv.IsNil() {
@@ -345,6 +363,58 @@ func walkValue(e any, check func(string) error) error {
 	return cherr.New(cherr.CodeQueryInvalid, "expression", "the driver cannot render a value of kind "+rv.Kind().String())
 }
 
+// isCastType admits a type name with optional balanced parentheses that hold
+// only letters, digits, underscores, commas and spaces.
+func isCastType(s string) bool {
+	if s == "" {
+		return false
+	}
+	depth := 0
+	for _, r := range s {
+		switch {
+		case r == '(':
+			depth++
+		case r == ')':
+			depth--
+			if depth < 0 {
+				return false
+			}
+		case r == '_' || r == ',' || r == ' ' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9'):
+		default:
+			return false
+		}
+	}
+	return depth == 0
+}
+
+// resolveValuers calls Value once on each top-level driver.Valuer argument and
+// substitutes the result, so the value that is checked is the value that
+// renders. The result must be a plain driver value.
+func resolveValuers(args []any) ([]any, error) {
+	out := slices.Clone(args)
+	for i, a := range out {
+		v, ok := a.(driver.Valuer)
+		if !ok {
+			continue
+		}
+		if rv := reflect.ValueOf(a); rv.Kind() == reflect.Pointer && rv.IsNil() {
+			out[i] = nil
+			continue
+		}
+		val, err := v.Value()
+		if err != nil {
+			return nil, cherr.New(cherr.CodeQueryInvalid, "expression", "a driver.Valuer argument returned an error")
+		}
+		switch val.(type) {
+		case nil, int64, float64, bool, []byte, string, time.Time:
+		default:
+			return nil, cherr.New(cherr.CodeQueryInvalid, "expression", "a driver.Valuer argument returned a value that is not a plain driver value")
+		}
+		out[i] = val
+	}
+	return out, nil
+}
+
 // walkExMap checks the column keys and values of a goqu.Ex or goqu.ExOr map.
 func walkExMap[M ~map[string]any](m M, check func(string) error) error {
 	for k, val := range m {
@@ -362,6 +432,10 @@ func walkExMap[M ~map[string]any](m M, check func(string) error) error {
 // before it renders. The base engine checks neither.
 func (d dialect) QueryCondition(identifier, operator string, args ...any) (sqlconnect.Expression, error) {
 	if err := validateIdentifier(identifier); err != nil {
+		return nil, err
+	}
+	args, err := resolveValuers(args)
+	if err != nil {
 		return nil, err
 	}
 	if err := walkIdentifiers(args, validateIdentifier); err != nil {
@@ -441,6 +515,11 @@ func (d dialect) TimestampAdd(timeValue any, interval int, unit string) (sqlconn
 	if err := checkedWeeks(interval, unit); err != nil {
 		return nil, err
 	}
+	resolved, err := resolveValuers([]any{timeValue})
+	if err != nil {
+		return nil, err
+	}
+	timeValue = resolved[0]
 	if err := walkIdentifiers(timeValue, validateIdentifier); err != nil {
 		return nil, err
 	}
@@ -452,6 +531,11 @@ func (d dialect) DateAdd(dateValue any, interval int, unit string) (sqlconnect.E
 	if err := checkedWeeks(interval, unit); err != nil {
 		return nil, err
 	}
+	resolved, err := resolveValuers([]any{dateValue})
+	if err != nil {
+		return nil, err
+	}
+	dateValue = resolved[0]
 	if err := walkIdentifiers(dateValue, validateIdentifier); err != nil {
 		return nil, err
 	}
@@ -460,6 +544,10 @@ func (d dialect) DateAdd(dateValue any, interval int, unit string) (sqlconnect.E
 
 // Literal checks the Goqu nodes in the arguments. The SQL text itself is raw by contract.
 func (d dialect) Literal(sql string, args ...any) (sqlconnect.Expression, error) {
+	args, err := resolveValuers(args)
+	if err != nil {
+		return nil, err
+	}
 	if err := walkIdentifiers(args, validateIdentifier); err != nil {
 		return nil, err
 	}

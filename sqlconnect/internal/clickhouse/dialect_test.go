@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -232,4 +233,53 @@ func TestWalkIdentifiers_PointersAndBoundedErrors(t *testing.T) {
 	e, err := d.QueryCondition("c", "in", &[]any{1, "x"}, nilTime)
 	require.NoError(t, err)
 	require.Equal(t, "(`c` IN ((1, 'x'), NULL))", e.String())
+}
+
+type exprValuer struct{ v any }
+
+func (e exprValuer) Value() (driver.Value, error) { return e.v, nil }
+
+// TestWalkIdentifiers_CastsValuersUnsigned covers text that Goqu writes
+// verbatim or converts on its own: cast types, Valuer results and unsigned values.
+func TestWalkIdentifiers_CastsValuersUnsigned(t *testing.T) {
+	d, _ := sqlconnect.NewDialect("clickhouse", nil)
+	x := d.Expressions()
+	for name, call := range map[string]func() error{
+		"castInjection": func() error {
+			_, err := d.QueryCondition("c", "eq", goqu.Cast(goqu.C("other"), "String) OR 1=1 OR (1"))
+			return err
+		},
+		"castQuote":       func() error { _, err := d.ParseGoquExpression(goqu.Cast(goqu.C("o"), "Enum8('a' = 1)")); return err },
+		"castComment":     func() error { _, err := d.ParseGoquExpression(goqu.Cast(goqu.C("o"), "String --")); return err },
+		"valuerExpr":      func() error { _, err := d.QueryCondition("c", "eq", exprValuer{goqu.C("a`b")}); return err },
+		"valuerStruct":    func() error { _, err := d.QueryCondition("c", "eq", exprValuer{struct{}{}}); return err },
+		"valuerNested":    func() error { _, err := d.ParseGoquExpression(goqu.C("c").Eq(exprValuer{int64(1)})); return err },
+		"valuerLiteral":   func() error { _, err := x.Literal("?", exprValuer{goqu.C("a`b")}); return err },
+		"valuerTimestamp": func() error { _, err := x.TimestampAdd(exprValuer{goqu.C("a`b")}, 1, "day"); return err },
+		"uintAboveInt64":  func() error { _, err := d.QueryCondition("id", "eq", uint64(math.MaxInt64)+1); return err },
+		"uintMax":         func() error { _, err := d.QueryCondition("id", "eq", uint64(math.MaxUint64)); return err },
+		"uintInSlice":     func() error { _, err := d.QueryCondition("id", "in", 1, uint(math.MaxUint)); return err },
+	} {
+		err := call()
+		require.Error(t, err, name)
+		requireCode(t, err, "CH_QUERY_INVALID")
+	}
+	for want, call := range map[string]func() (sqlconnect.Expression, error){
+		"(`id` = 9223372036854775807)": func() (sqlconnect.Expression, error) {
+			return d.QueryCondition("id", "eq", uint64(math.MaxInt64))
+		},
+		"(`c` = 'x')": func() (sqlconnect.Expression, error) {
+			return d.QueryCondition("c", "eq", sql.NullString{String: "x", Valid: true})
+		},
+		"CAST(`o` AS Nullable(Decimal(18, 4)))": func() (sqlconnect.Expression, error) {
+			return d.ParseGoquExpression(goqu.Cast(goqu.C("o"), "Nullable(Decimal(18, 4))"))
+		},
+	} {
+		e, err := call()
+		require.NoError(t, err, want)
+		require.Equal(t, want, e.String())
+	}
+	e, err := d.QueryCondition("c", "eq", sql.NullString{})
+	require.NoError(t, err, "an invalid NullString resolves to NULL")
+	require.Equal(t, "(`c` IS NULL)", e.String())
 }
