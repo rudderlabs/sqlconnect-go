@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"net"
+	"slices"
 )
 
 // HostValidationOption customises ValidateHost.
@@ -157,16 +158,7 @@ func EmbeddedIPv4(ip net.IP) []net.IP {
 	case nat64WellKnown.Contains(b):
 		return []net.IP{net.IPv4(b[12], b[13], b[14], b[15])}
 	case nat64Local.Contains(b):
-		// RFC 8215 lets an operator use any RFC 6052 prefix length inside this
-		// /48, and the address alone does not say which one. Return the reading
-		// of every layout that fits (/48, /56, /64, /96); the caller refuses the
-		// address when any reading is refused. Byte 8 is the reserved "u" octet.
-		return []net.IP{
-			net.IPv4(b[6], b[7], b[9], b[10]),
-			net.IPv4(b[7], b[9], b[10], b[11]),
-			net.IPv4(b[9], b[10], b[11], b[12]),
-			net.IPv4(b[12], b[13], b[14], b[15]),
-		}
+		return nat64LocalReadings(b)
 	case sixToFour.Contains(b):
 		return []net.IP{net.IPv4(b[2], b[3], b[4], b[5])}
 	case teredo.Contains(b):
@@ -187,3 +179,38 @@ func EmbeddedIPv4(ip net.IP) []net.IP {
 // reserved prefix is safe: it belongs to AWS, so no customer VPC is numbered
 // from it.
 var awsIMDSv6 = &net.IPNet{IP: net.ParseIP("fd00:ec2::"), Mask: net.CIDRMask(32, 128)}
+
+// nat64LocalReadings returns the IPv4 readings of an address in 64:ff9b:1::/48.
+// RFC 8215 lets an operator use any RFC 6052 prefix length inside this /48, and
+// the address alone does not say which one. So every layout the address is
+// valid under is read (RFC 6052 section 2.2): /48, /56 and /64 need the "u"
+// octet (byte 8) and the suffix after the IPv4 bytes to be zero; /96 is always
+// valid. The caller refuses the address when any reading is refused.
+//
+// A 0.0.0.0 reading is dropped while another reading is left, because a
+// translator never forwards to the unspecified address. Without this rule every
+// /48-layout address would read as 0.0.0.0 under the /96 layout.
+func nat64LocalReadings(b net.IP) []net.IP {
+	zero := func(s []byte) bool { return !slices.ContainsFunc(s, func(x byte) bool { return x != 0 }) }
+	var all []net.IP
+	if b[8] == 0 && zero(b[11:16]) {
+		all = append(all, net.IPv4(b[6], b[7], b[9], b[10]))
+	}
+	if b[8] == 0 && zero(b[12:16]) {
+		all = append(all, net.IPv4(b[7], b[9], b[10], b[11]))
+	}
+	if b[8] == 0 && zero(b[13:16]) {
+		all = append(all, net.IPv4(b[9], b[10], b[11], b[12]))
+	}
+	all = append(all, net.IPv4(b[12], b[13], b[14], b[15]))
+	var out []net.IP
+	for _, v4 := range all {
+		if !v4.IsUnspecified() {
+			out = append(out, v4)
+		}
+	}
+	if len(out) == 0 {
+		return []net.IP{net.IPv4zero.To16()}
+	}
+	return out
+}

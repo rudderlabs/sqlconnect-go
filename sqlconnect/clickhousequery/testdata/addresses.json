@@ -166,22 +166,21 @@
       "embeddedIPv4": "169.254.169.254"
     },
     {
-      "name": "nat64_local_48_zero_suffix",
+      "name": "nat64_local_48_public",
       "address": "64:ff9b:1:808:8:800::",
-      "verdict": "refused",
-      "class": "unspecified",
-      "embeddedIPv4": "0.0.0.0"
+      "verdict": "allowed",
+      "class": null
     },
     {
       "name": "nat64_local_56_layout_loopback",
-      "address": "64:ff9b:1:87f:0:1:808:808",
+      "address": "64:ff9b:1:87f:0:1::",
       "verdict": "refused",
       "class": "loopback",
       "embeddedIPv4": "127.0.0.1"
     },
     {
       "name": "nat64_local_64_layout_metadata",
-      "address": "64:ff9b:1:808:a9:fea9:fe08:808",
+      "address": "64:ff9b:1:808:a9:fea9:fe00::",
       "verdict": "refused",
       "class": "link_local",
       "embeddedIPv4": "169.254.169.254"
@@ -194,38 +193,44 @@
       "embeddedIPv4": "169.254.169.254"
     },
     {
+      "name": "nat64_local_96_loopback",
+      "address": "64:ff9b:1::7f00:1",
+      "verdict": "refused",
+      "class": "loopback",
+      "embeddedIPv4": "127.0.0.1"
+    },
+    {
+      "name": "nat64_local_96_public",
+      "address": "64:ff9b:1::808:808",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
       "name": "nat64_local_96_subprefix_loopback",
       "address": "64:ff9b:1:100::7f00:1",
       "verdict": "refused",
-      "class": "unspecified",
-      "embeddedIPv4": "0.0.0.0"
+      "class": "loopback",
+      "embeddedIPv4": "127.0.0.1"
     },
     {
       "name": "nat64_local_96_subprefix_metadata",
       "address": "64:ff9b:1:100::a9fe:a9fe",
       "verdict": "refused",
-      "class": "unspecified",
-      "embeddedIPv4": "0.0.0.0"
+      "class": "link_local",
+      "embeddedIPv4": "169.254.169.254"
     },
     {
-      "name": "nat64_local_96_zero_subprefix_loopback",
-      "address": "64:ff9b:1::7f00:1",
-      "verdict": "refused",
-      "class": "unspecified",
-      "embeddedIPv4": "0.0.0.0"
-    },
-    {
-      "name": "nat64_local_96_zero_subprefix_public",
-      "address": "64:ff9b:1::808:808",
-      "verdict": "refused",
-      "class": "unspecified",
-      "embeddedIPv4": "0.0.0.0"
-    },
-    {
-      "name": "nat64_local_all_layouts_public",
+      "name": "nat64_local_96_subprefix_public",
       "address": "64:ff9b:1:808:8:808:808:808",
       "verdict": "allowed",
       "class": null
+    },
+    {
+      "name": "nat64_local_all_zero",
+      "address": "64:ff9b:1::",
+      "verdict": "refused",
+      "class": "unspecified",
+      "embeddedIPv4": "0.0.0.0"
     },
     {
       "name": "nat64_metadata",
