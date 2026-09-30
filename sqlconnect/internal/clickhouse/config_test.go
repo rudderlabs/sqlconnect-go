@@ -161,7 +161,7 @@ func TestSQ6_ExcludedConfiguration(t *testing.T) {
 		_, err := clickhouse.ParseConfigForTest(validJSON(func(m map[string]any) { m[key] = "x" }), false)
 		requireConfigInvalid(t, err, key)
 	}
-	require.Equal(t, 8, reflect.TypeOf(clickhouse.Config{}).NumField())
+	require.Equal(t, 8, reflect.TypeFor[clickhouse.Config]().NumField())
 }
 
 func TestSQ25_ScratchExclusions(t *testing.T) {

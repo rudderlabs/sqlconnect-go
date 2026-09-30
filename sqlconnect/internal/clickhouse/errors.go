@@ -10,6 +10,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"net/http"
 	"syscall"
 
 	ch "github.com/rudderlabs/clickhouse-go/v2"
@@ -140,8 +141,11 @@ func isTLSError(err error) bool {
 		rh  tls.RecordHeaderError
 		alt tls.AlertError
 	)
+	// net/http replaces the RecordHeaderError of a plain HTTP answer to a TLS
+	// client with ErrSchemeMismatch.
 	return errors.As(err, &cv) || errors.As(err, &ua) || errors.As(err, &hn) ||
-		errors.As(err, &ci) || errors.As(err, &rh) || errors.As(err, &alt)
+		errors.As(err, &ci) || errors.As(err, &rh) || errors.As(err, &alt) ||
+		errors.Is(err, http.ErrSchemeMismatch)
 }
 
 // bound turns err into an adapter error with the fixed message of its code,
