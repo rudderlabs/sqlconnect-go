@@ -330,3 +330,31 @@ func TestQueryGuard_ParenthesisedJoinLists(t *testing.T) {
 		require.NoError(t, err, sql)
 	}
 }
+
+// TestQueryGuard_TableFunctionNamesAnywhere pins the name rule: a call of any
+// 26.3 table function is refused wherever it stands.
+func TestQueryGuard_TableFunctionNamesAnywhere(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT id FROM db.users WHERE `in`(id, url('x'))",
+		"SELECT id FROM db.users WHERE \"IN\"(id, s3('x'))",
+		"SELECT lower(toString(remoteSecure('h', db.t))) AS r FROM db.users",
+		"SELECT id FROM db.users WHERE has(arrayMap(x -> x, [1]), iceberg('x'))",
+		"SELECT id FROM db.users ORDER BY mongodb('h', 'db', 'c', 'u', 'p')",
+		"SELECT id FROM db.users WHERE id IN (1, numbers_mt(3))",
+		"SELECT `\\x75rl`('x') AS u FROM db.users",
+		"SELECT \u201cUrlCluster\u201d('c', 'x') AS u FROM db.users",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		d, ok := clickhousequery.Describe(err)
+		require.True(t, ok, sql)
+		require.Equal(t, "TABLE FUNCTION", d.Field, sql)
+	}
+	for _, sql := range []string{
+		"SELECT url, file, remote, numbers FROM db.users",
+		"SELECT encodeURLComponent(url) AS u, extractURLParameter(url, 'a') AS a FROM db.users",
+		"SELECT u.url AS url FROM db.users AS u WHERE url = 'https://example.test/'",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		require.NoError(t, err, sql)
+	}
+}

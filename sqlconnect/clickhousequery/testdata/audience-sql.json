@@ -20,6 +20,12 @@
       "normalized": "SELECT id FROM db.users WHERE tags = ['a', 'b']"
     },
     {
+      "name": "accept_column_named_url",
+      "sql": "SELECT url FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT url FROM db.users"
+    },
+    {
       "name": "accept_ends_in_line_comment",
       "sql": "SELECT id FROM db.users -- members",
       "verdict": "accept",
@@ -114,6 +120,12 @@
       "sql": "SELECT id AS member_id FROM db.users;\n",
       "verdict": "accept",
       "normalized": "SELECT id AS member_id FROM db.users"
+    },
+    {
+      "name": "accept_url_encoding_function",
+      "sql": "SELECT encodeURLComponent(url) AS u FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT encodeURLComponent(url) AS u FROM db.users"
     },
     {
       "name": "refuse_array_join_left_in_cte",
@@ -320,6 +332,12 @@
       "clause": "SETTINGS"
     },
     {
+      "name": "refuse_table_function_backtick_name_in_select",
+      "sql": "SELECT `url`('https://example.test/x', 'LineAsString') AS u FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
       "name": "refuse_table_function_comma_cte",
       "sql": "WITH a AS (SELECT u.id FROM db.users AS u, url('https://example.test/x', CSV, 'id UInt64') AS b) SELECT id FROM a",
       "verdict": "refuse",
@@ -416,6 +434,18 @@
       "clause": "TABLE FUNCTION"
     },
     {
+      "name": "refuse_table_function_merge_in_select",
+      "sql": "SELECT (SELECT count() FROM db.users) + length(merge('db', 'users.*')) AS n FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_mixed_case_name",
+      "sql": "SELECT Url('https://example.test/x', 'LineAsString') AS u FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
       "name": "refuse_table_function_not_in_after_param",
       "sql": "SELECT 1 WHERE {p1:String} NOT IN (remote('host.example', db.t))",
       "verdict": "refuse",
@@ -434,8 +464,20 @@
       "clause": "TABLE FUNCTION"
     },
     {
+      "name": "refuse_table_function_quoted_in_function",
+      "sql": "SELECT id FROM db.users WHERE `in`(id, url('https://example.test/ids.csv', 'CSV', 'id UInt64'))",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
       "name": "refuse_table_function_quoted_name",
       "sql": "SELECT * FROM `remote`('h', db.t)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_upper_case_name",
+      "sql": "SELECT id FROM db.users WHERE id = URL('https://example.test/x', 'LineAsString')",
       "verdict": "refuse",
       "clause": "TABLE FUNCTION"
     },

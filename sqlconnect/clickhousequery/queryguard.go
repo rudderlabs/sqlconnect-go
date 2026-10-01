@@ -155,9 +155,9 @@ func (g *guard) scan() string {
 		case tk.Kind == chsql.Punct && (tk.Text == ")" || tk.Text == "]" || tk.Text == "}"):
 			delete(inFrom, tk.Depth) // a closer carries the inner depth
 			open = open[:len(open)-1]
-		case isFileCall(tk, g.at(i-1), g.at(i+1)):
-			// The scalar file() reads a server file under user_files_path in
-			// any position, like the file() table function after FROM.
+		case isTableFunctionCall(tk, g.at(i+1)):
+			// A table function call reads outside the customer's tables in
+			// any position, for example as an argument of a quoted `in`().
 			return "TABLE FUNCTION"
 		case tk.Kind != chsql.Word:
 		case tk.Upper == "FROM" && len(open) > 0 && open[len(open)-1].args:
@@ -193,21 +193,43 @@ func (g *guard) scan() string {
 	return ""
 }
 
-// isFileCall reports a call of the file function: a bare or quoted name
-// "file" in any case, not qualified by a dot, followed by "(". A quoted call
-// name that holds an escape also counts.
-func isFileCall(tk, prev, next chsql.Token) bool {
-	if !isOpener(next) || (prev.Kind == chsql.Punct && prev.Text == ".") {
+// tableFunctionNames holds every table function of ClickHouse 26.3
+// (SELECT name FROM system.table_functions), in lower case. A call of one of
+// these names is refused in any position, because each reads outside the
+// customer's tables or can be spelled to. file is also a scalar function that
+// reads a server file.
+var tableFunctionNames = map[string]bool{
+	"arrowflight": true, "azureblobstorage": true, "azureblobstoragecluster": true, "cluster": true, "clusterallreplicas": true, "cosn": true,
+	"deltalake": true, "deltalakeazure": true, "deltalakeazurecluster": true, "deltalakecluster": true, "deltalakelocal": true, "deltalakes3": true,
+	"deltalakes3cluster": true, "dictionary": true, "executable": true, "file": true, "filecluster": true, "format": true,
+	"fuzzjson": true, "fuzzquery": true, "gcs": true, "generate_series": true, "generaterandom": true, "generateseries": true,
+	"hdfs": true, "hdfscluster": true, "hive": true, "hudi": true, "hudicluster": true, "iceberg": true,
+	"icebergazure": true, "icebergazurecluster": true, "icebergcluster": true, "iceberghdfs": true, "iceberghdfscluster": true, "iceberglocal": true,
+	"iceberglocalcluster": true, "icebergs3": true, "icebergs3cluster": true, "input": true, "jdbc": true, "loop": true,
+	"merge": true, "mergetreeanalyzeindexes": true, "mergetreeanalyzeindexesuuid": true, "mergetreeindex": true, "mergetreeprojection": true, "mergetreetextindex": true,
+	"mongodb": true, "mysql": true, "null": true, "numbers": true, "numbers_mt": true, "odbc": true,
+	"oss": true, "paimon": true, "paimonazure": true, "paimonazurecluster": true, "paimoncluster": true, "paimonhdfs": true,
+	"paimonhdfscluster": true, "paimonlocal": true, "paimons3": true, "paimons3cluster": true, "postgresql": true, "primes": true,
+	"prometheusquery": true, "prometheusqueryrange": true, "redis": true, "remote": true, "remotesecure": true, "s3": true,
+	"s3cluster": true, "sqlite": true, "timeseriesdata": true, "timeseriesmetrics": true, "timeseriesselector": true, "timeseriestags": true,
+	"url": true, "urlcluster": true, "values": true, "view": true, "viewexplain": true, "viewifpermitted": true,
+	"ytsaurus": true, "zeros": true, "zeros_mt": true,
+}
+
+// isTableFunctionCall reports a call of a table function by name, in any
+// position: a bare or quoted name in any letter case, followed by "(". A
+// quoted call name that holds an escape fails closed, because the escape
+// could spell such a name.
+func isTableFunctionCall(tk, next chsql.Token) bool {
+	if !isOpener(next) {
 		return false
 	}
 	switch tk.Kind {
 	case chsql.Word:
-		return tk.Upper == "FILE"
+		return tableFunctionNames[strings.ToLower(tk.Text)]
 	case chsql.QuotedIdent:
-		// A quoted call name with an escape could spell file, so it fails
-		// closed too.
 		name := strings.Trim(tk.Text, "`\"\u201c\u201d")
-		return strings.EqualFold(name, "file") || strings.Contains(name, "\\")
+		return tableFunctionNames[strings.ToLower(name)] || strings.Contains(name, "\\")
 	}
 	return false
 }
