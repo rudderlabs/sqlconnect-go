@@ -59,11 +59,11 @@ func TestSQ24_CloudSmoke(t *testing.T) {
 	require.NoError(t, db.RenameTable(ctx, a, b))
 	require.Equal(t, 3, countRows(t, db, b), "rename keeps the rows")
 	require.NoError(t, db.CreateTableFromQuery(ctx, a, "SELECT toUInt64(9) AS id, '' AS j"))
-	_, err = db.ExecContext(ctx, "EXCHANGE TABLES "+db.QuoteTable(a)+" AND "+db.QuoteTable(b))
+	_, err = pinned(t, db).ExecContext(ctx, "EXCHANGE TABLES "+db.QuoteTable(a)+" AND "+db.QuoteTable(b))
 	require.NoError(t, err)
 	require.Equal(t, 3, countRows(t, db, a), "exchange publishes the three-row table under the first name")
 	require.Equal(t, 1, countRows(t, db, b))
-	_, err = db.ExecContext(ctx, "EXCHANGE TABLES "+db.QuoteTable(a)+" AND "+db.QuoteIdentifier(scratch)+".`missing_x`")
+	_, err = pinned(t, db).ExecContext(ctx, "EXCHANGE TABLES "+db.QuoteTable(a)+" AND "+db.QuoteIdentifier(scratch)+".`missing_x`")
 	require.EqualValues(t, 60, db.ClassifyError(err).ServerCode)
 	require.NoError(t, db.TruncateTable(ctx, a))
 	require.Zero(t, countRows(t, db, a), "truncate empties the table")
@@ -111,14 +111,15 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 	db, ctx := cloudDB(t, 0), context.Background()
 	scratch := scratchOf(t)
 	sink := scratchTable(t, db, scratch, "cancel_sink_")
-	_, err := db.ExecContext(ctx, "CREATE TABLE "+db.QuoteTable(sink)+" (n UInt64) ENGINE = MergeTree ORDER BY n")
+	_, err := pinned(t, db).ExecContext(ctx, "CREATE TABLE "+db.QuoteTable(sink)+" (n UInt64) ENGINE = MergeTree ORDER BY n")
 	require.NoError(t, err)
 
 	t.Run("kill a running insert", func(t *testing.T) {
 		id := clickhousequery.NewQueryID()
+		conn := pinned(t, db)
 		done := make(chan error, 1)
 		go func() {
-			_, err := db.ExecContext(stmtCtx(ctx, map[string]any{"max_block_size": 1}, id),
+			_, err := conn.ExecContext(stmtCtx(ctx, map[string]any{"max_block_size": 1}, id),
 				"INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(600) WHERE sleepEachRow(0.1) = 0")
 			done <- err
 		}()
@@ -142,7 +143,7 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 
 	t.Run("finished", func(t *testing.T) {
 		id := clickhousequery.NewQueryID()
-		_, err := db.ExecContext(stmtCtx(ctx, map[string]any{}, id), "INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(10)")
+		_, err := pinned(t, db).ExecContext(stmtCtx(ctx, map[string]any{}, id), "INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(10)")
 		require.NoError(t, err)
 		require.Eventually(t, func() bool {
 			o, err := db.QueryOutcome(ctx, id, "Insert")
@@ -190,6 +191,16 @@ func drain(rows *sql.Rows) {
 	for rows.Next() {
 		_ = rows.Scan(&n, &pad)
 	}
+}
+
+// pinned returns a connection of its own for writes, so database/sql never
+// replays a write on a new connection after driver.ErrBadConn.
+func pinned(t *testing.T, db *clickhouse.DB) *sql.Conn {
+	t.Helper()
+	conn, err := db.Conn(context.Background())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	return conn
 }
 
 // scratchTable returns a fresh table name in the scratch database and drops
