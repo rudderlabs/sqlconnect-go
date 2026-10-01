@@ -360,11 +360,14 @@ func (g *guard) wrappedTableFunction(i int) int {
 // takes a table function as its set: the operand after the operator, or the
 // second of exactly two arguments of the function form.
 func (g *guard) inReadsTableFunction(i int, function bool) bool {
-	// The operator spelling x IN f(...) or x IN (a, f(...)) does not run f as
-	// a table function on 26.3 (it reports UNKNOWN_FUNCTION), and a scalar
-	// call there, such as CAST or lower, is a normal value. The name rule in
-	// scan refuses every table function name and the scalar file() there.
-	// Only the function spelling in(x, f()) gets the structural rule.
+	// A lone call as the set, x IN f(...) or x IN ((f(...))), fails whatever
+	// its name: the parser drops the parentheses, so the guard cannot tell a
+	// table function from a scalar there. A one-value list is written with =
+	// instead. A list of two or more values is a tuple and stays accepted.
+	if g.wrappedTableFunction(i+1) >= 0 {
+		return true
+	}
+	// The two-argument rule belongs to the function spelling in(x, f()).
 	if !function || !isOpener(g.at(i+1)) {
 		return false
 	}
