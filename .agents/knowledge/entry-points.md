@@ -34,7 +34,7 @@
 
 <!-- session: 2026-10-01 -->
 
-- `sqlconnect/internal/clickhouse/db.go`: ClickHouse factory, config parse and pool setup with `guardConn` and the guarded dialer.
+- `sqlconnect/internal/clickhouse/db.go`: `NewDB` is the factory entry point. It calls `newDB`, which parses the config, checks the dial policy and opens a lazy pool with `guardConn` and the guarded dialer. `init` registers the factory.
 - `sqlconnect/internal/clickhouse/validation.go`: `ValidateContext` with the five validation stages and the scratch probe and cleanup.
-- `sqlconnect/clickhousequery/queryguard.go`: `CheckAudienceSQL`, the audience SQL guard shared with Lookout through `testdata/audience-sql.json`.
-- `sqlconnect/internal/clickhouse/chtest/server.go`: test fixture with pinned containers, TLS, users and the fault proxy (`proxy.go`).
+- `sqlconnect/clickhousequery/queryguard.go`: `CheckAudienceSQL` returns the normalised SQL, or `CH_QUERY_INVALID` naming the first refused construct. The local corpus is `sqlconnect/clickhousequery/testdata/audience-sql.json`, run by `TestQueryGuard_SharedCorpus`.
+- `sqlconnect/internal/clickhouse/chtest/server.go`: test fixture with pinned containers (`Image`), TLS and users. `sqlconnect/internal/clickhouse/chtest/proxy.go` holds the fault proxy (`ProxyOptions`). Both are test-only.

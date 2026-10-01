@@ -39,5 +39,5 @@
 
 <!-- session: 2026-10-01 -->
 
-- ClickHouse uses `github.com/rudderlabs/clickhouse-go/v2` v2.48.0, a fork, in `go.mod`. Upgrading it forces the bumps in the fork's own `go.mod`. `golang.org/x/crypto` is at v0.56.0 for GO-2026-6354, GO-2026-6355 and GO-2026-6303.
-- `.github/workflows/test.yaml` runs `sqlconnect/internal/clickhouse` with `go test -json`, and `internal/scripts/assert-no-skip.sh` fails the job on any failed or skipped test. The `clickhouse-evidence` artifact holds the JSON output and the inspected image digests. The digest grep stops at a backslash, because `go test -json` escapes newlines in output lines.
+- ClickHouse uses `github.com/rudderlabs/clickhouse-go/v2` v2.48.0, a fork, in `go.mod`. `golang.org/x/crypto` is at v0.56.0 in `go.mod`.
+- `.github/workflows/test.yaml` runs `sqlconnect/internal/clickhouse` with `go test -json`. `internal/scripts/assert-no-skip.sh` fails the job on any failed test, on any skipped test except the `catalog_admin/current_catalog` and `catalog_admin/list_catalogs` subtests of `TestClickHouseDB`, and when a required test did not pass (`TestClickHouseDB/https`, `TestClickHouseDB/http`, `TestSQ5_TLSMatrix`, and `TestSQ4_FloorMatrix` for 24.8, 25.8 and 26.3). The `clickhouse-evidence` artifact holds the JSON output and the inspected image digests. The digest grep stops at a backslash, because `go test -json` escapes newlines in output lines.
