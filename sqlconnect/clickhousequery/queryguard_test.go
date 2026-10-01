@@ -269,3 +269,33 @@ func TestQueryGuard_ErrorTextIsBounded(t *testing.T) {
 	require.Error(t, err)
 	require.NotContains(t, err.Error(), "secret-value", "the error never echoes the query text")
 }
+
+// TestQueryGuard_ScalarFile pins the scalar file() function, which reads a
+// server file under user_files_path from any position in the query.
+func TestQueryGuard_ScalarFile(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT file('x') AS f FROM db.users",
+		"SELECT id FROM db.users WHERE c = file('x')",
+		"SELECT FILE ('x') AS f FROM db.users",
+		"SELECT `file`('x') AS f FROM db.users",
+		"SELECT \"File\"('x') AS f FROM db.users",
+		"SELECT \u201cfile\u201d('x') AS f FROM db.users",
+		"SELECT `\\x66ile`('x') AS f FROM db.users",
+		"SELECT lower(file('x')) AS f FROM db.users",
+		"SELECT id FROM db.users GROUP BY id HAVING max(c) = file('x')",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		d, ok := clickhousequery.Describe(err)
+		require.True(t, ok, sql)
+		require.Equal(t, "TABLE FUNCTION", d.Field, sql)
+	}
+	for _, sql := range []string{
+		"SELECT file FROM db.users",
+		"SELECT u.file AS f FROM db.users AS u",
+		"SELECT 'file(x)' AS f FROM db.users",
+		"SELECT filesize FROM db.users",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		require.NoError(t, err, sql)
+	}
+}

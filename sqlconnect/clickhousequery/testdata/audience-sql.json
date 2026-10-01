@@ -116,6 +116,18 @@
       "clause": "ARRAY JOIN"
     },
     {
+      "name": "refuse_file_function_in_select",
+      "sql": "SELECT file('x') AS f FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_file_function_in_where",
+      "sql": "SELECT id FROM db.users WHERE c = file('x')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
       "name": "refuse_final_in_subquery",
       "sql": "SELECT id FROM (SELECT id FROM db.users FINAL)",
       "verdict": "refuse",

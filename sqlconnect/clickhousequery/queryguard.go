@@ -1,6 +1,8 @@
 package clickhousequery
 
 import (
+	"strings"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chsql"
 )
@@ -153,6 +155,10 @@ func (g *guard) scan() string {
 		case tk.Kind == chsql.Punct && (tk.Text == ")" || tk.Text == "]" || tk.Text == "}"):
 			delete(inFrom, tk.Depth) // a closer carries the inner depth
 			open = open[:len(open)-1]
+		case isFileCall(tk, g.at(i-1), g.at(i+1)):
+			// The scalar file() reads a server file under user_files_path in
+			// any position, like the file() table function after FROM.
+			return "TABLE FUNCTION"
 		case tk.Kind != chsql.Word:
 		case tk.Upper == "FROM" && len(open) > 0 && open[len(open)-1].args:
 		case tk.Upper == "FROM" || tk.Upper == "JOIN":
@@ -185,6 +191,25 @@ func (g *guard) scan() string {
 		}
 	}
 	return ""
+}
+
+// isFileCall reports a call of the file function: a bare or quoted name
+// "file" in any case, not qualified by a dot, followed by "(". A quoted call
+// name that holds an escape also counts.
+func isFileCall(tk, prev, next chsql.Token) bool {
+	if !isOpener(next) || (prev.Kind == chsql.Punct && prev.Text == ".") {
+		return false
+	}
+	switch tk.Kind {
+	case chsql.Word:
+		return tk.Upper == "FILE"
+	case chsql.QuotedIdent:
+		// A quoted call name with an escape could spell file, so it fails
+		// closed too.
+		name := strings.Trim(tk.Text, "`\"\u201c\u201d")
+		return strings.EqualFold(name, "file") || strings.Contains(name, "\\")
+	}
+	return false
 }
 
 func isName(tk chsql.Token) bool {
