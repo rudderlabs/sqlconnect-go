@@ -146,7 +146,7 @@ func (g *guard) scan() string {
 		case tk.Kind == chsql.Punct && closerFor[tk.Text] != "":
 			open = append(open, bracket{args: tk.Text == "(" && isName(g.at(i-1))})
 		case tk.Kind == chsql.Punct && tk.Text == ",":
-			if inFrom[tk.Depth] && g.tableFunctionAt(i+1) >= 0 {
+			if inFrom[tk.Depth] && g.fromItemReadsTableFunction(i, inFrom) {
 				return "TABLE FUNCTION"
 			}
 			if !inFrom[tk.Depth] && tk.Depth == 0 && !listOK {
@@ -163,7 +163,7 @@ func (g *guard) scan() string {
 		case tk.Upper == "FROM" && len(open) > 0 && open[len(open)-1].args:
 		case tk.Upper == "FROM" || tk.Upper == "JOIN":
 			inFrom[tk.Depth] = true
-			if g.tableFunctionAt(i+1) >= 0 {
+			if g.fromItemReadsTableFunction(i, inFrom) {
 				return "TABLE FUNCTION"
 			}
 		case fromEnders[tk.Upper]:
@@ -252,6 +252,26 @@ func (g *guard) tableFunctionAt(i int) int {
 		return g.closerOf(i + 3)
 	}
 	return -1
+}
+
+// fromItemReadsTableFunction checks the FROM list item after the FROM, JOIN
+// or comma at i. ClickHouse reads a parenthesised list such as
+// FROM (url(...) AS a CROSS JOIN t) as a join, so the check skips the opening
+// parentheses and marks each depth it skips as a FROM list, which makes the
+// commas inside it item separators too. A parenthesis that starts a query
+// opens a subquery, which the scan checks on its own.
+func (g *guard) fromItemReadsTableFunction(i int, inFrom map[int]bool) bool {
+	k := 0
+	for isOpener(g.at(i + 1 + k)) {
+		k++
+	}
+	if k > 0 && g.startsQuery(i+1+k) {
+		return false
+	}
+	for j := 1; j <= k; j++ {
+		inFrom[g.at(i+j).Depth] = true
+	}
+	return g.tableFunctionAt(i+1+k) >= 0
 }
 
 // wrappedTableFunction reports a table function call at i, alone inside any

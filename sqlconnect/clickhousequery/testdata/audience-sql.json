@@ -212,6 +212,12 @@
       "clause": "TABLE FUNCTION"
     },
     {
+      "name": "refuse_table_function_comma_in_paren",
+      "sql": "SELECT count() FROM (system.one AS a, numbers(2) AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
       "name": "refuse_table_function_comma_subquery",
       "sql": "SELECT id FROM (SELECT u.id FROM db.users u, s3('https://example.test/x')) s",
       "verdict": "refuse",
@@ -220,6 +226,18 @@
     {
       "name": "refuse_table_function_comma_top",
       "sql": "SELECT a.id FROM db.users AS a, url('https://example.test/', CSV, 'id UInt64') AS b",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_first_in_paren_cross_join",
+      "sql": "SELECT count() FROM (url('http://169.254.169.254/latest/meta-data/', 'LineAsString') AS a CROSS JOIN system.one AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_first_in_paren_join",
+      "sql": "SELECT * FROM (remote('internal-host:9000', system.users) AS r JOIN system.one AS o ON 1)",
       "verdict": "refuse",
       "clause": "TABLE FUNCTION"
     },
@@ -292,6 +310,12 @@
     {
       "name": "refuse_table_function_not_in_url",
       "sql": "SELECT id FROM db.users WHERE id GLOBAL NOT IN url('https://example.test/x', CSV, 'id UInt64')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_numbers_in_paren_join",
+      "sql": "SELECT count() FROM (numbers(3) AS a JOIN system.one AS b ON 1)",
       "verdict": "refuse",
       "clause": "TABLE FUNCTION"
     },

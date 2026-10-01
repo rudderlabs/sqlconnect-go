@@ -299,3 +299,30 @@ func TestQueryGuard_ScalarFile(t *testing.T) {
 		require.NoError(t, err, sql)
 	}
 }
+
+// TestQueryGuard_ParenthesisedJoinLists pins table functions inside a
+// parenthesised FROM or JOIN list, which ClickHouse runs as a join.
+func TestQueryGuard_ParenthesisedJoinLists(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT count() FROM ((url('x') AS a CROSS JOIN system.one AS b))",
+		"SELECT count() FROM (system.one AS a, (numbers(2)) AS b)",
+		"SELECT count() FROM ((system.one AS a, numbers(2) AS b))",
+		"SELECT count() FROM db.t AS t JOIN (s3('x') AS a CROSS JOIN system.one AS b) ON 1",
+		"SELECT count() FROM (system.one AS a JOIN (url('x') AS c JOIN system.one AS d ON 1) ON 1)",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		d, ok := clickhousequery.Describe(err)
+		require.True(t, ok, sql)
+		require.Equal(t, "TABLE FUNCTION", d.Field, sql)
+	}
+	for _, sql := range []string{
+		"SELECT a.id FROM (db.a AS a JOIN db.b AS b ON a.id = b.id)",
+		"SELECT a.id FROM (db.a AS a, db.b AS b)",
+		"SELECT s.id FROM (SELECT id FROM db.users) AS s",
+		"SELECT s.id FROM ((SELECT id FROM db.users)) AS s",
+		"SELECT id FROM db.users WHERE (a, b) IN (SELECT a, b FROM db.t)",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		require.NoError(t, err, sql)
+	}
+}
