@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -99,7 +100,9 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 	// does, so a refused driver setting is named by stage 2.
 	control := driverExec{conn: conn, settings: helloSettings}
 	var version, current string
-	if err := control.QueryRowContext(ctx, "SELECT version(), currentDatabase()").Scan(&version, &current); err != nil {
+	// On a warm pool db.Conn sends nothing, so this read can be the first
+	// request: it runs under the same 90 s bound.
+	if err := control.QueryRowContext(openCtx, "SELECT version(), currentDatabase()").Scan(&version, &current); err != nil {
 		return res, openFailure(err, refused)
 	}
 	if v, err := parseVersion(version); err != nil || less(v, versionFloor) {
@@ -459,23 +462,45 @@ func (c probeCleanup) run(parent context.Context) error {
 	failed := func(err error) error {
 		return stageErr(4, "scratch_cleanup", wrap(cherr.CodeScratchCleanupFailed, c.ref.Name, "the probe table could not be removed", err))
 	}
+	var cleanups []func()
 	stmt := "DROP TABLE " + c.db.QuoteTable(c.ref) + " SYNC"
 	if !c.created {
 		stmt = "DROP TABLE IF EXISTS " + c.db.QuoteTable(c.ref) + " SYNC"
 	}
 	ex := c.exec
-	if c.broken {
+	replace := func() error {
 		if c.release != nil {
 			c.release() // give the broken connection's slot back before asking for another
 		}
 		fresh, done, err := c.acquire(ctx)
 		if err != nil {
+			return err
+		}
+		cleanups = append(cleanups, done)
+		ex = fresh
+		return nil
+	}
+	defer func() {
+		for _, done := range cleanups {
+			done()
+		}
+	}()
+	if c.broken {
+		if err := replace(); err != nil {
 			return failed(err)
 		}
-		defer done()
-		ex = fresh
 	}
-	if _, err := ex.ExecContext(ctx, stmt); err != nil {
+	_, err := ex.ExecContext(ctx, stmt)
+	if errors.Is(err, sql.ErrConnDone) && !c.broken {
+		// An earlier read lost the connection, and its bounded error no longer
+		// carries driver.ErrBadConn. ErrConnDone means the DROP was never
+		// sent, so it runs again on a replacement connection.
+		if rerr := replace(); rerr != nil {
+			return failed(rerr)
+		}
+		_, err = ex.ExecContext(ctx, stmt)
+	}
+	if err != nil {
 		return failed(err)
 	}
 	if err := c.db.AwaitTableAbsent(ctx, ex, c.ref, c.policy); err != nil {
@@ -581,19 +606,17 @@ func less(a, b [3]int) bool {
 	return false
 }
 
-// sanitizeVersion keeps only digits and dots, at most 32 bytes, so a hostile
-// server cannot put text into an error through version().
+// versionRE is the whole shape of a ClickHouse version string.
+var versionRE = regexp.MustCompile(`^[0-9]{1,4}(\.[0-9]{1,8}){2,3}$`)
+
+// sanitizeVersion returns s when it is a complete version string, else a
+// fixed label, so a hostile server cannot put text (or digits taken from
+// text) into an error through version().
 func sanitizeVersion(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		if b.Len() >= 32 {
-			break
-		}
-		if r == '.' || r >= '0' && r <= '9' {
-			b.WriteRune(r)
-		}
+	if versionRE.MatchString(s) {
+		return s
 	}
-	return b.String()
+	return "(unrecognized)"
 }
 
 // knownEngines are the database engine names an error may repeat. Any other

@@ -73,6 +73,23 @@ func TestProbeCleanup_Codes(t *testing.T) {
 		_ = name
 	}
 	require.NoError(t, probeCleanup{db: db, ref: ref, created: false, exec: scripted(t, execOK, noRow)}.run(context.Background()))
+
+	// A visibility read that lost the connection leaves a closed *sql.Conn and
+	// a bounded error without driver.ErrBadConn: the DROP moves to a fresh one.
+	closed, err := scripted(t, execOK).db.Conn(context.Background())
+	require.NoError(t, err)
+	require.NoError(t, closed.Close())
+	replacement := scripted(t, execOK, noRow)
+	acquired := 0
+	require.NoError(t, probeCleanup{
+		db: db, ref: ref, created: true, exec: closed,
+		acquire: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
+			acquired++
+			return replacement, func() {}, nil
+		},
+	}.run(context.Background()))
+	require.Equal(t, 1, acquired)
+	require.True(t, strings.HasPrefix(replacement.lastExec, "DROP TABLE `scratch_db`.`_rudder_probe_"), replacement.lastExec)
 	require.Contains(t, unknownLastExec(t), "DROP TABLE IF EXISTS", "an unknown CREATE outcome drops only if the table exists")
 }
 
@@ -86,7 +103,10 @@ func TestValidation_VersionAndStages(t *testing.T) {
 	}
 	require.True(t, less([3]int{25, 8, 99}, versionFloor))
 	require.False(t, less([3]int{26, 3, 0}, versionFloor))
-	require.Equal(t, "25.8.1.2", sanitizeVersion("25.8.1.2<script>secret"))
+	require.Equal(t, "25.8.1.2", sanitizeVersion("25.8.1.2"))
+	for _, hostile := range []string{"25.8.1.2<script>secret", "25.8.1.2 password=12345678", "12345678", ""} {
+		require.Equal(t, "(unrecognized)", sanitizeVersion(hostile), hostile)
+	}
 	require.Equal(t, []string{"Replicated", "(unrecognized)"}, []string{engineLabel("Replicated"), engineLabel("pw_Retl_123")},
 		"an unknown engine answer is server text and is never repeated")
 

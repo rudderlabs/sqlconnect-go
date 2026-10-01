@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -233,4 +234,35 @@ func TestValidation_PingDelegates(t *testing.T) {
 	cctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.Error(t, db.PingContext(cctx))
+}
+
+func TestValidation_VisibilityDisconnectAndWarmPool(t *testing.T) {
+	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
+	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", false)
+	// The visibility read after the CREATE loses its connection: the cleanup
+	// must drop the probe through a fresh connection.
+	p := chtest.NewProxy(t, srv, chtest.ProxyOptions{})
+	p.DropResponseOnce(func(r chtest.Request) bool {
+		return strings.Contains(r.SQL, "FROM system.tables") && strings.Contains(r.SQL, "_rudder_probe_")
+	})
+	_, err := openScopedVia(t, srv, p, "rudder_retl", "pw_Retl_123").ValidateContext(context.Background())
+	require.Error(t, err)
+	requireStage(t, err, 4, "scratch_write")
+	require.Equal(t, "0", probeCount(t, srv), "no probe remains after a visibility-read disconnect")
+
+	// On a warm pool the version read is the first request; it still carries
+	// the 90 s bound as max_execution_time.
+	db := openScoped(t, srv, "rudder_retl", "pw_Retl_123")
+	for range 2 {
+		_, err := db.ValidateContext(context.Background())
+		require.NoError(t, err)
+	}
+	srv.FlushLogs(t)
+	rows := srv.QueryLogLike(t, "SELECT version(), currentDatabase()%")
+	require.GreaterOrEqual(t, len(rows), 2)
+	for _, r := range rows {
+		n, err := strconv.Atoi(r.Settings["max_execution_time"])
+		require.NoError(t, err, "the version read carries a deadline: %v", r.Settings)
+		require.LessOrEqual(t, n, 95)
+	}
 }
