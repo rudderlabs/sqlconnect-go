@@ -484,7 +484,10 @@ type probeCleanup struct {
 	// set, gives a fresh pool connection for a step whose connection broke.
 	acquire  func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
 	fallback func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
-	policy   sqlconnect.VisibilityPolicy
+	// broken is set once a step finds the acquired connection unusable;
+	// later steps then go straight to the fallback.
+	broken *bool
+	policy sqlconnect.VisibilityPolicy
 }
 
 // run drops the probe on a context detached from the caller, so a caller
@@ -518,21 +521,27 @@ func (c probeCleanup) run(parent context.Context) error {
 	return nil
 }
 
-// step runs fn on the connection from acquire. When that fails without a
-// server answer (a broken connection, a network error) and a fallback is set,
-// it runs fn once more on a fresh connection, so a broken validation
-// connection never blocks the DROP. An error the server answered, such as a
-// denied DROP, stays fatal and runs once.
+// step runs fn on the connection from acquire. When that connection is
+// unusable before the statement runs (sql.ErrConnDone or driver.ErrBadConn)
+// and a fallback is set, it runs fn on a fresh connection, and later steps
+// use the fallback too. Any other failure, including one the server or a
+// proxy answered, stays fatal and runs once.
 func (c probeCleanup) step(ctx context.Context, fn func(ex sqlconnect.QueryExecutor) error) error {
-	ex, done, err := c.acquire(ctx)
-	if err == nil {
-		err = fn(ex)
-		done()
+	if c.fallback != nil && c.broken != nil && *c.broken {
+		return c.run1(ctx, c.fallback, fn)
 	}
-	if err == nil || c.fallback == nil || classify(err).ServerCode != 0 {
+	err := c.run1(ctx, c.acquire, fn)
+	if c.fallback == nil || !(errors.Is(err, sql.ErrConnDone) || errors.Is(err, driver.ErrBadConn)) {
 		return err
 	}
-	ex, done, err = c.fallback(ctx)
+	if c.broken != nil {
+		*c.broken = true
+	}
+	return c.run1(ctx, c.fallback, fn)
+}
+
+func (c probeCleanup) run1(ctx context.Context, acquire func(context.Context) (sqlconnect.QueryExecutor, func(), error), fn func(ex sqlconnect.QueryExecutor) error) error {
+	ex, done, err := acquire(ctx)
 	if err != nil {
 		return err
 	}
@@ -587,6 +596,7 @@ func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 		acquire: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
 			return ex, func() {}, nil
 		},
+		broken: new(bool),
 		fallback: func(actx context.Context) (sqlconnect.QueryExecutor, func(), error) {
 			fresh, err := db.Conn(actx)
 			if err != nil {

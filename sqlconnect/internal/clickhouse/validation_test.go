@@ -267,14 +267,30 @@ func TestProbeCleanup_ReusesValidationConnection(t *testing.T) {
 	for _, broken := range []error{sql.ErrConnDone, driver.ErrBadConn} {
 		good := scripted(t, execOK, noRow)
 		require.NoError(t, probeCleanup{
-			db: unitDB(t), ref: ref, created: true,
-			acquire:  fixed(scripted(t, failWith(broken), failWith(broken))),
+			db: unitDB(t), ref: ref, created: true, broken: new(bool),
+			acquire:  fixed(scripted(t, failWith(broken))),
 			fallback: fixed(good),
 		}.run(context.Background()), broken.Error())
 		require.True(t, strings.HasPrefix(good.lastExec, "DROP TABLE `scratch_db`.`_rudder_probe_"), good.lastExec)
 	}
 
-	// A DROP the server denies runs once and stays fatal.
+	// A DROP the server or a proxy refuses runs once and stays fatal.
+	for _, refused := range []error{
+		&cherr.Error{Code: cherr.CodeNetwork, Detail: "HTTP 403 from a proxy"},
+		&cherr.Error{Code: cherr.CodeRateLimited},
+		&cherr.Error{Code: cherr.CodeRedirectRefused},
+	} {
+		once := scripted(t, failWith(refused))
+		err := probeCleanup{
+			db: unitDB(t), ref: ref, created: true, broken: new(bool), acquire: fixed(once),
+			fallback: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
+				t.Error("a refused DROP must not take the fallback")
+				return nil, nil, errors.New("unexpected")
+			},
+		}.run(context.Background())
+		requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
+		require.Equal(t, 1, once.calls, "the refused DROP ran once")
+	}
 	denied := scripted(t, failWith(&cherr.Error{Code: cherr.CodePermission, ServerCode: 497}))
 	err := probeCleanup{
 		db: unitDB(t), ref: ref, created: true, acquire: fixed(denied),
