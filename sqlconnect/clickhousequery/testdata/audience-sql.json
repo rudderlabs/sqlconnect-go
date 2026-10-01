@@ -212,6 +212,18 @@
       "clause": "TABLE FUNCTION"
     },
     {
+      "name": "refuse_table_function_in_after_param",
+      "sql": "SELECT 1 WHERE {p1:String} IN (remote('host.example', db.t))",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_after_param_nested",
+      "sql": "SELECT 1 WHERE {p1:String} IN ((remote('host.example', db.t)))",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
       "name": "refuse_table_function_in_any_name",
       "sql": "SELECT id FROM db.users WHERE id IN numbers_mt(10)",
       "verdict": "refuse",
@@ -256,6 +268,12 @@
     {
       "name": "refuse_table_function_join",
       "sql": "SELECT a.id FROM db.users a JOIN s3('x') b ON a.id = b.id",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_not_in_after_param",
+      "sql": "SELECT 1 WHERE {p1:String} NOT IN (remote('host.example', db.t))",
       "verdict": "refuse",
       "clause": "TABLE FUNCTION"
     },
