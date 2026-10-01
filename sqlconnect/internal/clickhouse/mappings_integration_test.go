@@ -2,10 +2,14 @@ package clickhouse_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
 func TestSQ15_SQ16_Integers(t *testing.T) {
@@ -131,4 +135,47 @@ func TestRowErrors(t *testing.T) {
 	requireCode(t, err, "CH_DUPLICATE_COLUMN")
 	rows := queryJSON(t, db, "SELECT toString(number) s FROM numbers(3)") // copied byte slices stay stable
 	require.Equal(t, []string{`{"s":"0"}`, `{"s":"2"}`}, []string{string(rows[0]), string(rows[2])})
+}
+
+func TestJSONColumn(t *testing.T) {
+	db := openFloor(t)
+	m := queryJSONMap(t, db, `SELECT '{"a":1,"b":{"c":"x"},"d":[1,2],"f":1.5,"n":18446744073709551615}'::JSON AS j,
+		['{"a":2}'::JSON] AS arr, CAST(NULL AS Nullable(JSON)) AS nj, '{"w":5,"d":"1.50"}'::JSON(w UInt256, d Decimal(9, 2)) AS typed`)
+	require.Equal(t, map[string]any{
+		"j": map[string]any{
+			"a": json.Number("1"), "b": map[string]any{"c": "x"}, "d": []any{json.Number("1"), json.Number("2")},
+			"f": json.Number("1.5"), "n": json.Number("18446744073709551615"),
+		},
+		"arr": []any{map[string]any{"a": json.Number("2")}}, "nj": nil,
+		// Typed paths follow the wide-integer string policy. A typed decimal
+		// path keeps its exact value, but the object carries no scale.
+		"typed": map[string]any{"w": "5", "d": "1.5"},
+	}, m)
+}
+
+type failingScan struct{}
+
+func (failingScan) Scan(...any) error { return errors.New("scan failed") }
+
+func TestMapperReturnsNoPartialRow(t *testing.T) {
+	db := openFloor(t)
+	for _, c := range []struct {
+		q    string
+		scan func(*sql.Rows) sqlconnect.RowScan
+		code string
+	}{
+		{"SELECT 1 AS a, unhex('ff') AS b", func(r *sql.Rows) sqlconnect.RowScan { return r }, "CH_VALUE_ENCODING"},
+		{"SELECT 1 AS a", func(*sql.Rows) sqlconnect.RowScan { return failingScan{} }, "CH_UNKNOWN"},
+	} {
+		rows, err := db.QueryContext(context.Background(), c.q)
+		require.NoError(t, err)
+		cols, err := rows.ColumnTypes()
+		require.NoError(t, err)
+		require.True(t, rows.Next())
+		m, err := db.JSONRowMapper()(cols, c.scan(rows))
+		require.Nil(t, m, c.q)
+		requireCode(t, err, c.code)
+		require.NoError(t, rows.Close())
+		require.NoError(t, rows.Err())
+	}
 }

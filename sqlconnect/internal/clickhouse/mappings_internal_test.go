@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/clickhouse-go/v2/lib/chcol"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 )
 
@@ -71,4 +73,20 @@ func TestColumnError_KeepsCode(t *testing.T) {
 	require.True(t, errors.As(err, &ce))
 	require.Equal(t, cherr.CodeTypeUnsupported, ce.Code)
 	require.Equal(t, `CH_TYPE_UNSUPPORTED: column "c": x`, err.Error())
+}
+
+func TestJSONValue_ForkJSONObject(t *testing.T) {
+	o := chcol.NewJSON()
+	o.SetValueAtPath("a.b", int64(1))
+	o.SetValueAtPath("w", *big.NewInt(5))
+	want := map[string]any{"a": map[string]any{"b": json.Number("1")}, "w": "5"}
+	got, err := jsonValue(mustType(t, "JSON"), o) // a top-level column arrives as *chcol.JSON
+	require.NoError(t, err)
+	require.Equal(t, want, got)
+	got, err = jsonValue(mustType(t, "Array(JSON)"), []chcol.JSON{*o}) // elements arrive by value
+	require.NoError(t, err)
+	require.Equal(t, []any{want}, got)
+	got, err = jsonValue(mustType(t, "Nullable(JSON)"), (*chcol.JSON)(nil))
+	require.NoError(t, err)
+	require.Nil(t, got)
 }

@@ -95,6 +95,11 @@ func jsonValue(t chType, v any) (any, error) {
 		}
 		return (*b).Text(10), nil
 	}
+	if u := t.unwrap(); u.Name == "JSON" || u.Name == "Object" {
+		// Before deref: the fork's *chcol.JSON has MarshalJSON on the pointer
+		// only, and its dereferenced struct marshals to {}.
+		return jsonNumbers(v)
+	}
 	v = deref(v)
 	if v == nil {
 		return nil, nil //nolint:nilnil // a SQL NULL exports as JSON null
@@ -177,8 +182,6 @@ func jsonValue(t chType, v any) (any, error) {
 			return nil, errEncoding("the value is not valid UTF-8")
 		}
 		return s, nil
-	case "JSON", "Object":
-		return jsonNumbers(v)
 	case "SimpleAggregateFunction":
 		return jsonValue(t.Children[0], v)
 	case "Array":
@@ -296,6 +299,15 @@ func formatTimeOfDay(d time.Duration, t chType) string {
 // jsonNumbers re-encodes a JSON value and decodes it with UseNumber, so
 // numbers keep their exact text.
 func jsonNumbers(v any) (any, error) {
+	v = marshalable(v)
+	if v == nil {
+		return nil, nil //nolint:nilnil // a SQL NULL exports as JSON null
+	}
+	if o, ok := v.(interface{ NestedMap() map[string]any }); ok {
+		// The fork's JSON object: a typed wide-integer path holds a big.Int
+		// value, which json.Marshal prints as {}.
+		v = jsonSafe(o.NestedMap())
+	}
 	var raw []byte
 	switch s := v.(type) {
 	case string:
@@ -384,4 +396,86 @@ func mapTuple(t chType, v any) (any, error) {
 // Array branch maps.
 func mapNested(t chType, v any) (any, error) {
 	return mapSlice(chType{Name: "Tuple", Fields: t.Fields}, v)
+}
+
+// marshalable returns v in a form that keeps a pointer-receiver MarshalJSON:
+// v itself when it is a json.Marshaler, a pointer to a copy of v when only
+// the pointer is one, and otherwise the dereferenced value. A nil pointer
+// becomes nil.
+func marshalable(v any) any {
+	if v == nil {
+		return nil
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Pointer && rv.IsNil() {
+		return nil
+	}
+	if _, ok := v.(json.Marshaler); ok {
+		return v
+	}
+	if rv.Kind() != reflect.Pointer && rv.Kind() != reflect.Interface {
+		p := reflect.New(rv.Type())
+		p.Elem().Set(rv)
+		if m, ok := p.Interface().(json.Marshaler); ok {
+			return m
+		}
+	}
+	return deref(v)
+}
+
+// jsonSafe rewrites the values json.Marshal cannot print exactly: a big.Int
+// becomes its digits as a string, a decimal its text as a string and a time
+// UTC RFC 3339 text. Maps and slices are walked; other values pass unchanged.
+func jsonSafe(v any) any {
+	switch x := v.(type) {
+	case nil:
+		return nil
+	case big.Int:
+		return x.Text(10)
+	case *big.Int:
+		if x == nil {
+			return nil
+		}
+		return x.Text(10)
+	case time.Time:
+		return x.UTC().Format(time.RFC3339Nano)
+	case interface {
+		StringFixed(int32) string
+		String() string
+	}:
+		return x.String()
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, e := range x {
+			out[k] = jsonSafe(e)
+		}
+		return out
+	case []any:
+		out := make([]any, len(x))
+		for i, e := range x {
+			out[i] = jsonSafe(e)
+		}
+		return out
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Pointer:
+		if rv.IsNil() {
+			return nil
+		}
+		if _, ok := v.(json.Marshaler); ok {
+			return v
+		}
+		return jsonSafe(rv.Elem().Interface())
+	case reflect.Slice, reflect.Array:
+		if rv.Type().Elem().Kind() == reflect.Uint8 {
+			return v
+		}
+		out := make([]any, rv.Len())
+		for i := range out {
+			out[i] = jsonSafe(rv.Index(i).Interface())
+		}
+		return out
+	}
+	return v
 }
