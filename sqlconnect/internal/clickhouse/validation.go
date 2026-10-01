@@ -121,8 +121,12 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 		return stage2UnionSettings(int(clickhousequery.MaxRunBudget.Seconds()))
 	}}
 	var one uint8
-	if err := union.QueryRowContext(ctx, "SELECT 1").Scan(&one); err != nil {
-		return res, settingFailure(ctx, conn, err)
+	// The fork replaces max_execution_time with the remaining deadline, so the
+	// check runs without a deadline and sends the run budget itself.
+	budgetCtx, stopBudget := withoutDeadline(ctx)
+	defer stopBudget()
+	if err := union.QueryRowContext(budgetCtx, "SELECT 1").Scan(&one); err != nil {
+		return res, settingFailure(budgetCtx, conn, err)
 	}
 
 	// Stage 3: grants and engine.
@@ -312,6 +316,18 @@ func (db *DB) refusedOpenSetting(ctx context.Context, code int32) string {
 		return "max_execution_time"
 	}
 	return ""
+}
+
+// withoutDeadline returns a context that ends when ctx ends but carries no
+// deadline. The fork adds max_execution_time from a context deadline and
+// overwrites the statement's own value.
+func withoutDeadline(ctx context.Context) (context.Context, func()) {
+	c, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	stop := context.AfterFunc(ctx, cancel)
+	return c, func() {
+		stop()
+		cancel()
+	}
 }
 
 // settingFailure maps a stage 2 failure. Codes 164 and 452 are CH_PERMISSION

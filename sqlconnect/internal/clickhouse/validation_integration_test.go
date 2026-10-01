@@ -11,6 +11,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -228,9 +229,11 @@ func TestValidation_PingDelegates(t *testing.T) {
 	require.NoError(t, db.Ping(), "metadata warnings never fail Ping")
 	r1, err := db.ValidateContext(context.Background())
 	require.NoError(t, err)
-	r2, _ := db.ValidateContext(context.Background())
-	r1.Warnings = append(r1.Warnings, sqlconnect.ValidationWarning{Operation: "mutated"})
-	require.NotContains(t, r2.Warnings, sqlconnect.ValidationWarning{Operation: "mutated"}, "each call owns its result")
+	r2, err := db.ValidateContext(context.Background())
+	require.NoError(t, err)
+	require.NotEmpty(t, r1.Warnings, "the published script yields at least the inspect_grants warning")
+	r1.Warnings[0].Operation = "mutated"
+	require.NotContains(t, r2.Warnings, sqlconnect.ValidationWarning{Info: r1.Warnings[0].Info, Operation: "mutated"}, "each call owns its result")
 	cctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.Error(t, db.PingContext(cctx))
@@ -264,5 +267,21 @@ func TestValidation_VisibilityDisconnectAndWarmPool(t *testing.T) {
 		n, err := strconv.Atoi(r.Settings["max_execution_time"])
 		require.NoError(t, err, "the version read carries a deadline: %v", r.Settings)
 		require.LessOrEqual(t, n, 95)
+	}
+}
+
+func TestSQ14_RunBudgetUnderCallerDeadline(t *testing.T) {
+	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
+	srv.AdminExec(t, "CREATE SETTINGS PROFILE p_budget SETTINGS max_execution_time MAX 600")
+	srv.AdminExec(t, "CREATE USER u_budget IDENTIFIED WITH sha256_password BY 'pw_Budget_123' SETTINGS PROFILE p_budget")
+	db := openAs(t, srv, chtest.User{Name: "u_budget", Password: "pw_Budget_123"})
+	for _, d := range []time.Duration{120 * time.Second, time.Hour} {
+		ctx, cancel := context.WithTimeout(context.Background(), d)
+		_, err := db.ValidateContext(ctx)
+		cancel()
+		details, _ := clickhousequery.Describe(err)
+		require.Equal(t, [2]any{"max_execution_time", int32(452)}, [2]any{details.Field, details.ServerCode},
+			"a caller deadline must not replace the two-hour budget (%s): %v", d, err)
+		requireStage(t, err, 2, "settings")
 	}
 }
