@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-go-kit/testhelper/rand"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/clickhouse"
