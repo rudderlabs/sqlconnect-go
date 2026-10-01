@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -52,45 +53,46 @@ func TestValidation_EngineRules(t *testing.T) {
 	}
 }
 
+// fixed returns an acquire function that hands out ex for every step.
+func fixed(ex sqlconnect.QueryExecutor) func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
+	return func(context.Context) (sqlconnect.QueryExecutor, func(), error) { return ex, func() {}, nil }
+}
+
 func TestProbeCleanup_Codes(t *testing.T) {
 	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("scratch_db"))
 	db := unitDB(t)
 	for name, c := range map[string]probeCleanup{
 		"acquisition fails": {
-			db: db, ref: ref, created: true, broken: true,
+			db: db, ref: ref, created: true,
 			acquire: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
 				return nil, nil, errors.New("pool exhausted")
 			},
 		},
 		"absence times out": {
-			db: db, ref: ref, created: true, exec: scripted(t, execOK, row("still-there")),
+			db: db, ref: ref, created: true, acquire: fixed(scripted(t, execOK, row("still-there"))),
 			policy: sqlconnect.VisibilityPolicy{InitialBackoff: time.Millisecond, Deadline: 50 * time.Millisecond},
 		},
-		"drop refused": {db: db, ref: ref, created: true, exec: scripted(t, execErr(&ch.Exception{Code: 497}))},
+		"drop refused": {db: db, ref: ref, created: true, acquire: fixed(scripted(t, execErr(&ch.Exception{Code: 497})))},
 	} {
 		err := c.run(context.Background())
 		requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
 		requireStage(t, err, 4, "scratch_cleanup")
 		_ = name
 	}
-	require.NoError(t, probeCleanup{db: db, ref: ref, created: false, exec: scripted(t, execOK, noRow)}.run(context.Background()))
+	require.NoError(t, probeCleanup{db: db, ref: ref, created: false, acquire: fixed(scripted(t, execOK, noRow))}.run(context.Background()))
 
-	// A visibility read that lost the connection leaves a closed *sql.Conn and
-	// a bounded error without driver.ErrBadConn: the DROP moves to a fresh one.
-	closed, err := scripted(t, execOK).db.Conn(context.Background())
-	require.NoError(t, err)
-	require.NoError(t, closed.Close())
-	replacement := scripted(t, execOK, noRow)
-	acquired := 0
+	// Each step takes its own connection and releases it.
+	good := scripted(t, execOK, noRow)
+	var acquired, released int
 	require.NoError(t, probeCleanup{
-		db: db, ref: ref, created: true, exec: closed,
+		db: db, ref: ref, created: true,
 		acquire: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
 			acquired++
-			return replacement, func() {}, nil
+			return good, func() { released++ }, nil
 		},
 	}.run(context.Background()))
-	require.Equal(t, 1, acquired)
-	require.True(t, strings.HasPrefix(replacement.lastExec, "DROP TABLE `scratch_db`.`_rudder_probe_"), replacement.lastExec)
+	require.Equal(t, []int{2, 2}, []int{acquired, released}, "the DROP and the absence check each take and release a connection")
+	require.True(t, strings.HasPrefix(good.lastExec, "DROP TABLE `scratch_db`.`_rudder_probe_"), good.lastExec)
 	require.Contains(t, unknownLastExec(t), "DROP TABLE IF EXISTS", "an unknown CREATE outcome drops only if the table exists")
 }
 
@@ -153,7 +155,7 @@ func TestProbeCleanup_WaitsForUnknownCreate(t *testing.T) {
 	t.Cleanup(func() { sleep = orig })
 	cleanup := func(l *lateCreate) probeCleanup {
 		return probeCleanup{
-			db: db, ref: ref, createID: "retl-create", exec: l.exec(t),
+			db: db, ref: ref, createID: "retl-create", acquire: fixed(l.exec(t)),
 			policy: sqlconnect.VisibilityPolicy{InitialBackoff: time.Millisecond, Deadline: 50 * time.Millisecond},
 		}
 	}
@@ -182,9 +184,69 @@ func TestProbeCleanup_WaitsForUnknownCreate(t *testing.T) {
 	// The outcome read is refused: the DROP runs at once, and the outcome
 	// stays open.
 	refused := scripted(t, failWith(&ch.Exception{Code: 497}), execOK, noRow)
-	err := probeCleanup{db: db, ref: ref, createID: "retl-create", exec: refused}.run(context.Background())
+	err := probeCleanup{db: db, ref: ref, createID: "retl-create", acquire: fixed(refused)}.run(context.Background())
 	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
 	require.True(t, strings.HasPrefix(refused.lastExec, "DROP TABLE IF EXISTS "), refused.lastExec)
+}
+
+func TestProbeCleanup_OutcomeReadKeepsDropTime(t *testing.T) {
+	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("scratch_db"))
+	orig := probeLookupTimeout
+	probeLookupTimeout = 20 * time.Millisecond
+	t.Cleanup(func() { probeLookupTimeout = orig })
+
+	// The outcome read stalls until its context ends. The DROP still runs,
+	// on a context with time left.
+	var dropped atomic.Bool
+	stalled := sql.OpenDB(stubConnector{
+		query: func(ctx context.Context, q string, _ []driver.NamedValue) (driver.Rows, error) {
+			if q == processesSQL {
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}
+			return &stubRows{}, nil
+		},
+		exec: func(ctx context.Context, q string, _ []driver.NamedValue) (driver.Result, error) {
+			if ctx.Err() == nil && strings.HasPrefix(q, "DROP TABLE IF EXISTS ") {
+				dropped.Store(true)
+			}
+			return driver.RowsAffected(0), nil
+		},
+	})
+	t.Cleanup(func() { _ = stalled.Close() })
+	start := time.Now()
+	err := probeCleanup{
+		db: unitDB(t), ref: ref, createID: "retl-create", acquire: fixed(stalled),
+		policy: sqlconnect.VisibilityPolicy{InitialBackoff: time.Millisecond, Deadline: time.Second},
+	}.run(context.Background())
+	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
+	require.True(t, dropped.Load(), "the DROP reached the server")
+	require.Less(t, time.Since(start), 10*time.Second, "the outcome wait has its own bound")
+}
+
+func TestProbeCleanup_BadConnOnOutcomeRead(t *testing.T) {
+	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("scratch_db"))
+	orig := sleep
+	sleep = func(context.Context, time.Duration) error { return nil }
+	t.Cleanup(func() { sleep = orig })
+	// The outcome read loses its connection with driver.ErrBadConn. The DROP
+	// takes another connection and still runs.
+	broken := scripted(t, failWith(driver.ErrBadConn))
+	good := scripted(t, execOK, noRow)
+	var acquired, released int
+	err := probeCleanup{
+		db: unitDB(t), ref: ref, createID: "retl-create",
+		acquire: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
+			acquired++
+			if acquired == 1 {
+				return broken, func() { released++ }, nil
+			}
+			return good, func() { released++ }, nil
+		},
+	}.run(context.Background())
+	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED") // the outcome read failed, so the outcome stays open
+	require.Equal(t, acquired, released, "each step releases its connection")
+	require.True(t, strings.HasPrefix(good.lastExec, "DROP TABLE IF EXISTS "), good.lastExec)
 }
 
 func countOf(list []string, s string) int {

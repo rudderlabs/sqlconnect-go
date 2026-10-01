@@ -47,6 +47,14 @@ const (
 	engineSQL           = "SELECT engine FROM system.databases WHERE name = ?"
 )
 
+// probeLookupTimeout bounds one outcome read, and probeCleanupReserve is the
+// part of probeCleanupTimeout that the outcome wait never uses. A stalled
+// read therefore always leaves time for the DROP and the absence check.
+// Tests shorten probeLookupTimeout.
+var probeLookupTimeout = 5 * time.Second
+
+const probeCleanupReserve = 20 * time.Second
+
 // diagnosticSettings are the settings stage 5 reads from system.settings.
 var diagnosticSettings = []string{
 	"async_insert", "cancel_http_readonly_queries_on_client_close", "date_time_input_format",
@@ -145,7 +153,7 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 	}
 
 	// Stage 4: probe.
-	if err := db.probe(ctx, conn, ex); err != nil {
+	if err := db.probe(ctx, ex); err != nil {
 		return res, err
 	}
 
@@ -471,9 +479,6 @@ type probeCleanup struct {
 	// createID is the query id of a CREATE with an unknown outcome. That
 	// CREATE can still be in transit, so the DROP waits until it is over.
 	createID string
-	exec     sqlconnect.QueryExecutor
-	broken   bool // the original connection returned driver.ErrBadConn or sql.ErrConnDone
-	release  func()
 	acquire  func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
 	policy   sqlconnect.VisibilityPolicy
 }
@@ -486,49 +491,20 @@ func (c probeCleanup) run(parent context.Context) error {
 	failed := func(err error) error {
 		return stageErr(4, "scratch_cleanup", wrap(cherr.CodeScratchCleanupFailed, c.ref.Name, "the probe table could not be removed", err))
 	}
-	var cleanups []func()
 	stmt := "DROP TABLE " + c.db.QuoteTable(c.ref) + " SYNC"
 	if !c.created {
 		stmt = "DROP TABLE IF EXISTS " + c.db.QuoteTable(c.ref) + " SYNC"
 	}
-	ex := c.exec
-	replace := func() error {
-		if c.release != nil {
-			c.release() // give the broken connection's slot back before asking for another
-		}
-		fresh, done, err := c.acquire(ctx)
-		if err != nil {
-			return err
-		}
-		cleanups = append(cleanups, done)
-		ex = fresh
-		return nil
-	}
-	defer func() {
-		for _, done := range cleanups {
-			done()
-		}
-	}()
-	if c.broken {
-		if err := replace(); err != nil {
-			return failed(err)
-		}
-	}
-	unresolved := c.createID != "" && !c.createSettled(ctx, ex)
-	_, err := ex.ExecContext(ctx, stmt)
-	if errors.Is(err, sql.ErrConnDone) && !c.broken {
-		// An earlier read lost the connection, and its bounded error no longer
-		// carries driver.ErrBadConn. ErrConnDone means the DROP was never
-		// sent, so it runs again on a replacement connection.
-		if rerr := replace(); rerr != nil {
-			return failed(rerr)
-		}
-		_, err = ex.ExecContext(ctx, stmt)
-	}
-	if err != nil {
+	unresolved := c.createID != "" && !c.createSettled(ctx)
+	if err := c.step(ctx, func(ex sqlconnect.QueryExecutor) error {
+		_, err := ex.ExecContext(ctx, stmt)
+		return err
+	}); err != nil {
 		return failed(err)
 	}
-	if err := c.db.AwaitTableAbsent(ctx, ex, c.ref, c.policy); err != nil {
+	if err := c.step(ctx, func(ex sqlconnect.QueryExecutor) error {
+		return c.db.AwaitTableAbsent(ctx, ex, c.ref, c.policy)
+	}); err != nil {
 		return failed(err)
 	}
 	if unresolved {
@@ -538,15 +514,37 @@ func (c probeCleanup) run(parent context.Context) error {
 	return nil
 }
 
+// step runs fn on a fresh pool connection and releases it after. A
+// connection that an earlier step broke therefore never blocks a later one.
+func (c probeCleanup) step(ctx context.Context, fn func(ex sqlconnect.QueryExecutor) error) error {
+	ex, done, err := c.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	return fn(ex)
+}
+
 // createSettled waits until the unknown-outcome CREATE has finished or
 // failed, so it cannot create the table after the DROP. It polls at most
-// probeSettlePolls times. Only a finished or failed outcome proves that the
-// CREATE is over. A CREATE that is still running or never seen, or an
-// outcome read that fails, leaves the outcome open, and it returns false.
-func (c probeCleanup) createSettled(ctx context.Context, ex sqlconnect.QueryExecutor) bool {
-	row := func(q string, args ...any) *sql.Row { return ex.QueryRowContext(ctx, q, args...) }
+// probeSettlePolls times, each read bounded by probeLookupTimeout, and stops
+// when less than probeCleanupReserve of ctx remains. Only a finished or
+// failed outcome proves that the CREATE is over. A CREATE that is still
+// running or never seen, or an outcome read that fails, leaves the outcome
+// open, and it returns false.
+func (c probeCleanup) createSettled(ctx context.Context) bool {
 	for i := range probeSettlePolls {
-		o, err := queryOutcome(row, c.createID, "Create")
+		if dl, ok := ctx.Deadline(); ok && time.Until(dl) < probeCleanupReserve {
+			return false
+		}
+		var o sqlconnect.QueryOutcome
+		lctx, stop := context.WithTimeout(ctx, probeLookupTimeout)
+		err := c.step(lctx, func(ex sqlconnect.QueryExecutor) error {
+			var err error
+			o, err = queryOutcome(func(q string, args ...any) *sql.Row { return ex.QueryRowContext(lctx, q, args...) }, c.createID, "Create")
+			return err
+		})
+		stop()
 		switch {
 		case err != nil:
 			return false
@@ -564,14 +562,13 @@ func (c probeCleanup) createSettled(ctx context.Context, ex sqlconnect.QueryExec
 
 // probe creates, fills, reads and drops one table with a random name. The
 // CREATE is plain: an existing table with the name fails the stage.
-func (db *DB) probe(ctx context.Context, conn *sql.Conn, ex driverExec) (err error) {
+func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 	var b [8]byte
 	_, _ = rand.Read(b[:])
 	ref := sqlconnect.NewRelationRef("_rudder_probe_"+hex.EncodeToString(b[:]), sqlconnect.WithSchema(db.cfg.ScratchDatabase))
 	t := db.QuoteTable(ref)
 	cleanup := probeCleanup{
-		db: db, ref: ref, exec: ex,
-		release: func() { _ = conn.Close() },
+		db: db, ref: ref,
 		acquire: func(actx context.Context) (sqlconnect.QueryExecutor, func(), error) {
 			fresh, err := db.Conn(actx)
 			if err != nil {
@@ -589,12 +586,7 @@ func (db *DB) probe(ctx context.Context, conn *sql.Conn, ex driverExec) (err err
 			err = cerr // a cleanup failure wins
 		}
 	}()
-	fail := func(e error) error {
-		if errors.Is(e, driver.ErrBadConn) || errors.Is(e, sql.ErrConnDone) {
-			cleanup.broken = true
-		}
-		return stageErr(4, "scratch_write", e)
-	}
+	fail := func(e error) error { return stageErr(4, "scratch_write", e) }
 	createID := clickhousequery.NewQueryID()
 	if _, cerr := ex.execAs(ctx, createID, "CREATE TABLE "+t+" (probe UInt8)\nENGINE = MergeTree\nORDER BY tuple()"); cerr != nil {
 		// An unknown outcome may have created the table, or may still create
