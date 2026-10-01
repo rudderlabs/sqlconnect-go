@@ -7,5 +7,6 @@
     "_boolean": "boolean",
     "_date": "datetime",
     "_timestamp": "datetime",
-    "_array": "array"
+    "_array": "array",
+    "_tuple": "json"
 }

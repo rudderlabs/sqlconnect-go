@@ -27,6 +27,7 @@ func TestClickHouseDB(t *testing.T) {
 					QuotedConditionIdentifiers: true,
 					NoLegacyMappings:           true,
 					OpaqueExpressionErrors:     true,
+					ReportsViews:               true,
 					NewDB: func(cfg json.RawMessage) (sqlconnect.DB, error) {
 						return clickhouse.NewDBForTest(cfg, chpolicy.Policy{AllowLoopback: true, AllowPlainHTTP: true}, srv.CA)
 					},

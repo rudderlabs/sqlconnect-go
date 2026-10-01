@@ -48,6 +48,9 @@ type Options struct {
 	// OpaqueExpressionErrors skips the check that an expression error names the refused operator: the driver
 	// bounds its error text and never echoes caller input.
 	OpaqueExpressionErrors bool
+
+	// ReportsViews expects ListTables to report a view with the view relation type.
+	ReportsViews bool
 }
 
 func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMessage, formatfn func(string) string, opts Options) {
@@ -588,6 +591,12 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 	})
 
 	t.Run("table admin", func(t *testing.T) {
+		expectedView := func(v sqlconnect.RelationRef) sqlconnect.RelationRef {
+			if opts.ReportsViews {
+				v.Type = sqlconnect.ViewRelation
+			}
+			return v
+		}
 		table := sqlconnect.NewRelationRef(formatfn("test_table"), sqlconnect.WithSchema(schema.Name))
 		view := sqlconnect.NewRelationRef(formatfn("test_view"), sqlconnect.WithSchema(schema.Name))
 
@@ -653,7 +662,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		t.Run("list tables with views", func(t *testing.T) {
 			tables, err := db.ListTables(ctx, schema)
 			require.NoError(t, err, "it should be able to list tables")
-			require.True(t, containsRelation(tables, view), "it should contain the created view")
+			require.Contains(t, tables, expectedView(view), "it should contain the created view")
 			require.Contains(t, tables, table, "it should contain the table as well")
 		})
 
@@ -668,7 +677,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			viewWithCatalog := view
 			viewWithCatalog.Catalog = currentCatalog.Name
 			require.Contains(t, tables, tableWithCatalog, "it should contain the created table")
-			require.True(t, containsRelation(tables, viewWithCatalog), "it should contain the created view")
+			require.Contains(t, tables, expectedView(viewWithCatalog), "it should contain the created view")
 		})
 
 		t.Run("list tables with nonexistent catalog", func(t *testing.T) {
@@ -1234,13 +1243,6 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			opts.ExtraTests(t, db)
 		})
 	}
-}
-
-// containsRelation matches name, schema and catalog; drivers that report views set the relation type.
-func containsRelation(refs []sqlconnect.RelationRef, want sqlconnect.RelationRef) bool {
-	return lo.ContainsBy(refs, func(r sqlconnect.RelationRef) bool {
-		return r.Name == want.Name && r.Schema == want.Schema && r.Catalog == want.Catalog
-	})
 }
 
 func GenerateTestSchema(formatfn func(string) string) string {
