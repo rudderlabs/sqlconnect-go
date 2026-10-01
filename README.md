@@ -3,6 +3,7 @@
 Sqlconnect provides a uniform client interface for accessing multiple warehouses:
 
 - bigquery ([configuration](sqlconnect/internal/bigquery/config.go))
+- clickhouse ([configuration](sqlconnect/internal/clickhouse/config.go))
 - databricks ([configuration](sqlconnect/internal/databricks/config.go))
 - mysql ([configuration](sqlconnect/internal/mysql/config.go))
 - postgres ([configuration](sqlconnect/internal/postgres/config.go))
