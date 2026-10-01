@@ -140,7 +140,8 @@ func TestRowErrors(t *testing.T) {
 func TestJSONColumn(t *testing.T) {
 	db := openFloor(t)
 	m := queryJSONMap(t, db, `SELECT '{"a":1,"b":{"c":"x"},"d":[1,2],"f":1.5,"n":18446744073709551615}'::JSON AS j,
-		['{"a":2}'::JSON] AS arr, CAST(NULL AS Nullable(JSON)) AS nj, '{"w":5,"d":"1.50"}'::JSON(w UInt256, d Decimal(9, 2)) AS typed`)
+		['{"a":2}'::JSON] AS arr, CAST(NULL AS Nullable(JSON)) AS nj, '{"w":5,"d":"1.50"}'::JSON(w UInt256, d Decimal(9, 2)) AS typed,
+		'{"a":[1,2]}'::JSON(a Array(UInt8)) AS u8, '{"o":[{"x":1},{"x":2}]}'::JSON AS objs`)
 	require.Equal(t, map[string]any{
 		"j": map[string]any{
 			"a": json.Number("1"), "b": map[string]any{"c": "x"}, "d": []any{json.Number("1"), json.Number("2")},
@@ -150,6 +151,8 @@ func TestJSONColumn(t *testing.T) {
 		// Typed paths follow the wide-integer string policy. A typed decimal
 		// path keeps its exact value, but the object carries no scale.
 		"typed": map[string]any{"w": "5", "d": "1.5"},
+		"u8":    map[string]any{"a": []any{json.Number("1"), json.Number("2")}}, // numbers, never base64
+		"objs":  map[string]any{"o": []any{map[string]any{"x": json.Number("1")}, map[string]any{"x": json.Number("2")}}},
 	}, m)
 }
 

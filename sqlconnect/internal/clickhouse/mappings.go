@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"bytes"
 	"database/sql"
+	"encoding"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -291,26 +292,32 @@ func formatTimeOfDay(d time.Duration, t chType) string {
 	return s
 }
 
-// jsonNumbers re-encodes a JSON value and decodes it with UseNumber, so
-// numbers keep their exact text.
+// jsonNumbers decodes a JSON column value with UseNumber, so numbers keep
+// their exact text. The fork sends the JSON text, or a *chcol.JSON object
+// that normalizeJSONValue turns into plain JSON values first.
 func jsonNumbers(v any) (any, error) {
-	v = marshalable(v)
-	if v == nil {
-		return nil, nil //nolint:nilnil // a SQL NULL exports as JSON null
-	}
-	if o, ok := v.(interface{ NestedMap() map[string]any }); ok {
-		// The fork's JSON object: a typed wide-integer path holds a big.Int
-		// value, which json.Marshal prints as {}.
-		v = jsonSafe(o.NestedMap())
+	if rv := reflect.ValueOf(v); rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return nil, nil //nolint:nilnil // a SQL NULL exports as JSON null
+		}
+		if k := rv.Elem().Kind(); k == reflect.String || (k == reflect.Slice && rv.Elem().Type().Elem().Kind() == reflect.Uint8) {
+			v = rv.Elem().Interface()
+		}
 	}
 	var raw []byte
 	switch s := v.(type) {
+	case nil:
+		return nil, nil //nolint:nilnil // a SQL NULL exports as JSON null
 	case string:
 		raw = []byte(s)
 	case []byte:
 		raw = bytes.Clone(s)
 	default:
-		b, err := json.Marshal(v)
+		n, err := normalizeJSONValue(v)
+		if err != nil {
+			return nil, err
+		}
+		b, err := json.Marshal(n)
 		if err != nil {
 			return nil, errEncoding("the JSON value cannot be encoded")
 		}
@@ -329,6 +336,138 @@ func jsonNumbers(v any) (any, error) {
 		return nil, errEncoding("the JSON value has trailing data")
 	}
 	return out, nil
+}
+
+// normalizeJSONValue turns one value of the fork's JSON object into plain
+// JSON values: nil, bool, string, json.Number, []any and map[string]any.
+// json.Marshal must never see a fork type: it prints a big.Int or a
+// chcol.JSON value as {}, a []uint8 as base64, and it replaces invalid UTF-8
+// with U+FFFD. Any other struct is refused, never printed as {}.
+func normalizeJSONValue(v any) (any, error) {
+	if v == nil {
+		return nil, nil //nolint:nilnil // a JSON null stays null
+	}
+	switch x := v.(type) {
+	case json.Number:
+		return x, nil
+	case string:
+		if !utf8.ValidString(x) {
+			return nil, errEncoding("a JSON string is not valid UTF-8")
+		}
+		return x, nil
+	case bool:
+		return x, nil
+	case big.Int:
+		return x.Text(10), nil
+	case *big.Int:
+		if x == nil {
+			return nil, nil //nolint:nilnil // a JSON null stays null
+		}
+		return x.Text(10), nil
+	case time.Time:
+		return x.UTC().Format(time.RFC3339Nano), nil
+	case time.Duration:
+		return nil, cherr.New(cherr.CodeTypeUnsupported, "", "a JSON path of a time-of-day type is not supported; project it with an explicit cast")
+	case interface{ NestedMap() map[string]any }: // *chcol.JSON
+		if isNilPointer(v) {
+			return nil, nil //nolint:nilnil // a JSON null stays null
+		}
+		return normalizeJSONValue(x.NestedMap())
+	case interface {
+		Nil() bool
+		Any() any
+	}: // chcol.Dynamic and chcol.Variant
+		if isNilPointer(v) || x.Nil() {
+			return nil, nil //nolint:nilnil // a JSON null stays null
+		}
+		return normalizeJSONValue(x.Any())
+	case interface {
+		StringFixed(int32) string
+		String() string
+	}: // decimal.Decimal: the object carries no scale, so the text is exact but unpadded
+		return x.String(), nil
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Pointer && rv.Kind() != reflect.Interface {
+		// A method set on the pointer only, as on chcol.JSON, needs an
+		// addressable copy.
+		p := reflect.New(rv.Type())
+		p.Elem().Set(rv)
+		if _, ok := p.Interface().(interface{ NestedMap() map[string]any }); ok {
+			return normalizeJSONValue(p.Interface())
+		}
+	}
+	if tm, ok := v.(encoding.TextMarshaler); ok { // uuid.UUID, net.IP, netip.Addr
+		if isNilPointer(v) {
+			return nil, nil //nolint:nilnil // a JSON null stays null
+		}
+		b, err := tm.MarshalText()
+		if err != nil {
+			return nil, errEncoding("a JSON value cannot be printed as text")
+		}
+		return normalizeJSONValue(string(b))
+	}
+	switch rv.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if rv.IsNil() {
+			return nil, nil //nolint:nilnil // a JSON null stays null
+		}
+		return normalizeJSONValue(rv.Elem().Interface())
+	case reflect.String:
+		return normalizeJSONValue(rv.String())
+	case reflect.Bool:
+		return rv.Bool(), nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return json.Number(strconv.FormatInt(rv.Int(), 10)), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return json.Number(strconv.FormatUint(rv.Uint(), 10)), nil
+	case reflect.Float32, reflect.Float64:
+		f := rv.Float()
+		if math.IsNaN(f) || math.IsInf(f, 0) {
+			return nil, nil //nolint:nilnil // JSON has no NaN or Inf; they export as JSON null
+		}
+		bits := 64
+		if rv.Kind() == reflect.Float32 {
+			bits = 32
+		}
+		return json.Number(strconv.FormatFloat(f, 'g', -1, bits)), nil
+	case reflect.Slice, reflect.Array: // also []uint8: numbers, never base64
+		if rv.Kind() == reflect.Slice && rv.IsNil() {
+			return []any{}, nil
+		}
+		out := make([]any, rv.Len())
+		for i := range out {
+			e, err := normalizeJSONValue(rv.Index(i).Interface())
+			if err != nil {
+				return nil, err
+			}
+			out[i] = e
+		}
+		return out, nil
+	case reflect.Map:
+		if rv.Type().Key().Kind() != reflect.String {
+			return nil, cherr.New(cherr.CodeTypeUnsupported, "", "a JSON map with non-string keys is not supported")
+		}
+		out := make(map[string]any, rv.Len())
+		for it := rv.MapRange(); it.Next(); {
+			k := it.Key().String()
+			if !utf8.ValidString(k) {
+				return nil, errEncoding("a JSON key is not valid UTF-8")
+			}
+			e, err := normalizeJSONValue(it.Value().Interface())
+			if err != nil {
+				return nil, err
+			}
+			out[k] = e
+		}
+		return out, nil
+	}
+	return nil, cherr.New(cherr.CodeTypeUnsupported, "", "a JSON value of this type is not supported; project it with an explicit cast")
+}
+
+func isNilPointer(v any) bool {
+	rv := reflect.ValueOf(v)
+	return rv.Kind() == reflect.Pointer && rv.IsNil()
 }
 
 // mapSlice maps each element with jsonValue. It keeps order and empty arrays
@@ -391,94 +530,4 @@ func mapTuple(t chType, v any) (any, error) {
 // Array branch maps.
 func mapNested(t chType, v any) (any, error) {
 	return mapSlice(chType{Name: "Tuple", Fields: t.Fields}, v)
-}
-
-// marshalable returns v in a form that keeps a pointer-receiver MarshalJSON:
-// v itself when it is a json.Marshaler, a pointer to a copy of v when only
-// the pointer is one, and otherwise the dereferenced value. A nil pointer
-// becomes nil.
-func marshalable(v any) any {
-	if v == nil {
-		return nil
-	}
-	rv := reflect.ValueOf(v)
-	if rv.Kind() == reflect.Pointer && rv.IsNil() {
-		return nil
-	}
-	if _, ok := v.(json.Marshaler); ok {
-		return v
-	}
-	if rv.Kind() != reflect.Pointer && rv.Kind() != reflect.Interface {
-		p := reflect.New(rv.Type())
-		p.Elem().Set(rv)
-		if m, ok := p.Interface().(json.Marshaler); ok {
-			return m
-		}
-	}
-	return deref(v)
-}
-
-// jsonSafe rewrites the values json.Marshal cannot print exactly: a big.Int
-// becomes its digits as a string, a decimal its text as a string and a time
-// UTC RFC 3339 text. Maps and slices are walked; other values pass unchanged.
-func jsonSafe(v any) any {
-	switch x := v.(type) {
-	case nil:
-		return nil
-	case interface {
-		Nil() bool
-		Any() any
-	}: // chcol.Dynamic and chcol.Variant
-		if x.Nil() {
-			return nil
-		}
-		return jsonSafe(x.Any())
-	case big.Int:
-		return x.Text(10)
-	case *big.Int:
-		if x == nil {
-			return nil
-		}
-		return x.Text(10)
-	case time.Time:
-		return x.UTC().Format(time.RFC3339Nano)
-	case interface {
-		StringFixed(int32) string
-		String() string
-	}:
-		return x.String()
-	case map[string]any:
-		out := make(map[string]any, len(x))
-		for k, e := range x {
-			out[k] = jsonSafe(e)
-		}
-		return out
-	case []any:
-		out := make([]any, len(x))
-		for i, e := range x {
-			out[i] = jsonSafe(e)
-		}
-		return out
-	}
-	rv := reflect.ValueOf(v)
-	switch rv.Kind() {
-	case reflect.Pointer:
-		if rv.IsNil() {
-			return nil
-		}
-		if _, ok := v.(json.Marshaler); ok {
-			return v
-		}
-		return jsonSafe(rv.Elem().Interface())
-	case reflect.Slice, reflect.Array:
-		if rv.Type().Elem().Kind() == reflect.Uint8 {
-			return v
-		}
-		out := make([]any, rv.Len())
-		for i := range out {
-			out[i] = jsonSafe(rv.Index(i).Interface())
-		}
-		return out
-	}
-	return v
 }
