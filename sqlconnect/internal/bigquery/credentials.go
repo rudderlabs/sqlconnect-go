@@ -3,6 +3,7 @@ package bigquery
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -33,7 +34,9 @@ func validateServiceAccountJSON(jsonKey []byte) error {
 		return nil
 	}
 	var f struct {
-		Type string `json:"type"`
+		Type           string `json:"type"`
+		TokenURI       string `json:"token_uri"`
+		UniverseDomain string `json:"universe_domain"`
 	}
 	if err := json.Unmarshal(jsonKey, &f); err != nil {
 		return fmt.Errorf("invalid credentials json: %w", err)
@@ -41,7 +44,26 @@ func validateServiceAccountJSON(jsonKey []byte) error {
 	if f.Type != serviceAccountCredentialType {
 		return fmt.Errorf("unsupported credential type %q: only service account credentials are supported", f.Type)
 	}
+	if f.TokenURI != "" && !allowedGoogleHost(f.TokenURI) {
+		return fmt.Errorf("unsupported bigquery credential endpoint")
+	}
+	if f.UniverseDomain != "" && f.UniverseDomain != "googleapis.com" {
+		return fmt.Errorf("unsupported bigquery universe domain")
+	}
 	return nil
+}
+
+// allowedGoogleHost reports whether rawURL is an https URL on a google host.
+func allowedGoogleHost(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "https" {
+		return false
+	}
+	h := strings.ToLower(u.Hostname())
+	return h == "oauth2.googleapis.com" || strings.HasSuffix(h, ".googleapis.com")
 }
 
 // isEmptyCredentials reports whether the credentials field carries no document.
