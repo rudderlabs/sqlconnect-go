@@ -65,3 +65,6 @@ func InspectTransport(db *DB) *http.Transport {
 // DriverScratchSettings exposes the driver write map, so test executors can
 // attach it with their own query ids.
 var DriverScratchSettings = driverScratchSettings
+
+// CodeOf returns the registry code that the classifier gives err.
+func CodeOf(err error) string { return classify(err).Code }

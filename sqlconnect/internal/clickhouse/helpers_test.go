@@ -535,12 +535,52 @@ func startSlow(t *testing.T, db *clickhouse.DB, ctx context.Context, id string) 
 }
 
 // openScopedVia opens a DB as user on customer_db that connects through the
-// proxy p over TLS.
-func openScopedVia(t *testing.T, srv *chtest.Server, p *chtest.Proxy, user, password string) *clickhouse.DB {
+// front p (a chtest.Proxy or a chtest.Balancer) over TLS.
+func openScopedVia(t *testing.T, srv *chtest.Server, p interface{ Port() int }, user, password string) *clickhouse.DB {
 	t.Helper()
 	cfg := withHostPort(srv.Config(user, password, "customer_db", "scratch_db", true), "localhost", p.Port())
 	db, err := clickhouse.NewDBForTest(cfg, testPolicy, srv.CA)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	return db
+}
+
+// stageOf returns the stage and tag of a validation failure, or -1 and "".
+func stageOf(err error) (int, string) {
+	var se sqlconnect.ValidationStageError
+	if !errors.As(err, &se) {
+		return -1, ""
+	}
+	return se.Stage, se.Tag
+}
+
+// requireStage asserts that err is a validation failure of stage n and tag.
+func requireStage(t *testing.T, err error, n int, tag string) {
+	t.Helper()
+	stage, got := stageOf(err)
+	require.Equal(t, []any{n, tag}, []any{stage, got}, "%v", err)
+}
+
+// probeCount returns the number of validation probe tables in scratch_db.
+func probeCount(t *testing.T, srv *chtest.Server) string {
+	t.Helper()
+	return strconv.Itoa(len(srv.ProbeTables(t)))
+}
+
+// openScopedOnDatabase opens a DB as user with the given customer and scratch
+// databases.
+func openScopedOnDatabase(t *testing.T, srv *chtest.Server, user, password, database, scratch string) *clickhouse.DB {
+	t.Helper()
+	return openWith(t, srv.Config(user, password, database, scratch, true), srv)
+}
+
+// filterOp returns the warnings with the operation op.
+func filterOp(w []sqlconnect.ValidationWarning, op string) []sqlconnect.ValidationWarning {
+	var out []sqlconnect.ValidationWarning
+	for _, x := range w {
+		if x.Operation == op {
+			out = append(out, x)
+		}
+	}
+	return out
 }

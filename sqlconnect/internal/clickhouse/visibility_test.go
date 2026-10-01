@@ -159,6 +159,7 @@ type scriptedExec struct {
 	calls     int
 	lastQuery string
 	lastArgs  []any
+	lastExec  string
 }
 
 var _ sqlconnect.QueryExecutor = (*scriptedExec)(nil)
@@ -180,6 +181,16 @@ func scripted(t *testing.T, script ...stubResult) *scriptedExec {
 			return nil, r.err
 		}
 		return &stubRows{vals: r.rows}, nil
+	}, exec: func(_ context.Context, q string, _ []driver.NamedValue) (driver.Result, error) {
+		ex.mu.Lock()
+		defer ex.mu.Unlock()
+		ex.lastExec = q
+		r := ex.script[min(ex.calls, len(ex.script)-1)]
+		ex.calls++
+		if r.err != nil {
+			return nil, r.err
+		}
+		return driver.RowsAffected(0), nil
 	}})
 	t.Cleanup(func() { _ = ex.db.Close() })
 	return ex
@@ -223,9 +234,10 @@ func (blockingExec) QueryRowContext(ctx context.Context, q string, args ...any) 
 }
 
 // stubConnector is a minimal database/sql driver. Every query goes to query;
-// every exec fails.
+// every exec goes to exec, and fails when exec is nil.
 type stubConnector struct {
 	query func(ctx context.Context, q string, args []driver.NamedValue) (driver.Rows, error)
+	exec  func(ctx context.Context, q string, args []driver.NamedValue) (driver.Result, error)
 }
 
 func (c stubConnector) Connect(context.Context) (driver.Conn, error) { return stubConn(c), nil }
@@ -245,8 +257,11 @@ func (c stubConn) QueryContext(ctx context.Context, q string, args []driver.Name
 	return c.query(ctx, q, args)
 }
 
-func (stubConn) ExecContext(context.Context, string, []driver.NamedValue) (driver.Result, error) {
-	return nil, io.ErrUnexpectedEOF
+func (c stubConn) ExecContext(ctx context.Context, q string, args []driver.NamedValue) (driver.Result, error) {
+	if c.exec == nil {
+		return nil, io.ErrUnexpectedEOF
+	}
+	return c.exec(ctx, q, args)
 }
 
 // CheckNamedValue accepts every argument as is.

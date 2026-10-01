@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +23,9 @@ import (
 type ProxyOptions struct {
 	IdleTimeout time.Duration // the proxy's server-side keep-alive timeout, 0 for the net/http default
 	PlainHTTP   bool          // serve plain HTTP instead of TLS with the fixture certificate
+	// RewriteSQL, when set, replaces the statement text (body or "query"
+	// parameter) before the proxy forwards it.
+	RewriteSQL func(string) string
 }
 
 // Request is one request the proxy received. Credentials are redacted.
@@ -70,11 +74,13 @@ type Proxy struct {
 	srv      *httptest.Server
 	upstream string
 	client   *http.Client
+	rewrite  func(string) string
 
 	nextConn atomic.Int64
 	mu       sync.Mutex
 	rules    []*rule
 	requests []Request
+	hooks    []func(Request)
 }
 
 // NewProxy starts a proxy on 127.0.0.1 that forwards to srv's plain HTTP port.
@@ -85,6 +91,7 @@ func NewProxy(t *testing.T, srv *Server, o ProxyOptions) *Proxy {
 		t:        t,
 		upstream: "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(srv.HTTPPort)),
 		client:   newLoopbackClient(),
+		rewrite:  o.RewriteSQL,
 	}
 	p.srv = httptest.NewUnstartedServer(http.HandlerFunc(p.serve))
 	p.srv.Config.IdleTimeout = o.IdleTimeout
@@ -151,6 +158,24 @@ func (p *Proxy) Requests() []Request {
 	return out
 }
 
+// OnRequest calls hook with every request whose body the proxy has read,
+// before it answers or forwards the request.
+func (p *Proxy) OnRequest(hook func(Request)) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.hooks = append(p.hooks, hook)
+}
+
+// runHooks calls the hooks without the lock, so a hook may call Requests.
+func (p *Proxy) runHooks(req Request) {
+	p.mu.Lock()
+	hooks := slices.Clone(p.hooks)
+	p.mu.Unlock()
+	for _, h := range hooks {
+		h(req)
+	}
+}
+
 func (p *Proxy) add(r *rule) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -215,6 +240,7 @@ func (p *Proxy) serve(w http.ResponseWriter, r *http.Request) {
 		req.SQL = string(body)
 	}
 	p.record(req)
+	p.runHooks(req)
 
 	rl := p.take(req, false)
 	if rl != nil {
@@ -230,6 +256,14 @@ func (p *Proxy) serve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if p.rewrite != nil {
+		if q := r.URL.Query(); q.Has("query") {
+			q.Set("query", p.rewrite(q.Get("query")))
+			r.URL.RawQuery = q.Encode()
+		} else {
+			body = []byte(p.rewrite(string(body)))
+		}
+	}
 	resp, err := p.forward(r, body)
 	if err != nil {
 		// The error text can hold the upstream URL with the query string

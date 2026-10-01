@@ -679,3 +679,36 @@ func (s *Server) KillStatements(t *testing.T) []string {
 	}
 	return out
 }
+
+// CreateUserWithConstraint creates a user whose settings profile pins setting
+// to value with a CONST constraint, so a statement that sends another value
+// fails with server code 452.
+func (s *Server) CreateUserWithConstraint(t *testing.T, setting, value string) User {
+	t.Helper()
+	u := User{Name: "u_" + strings.ToLower(randomString(t, 10)), Password: "pw_" + randomString(t, 16)}
+	profile := quoteIdent("p_" + u.Name)
+	s.AdminExec(t, "CREATE SETTINGS PROFILE "+profile+" SETTINGS "+quoteIdent(setting)+" = "+quoteString(value)+" CONST")
+	s.AdminExec(t, fmt.Sprintf("CREATE USER %s IDENTIFIED WITH sha256_password BY %s SETTINGS PROFILE %s",
+		quoteIdent(u.Name), quoteString(u.Password), profile))
+	return u
+}
+
+// ProbeTables returns the names of the validation probe tables in scratch_db.
+func (s *Server) ProbeTables(t *testing.T) []string {
+	t.Helper()
+	var out []string
+	for _, r := range s.AdminQuery(t, "SELECT name FROM system.tables WHERE database = 'scratch_db' AND startsWith(name, '_rudder_probe_')") {
+		if len(r) == 1 && r[0] != "" {
+			out = append(out, r[0])
+		}
+	}
+	return out
+}
+
+// DropProbes drops every validation probe table in scratch_db.
+func (s *Server) DropProbes(t *testing.T) {
+	t.Helper()
+	for _, name := range s.ProbeTables(t) {
+		s.AdminExec(t, "DROP TABLE IF EXISTS `scratch_db`."+quoteIdent(name)+" SYNC")
+	}
+}
