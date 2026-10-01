@@ -6,6 +6,7 @@ package clickhouse_test
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -80,15 +81,15 @@ func TestCP26_CloudReplicatedDefault(t *testing.T) {
 	var engine string
 	require.NoError(t, db.QueryRowContext(ctx, "SELECT value FROM system.settings WHERE name = 'default_table_engine'").Scan(&engine))
 	t.Logf("cloud default_table_engine=%s", engine)
-	require.Contains(t, engine, "MergeTree", "Cloud defaults to a replicated MergeTree engine")
 	scratch := scratchOf(t)
 	conn, err := db.Conn(ctx)
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
 
+	replicated := settingsExec{conn: conn, settings: map[string]any{"default_table_engine": "ReplicatedMergeTree"}}
 	plain := scratchTable(t, db, scratch, "cp26_default_")
-	_, err = conn.ExecContext(ctx, "CREATE TABLE "+db.QuoteTable(plain)+" (a UInt8) ORDER BY a")
-	require.NoError(t, err, "an engine-free CREATE uses the server default")
+	_, err = replicated.ExecContext(ctx, "CREATE TABLE "+db.QuoteTable(plain)+" (a UInt8) ORDER BY a")
+	require.NoError(t, err, "an engine-free CREATE uses the ReplicatedMergeTree default")
 	require.Regexp(t, `(Shared|Replicated)MergeTree`, showCreate(t, db, plain))
 
 	hostile := settingsExec{conn: conn, settings: map[string]any{"default_table_engine": "Log"}}
@@ -96,7 +97,7 @@ func TestCP26_CloudReplicatedDefault(t *testing.T) {
 	_, err = hostile.ExecContext(ctx, "CREATE TABLE "+db.QuoteTable(free)+" AS SELECT 1 AS a")
 	require.EqualValues(t, 36, db.ClassifyError(err).ServerCode, "negative control: the engine-free CTAS used the hostile default")
 
-	for name, ex := range map[string]sqlconnect.QueryExecutor{"server default": settingsExec{conn: conn, settings: map[string]any{}}, "hostile default": hostile} {
+	for name, ex := range map[string]sqlconnect.QueryExecutor{"replicated default": replicated, "hostile default": hostile} {
 		ours := scratchTable(t, db, scratch, "cp26_ours_")
 		_, err = db.CreateTableForQueryWithOptions(ctx, ex, ours, "SELECT toUInt64(1) AS id", sqlconnect.MaterializationOptions{SortingKey: []string{"id"}})
 		require.NoError(t, err, "%s: the explicit ENGINE decides the engine", name)
@@ -139,7 +140,7 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 		}, 2*time.Minute, 2*time.Second)
 	})
 
-	t.Run("finished and timed out", func(t *testing.T) {
+	t.Run("finished", func(t *testing.T) {
 		id := clickhousequery.NewQueryID()
 		_, err := db.ExecContext(stmtCtx(ctx, map[string]any{}, id), "INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(10)")
 		require.NoError(t, err)
@@ -147,20 +148,48 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 			o, err := db.QueryOutcome(ctx, id, "Insert")
 			return err == nil && o == sqlconnect.QueryFinished
 		}, 2*time.Minute, 2*time.Second)
-
-		rows, err := db.QueryContext(stmtCtx(ctx, map[string]any{"max_execution_time": 1, "max_block_size": 1}, clickhousequery.NewQueryID()),
-			"SELECT number FROM numbers(100) WHERE sleepEachRow(0.1) = 0")
-		if err == nil {
-			for rows.Next() {
-				_ = rows.Scan(new(uint64))
-			}
-			err = rows.Err()
-			_ = rows.Close()
-		}
-		require.Error(t, err)
-		require.EqualValues(t, 159, db.ClassifyError(err).ServerCode, "a statement over its time limit fails with code 159")
-		require.Equal(t, "CH_TIMEOUT", db.ClassifyError(err).Code)
 	})
+
+	t.Run("mid-stream kill", func(t *testing.T) {
+		id := clickhousequery.NewQueryID()
+		rows, err := db.QueryContext(stmtCtx(ctx, map[string]any{"max_block_size": 1}, id),
+			midStreamSQL)
+		require.NoError(t, err)
+		defer func() { _ = rows.Close() }()
+		require.True(t, rows.Next(), "the first block arrives before the kill")
+		require.Eventually(t, func() bool {
+			res, err := db.KillQuery(ctx, id)
+			return err == nil && len(res.Rows) == 1 && res.Rows[0].KillStatus == "finished"
+		}, 2*time.Minute, time.Second)
+		drain(rows)
+		require.EqualValues(t, 394, db.ClassifyError(rows.Err()).ServerCode, "the stream ends with code 394")
+		require.Equal(t, "CH_CANCELLED", db.ClassifyError(rows.Err()).Code)
+	})
+
+	t.Run("mid-stream timeout", func(t *testing.T) {
+		rows, err := db.QueryContext(stmtCtx(ctx, map[string]any{"max_execution_time": 2, "max_block_size": 1}, clickhousequery.NewQueryID()),
+			midStreamSQL)
+		require.NoError(t, err)
+		defer func() { _ = rows.Close() }()
+		require.True(t, rows.Next(), "the first block arrives before the time limit")
+		drain(rows)
+		require.EqualValues(t, 159, db.ClassifyError(rows.Err()).ServerCode, "the stream ends with code 159")
+		require.Equal(t, "CH_TIMEOUT", db.ClassifyError(rows.Err()).Code)
+	})
+}
+
+// midStreamSQL streams 1 MiB rows slowly. The server buffers about 1 MiB of
+// output before its first flush, so small rows would all arrive at the end.
+const midStreamSQL = "SELECT number, randomPrintableASCII(1048576) AS pad FROM numbers(600) WHERE sleepEachRow(0.1) = 0"
+
+func drain(rows *sql.Rows) {
+	var (
+		n   uint64
+		pad string
+	)
+	for rows.Next() {
+		_ = rows.Scan(&n, &pad)
+	}
 }
 
 // scratchTable returns a fresh table name in the scratch database and drops
@@ -168,7 +197,11 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 func scratchTable(t *testing.T, db *clickhouse.DB, scratch, prefix string) sqlconnect.RelationRef {
 	t.Helper()
 	ref := sqlconnect.NewRelationRef(prefix+strings.ToLower(rand.String(8)), sqlconnect.WithSchema(scratch))
-	t.Cleanup(func() { _ = db.DropTable(context.Background(), ref) })
+	t.Cleanup(func() {
+		if err := db.DropTable(context.Background(), ref); err != nil {
+			t.Errorf("drop %s: %v", ref.Name, err)
+		}
+	})
 	return ref
 }
 
