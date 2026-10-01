@@ -611,3 +611,71 @@ func (s *Server) LatestHello(t *testing.T) QueryLogRow {
 	require.NotEmpty(t, rows, "no connection-open query in query_log")
 	return rows[len(rows)-1]
 }
+
+// Running is a statement that StartAs sent in the background.
+type Running struct{ done chan string }
+
+// Wait blocks until the statement ends and fails the test unless it
+// succeeded.
+func (r *Running) Wait(t *testing.T) {
+	t.Helper()
+	if failure := <-r.done; failure != "" {
+		require.FailNow(t, "background statement failed", failure)
+	}
+}
+
+// StartAs sends sql as user under queryID in the background and returns once
+// system.processes shows the statement.
+func (s *Server) StartAs(t *testing.T, user, password, queryID, sql string) *Running {
+	t.Helper()
+	r := &Running{done: make(chan string, 1)}
+	u := s.plainURL("/", url.Values{"query_id": {queryID}, "default_format": {"TabSeparated"}})
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader(sql))
+		if err != nil {
+			r.done <- "build request"
+			return
+		}
+		req.SetBasicAuth(user, password)
+		resp, err := s.httpClient.Do(req)
+		if err != nil {
+			r.done <- "transport error"
+			return
+		}
+		defer func() { _ = resp.Body.Close() }()
+		b, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			r.done <- adminFailure(resp.StatusCode, string(b))
+			return
+		}
+		r.done <- ""
+	}()
+	require.Eventually(t, func() bool { return s.ProcessCount(t, queryID) == 1 }, time.Minute, 50*time.Millisecond,
+		"the background statement never showed in system.processes")
+	return r
+}
+
+// ProcessCount returns the number of system.processes rows with the query
+// id, for every user.
+func (s *Server) ProcessCount(t *testing.T, queryID string) int {
+	t.Helper()
+	rows := s.AdminQuery(t, "SELECT count() FROM system.processes WHERE query_id = "+quoteString(queryID))
+	require.Len(t, rows, 1)
+	n, err := strconv.Atoi(rows[0][0])
+	require.NoError(t, err)
+	return n
+}
+
+// KillStatements flushes the logs and returns the text of every KILL
+// statement the Go driver sent.
+func (s *Server) KillStatements(t *testing.T) []string {
+	t.Helper()
+	s.FlushLogs(t)
+	var out []string
+	for _, r := range s.queryLog(t, "startsWith(upper(trimLeft(query)), 'KILL')") {
+		out = append(out, r.Query)
+	}
+	return out
+}

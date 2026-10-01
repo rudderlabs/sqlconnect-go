@@ -501,3 +501,46 @@ func rawTypes(cols []sqlconnect.ColumnRef) []string {
 	}
 	return out
 }
+
+// retlFixture starts the pinned 26.3 server with the published-script user
+// rudder_retl, the table scratch_db.sink (n UInt64) and a DB scoped to that
+// user.
+func retlFixture(t *testing.T) (*chtest.Server, *clickhouse.DB) {
+	t.Helper()
+	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
+	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", false)
+	srv.AdminExec(t, "CREATE TABLE scratch_db.sink (n UInt64) ENGINE = MergeTree ORDER BY n")
+	return srv, openScoped(t, srv, "rudder_retl", "pw_Retl_123")
+}
+
+// idCtx is stmtCtx with no setting other than the progress header switch.
+func idCtx(ctx context.Context, id string) context.Context {
+	return stmtCtx(ctx, map[string]any{}, id)
+}
+
+// startSlow runs an INSERT that takes about 60 s on a pinned connection under
+// id and sends its error on the returned channel.
+func startSlow(t *testing.T, db *clickhouse.DB, ctx context.Context, id string) chan error {
+	t.Helper()
+	conn, err := db.Conn(ctx)
+	require.NoError(t, err)
+	done := make(chan error, 1)
+	go func() {
+		defer func() { _ = conn.Close() }()
+		_, err := conn.ExecContext(stmtCtx(ctx, map[string]any{"max_block_size": 1}, id),
+			"INSERT INTO scratch_db.sink SELECT number FROM numbers(600) WHERE sleepEachRow(0.1) = 0")
+		done <- err
+	}()
+	return done
+}
+
+// openScopedVia opens a DB as user on customer_db that connects through the
+// proxy p over TLS.
+func openScopedVia(t *testing.T, srv *chtest.Server, p *chtest.Proxy, user, password string) *clickhouse.DB {
+	t.Helper()
+	cfg := withHostPort(srv.Config(user, password, "customer_db", "scratch_db", true), "localhost", p.Port())
+	db, err := clickhouse.NewDBForTest(cfg, testPolicy, srv.CA)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+	return db
+}
