@@ -154,7 +154,7 @@ func unitDBWithRows(t *testing.T, cols []string, rows [][]driver.Value) (*DB, *s
 // unitDBScripted is unitDBWithRows with an answer chosen per query text.
 func unitDBScripted(t *testing.T, answer func(q string) ([]string, [][]driver.Value)) (*DB, *stubRecorder) {
 	t.Helper()
-	cfg, err := parseConfig(validJSONInternal(nil), false)
+	cfg, err := parseConfig(validJSONInternal(), false)
 	require.NoError(t, err)
 	rec := &stubRecorder{}
 	pool := sql.OpenDB(stubConnector{query: func(ctx context.Context, q string, args []driver.NamedValue) (driver.Rows, error) {

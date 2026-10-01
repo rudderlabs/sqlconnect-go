@@ -307,7 +307,7 @@ type validationStub struct {
 
 func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail func(q string) error) *DB {
 	t.Helper()
-	cfg, err := parseConfig(validJSONInternal(nil), false)
+	cfg, err := parseConfig(validJSONInternal(), false)
 	require.NoError(t, err)
 	one := func(v driver.Value) ([]string, [][]driver.Value, error) {
 		return []string{"v"}, [][]driver.Value{{v}}, nil

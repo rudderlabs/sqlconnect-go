@@ -22,22 +22,18 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chpolicy"
 )
 
-func validJSONInternal(mut func(m map[string]any)) json.RawMessage {
-	m := map[string]any{
+func validJSONInternal() json.RawMessage {
+	b, _ := json.Marshal(map[string]any{
 		"host": "ch.example.com", "database": "analytics", "user": "rudder_retl",
 		"password": "s3cret", "secure": true, "scratchDatabase": "_rudderstack_ws",
-	}
-	if mut != nil {
-		mut(m)
-	}
-	b, _ := json.Marshal(m)
+	})
 	return b
 }
 
 // mustDBInternal opens a lazy DB under the strict policy. It never connects.
 func mustDBInternal(t *testing.T) *DB {
 	t.Helper()
-	db, err := newDB(validJSONInternal(nil), openEnv{
+	db, err := newDB(validJSONInternal(), openEnv{
 		policySet: true, resolver: net.DefaultResolver,
 		dialTimeout: time.Second, readTimeout: clickhousequery.MaxRunBudget + 60*time.Second,
 	})
@@ -47,7 +43,7 @@ func mustDBInternal(t *testing.T) *DB {
 }
 
 func TestNewDB_RefusesBeforePolicy(t *testing.T) {
-	_, err := newDB(validJSONInternal(nil), openEnv{policy: chpolicy.Policy{}, policySet: false})
+	_, err := newDB(validJSONInternal(), openEnv{policy: chpolicy.Policy{}, policySet: false})
 	requireCode(t, err, "CH_CONFIG_INVALID")
 }
 
@@ -97,7 +93,7 @@ func TestTransport_PoolAndOptions(t *testing.T) {
 
 	p, ok := chpolicy.Current()
 	require.True(t, ok, "TestMain installs the strict policy")
-	d, err := NewDB(validJSONInternal(nil))
+	d, err := NewDB(validJSONInternal())
 	require.NoError(t, err)
 	defer func() { _ = d.Close() }()
 	require.Equal(t, p, d.env.policy)

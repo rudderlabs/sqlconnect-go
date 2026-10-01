@@ -133,7 +133,7 @@ func (c *badConnCounter) Reads() int  { return int(c.reads.Load()) }
 // driver.ErrBadConn; every query answers as DESCRIBE with one row "a UInt8".
 func unitDBBadConn(t *testing.T) (*DB, *badConnCounter) {
 	t.Helper()
-	cfg, err := parseConfig(validJSONInternal(nil), false)
+	cfg, err := parseConfig(validJSONInternal(), false)
 	require.NoError(t, err)
 	counter := &badConnCounter{}
 	d := &DB{cfg: cfg}

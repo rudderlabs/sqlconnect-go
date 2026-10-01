@@ -199,6 +199,9 @@ func TestSQ27_TransportOptions(t *testing.T) {
 	}
 	rows, err := db.QueryContext(context.Background(), "SELECT 1") // raw pool API
 	require.NoError(t, err)
+	require.True(t, rows.Next())
+	require.False(t, rows.Next())
+	require.NoError(t, rows.Err())
 	require.NoError(t, rows.Close())
 	require.Zero(t, proxied.Load())
 	require.Nil(t, clickhouse.InspectTransport(db).Proxy)
