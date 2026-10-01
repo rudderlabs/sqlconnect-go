@@ -165,24 +165,26 @@ func TestProbeCleanup_WaitsForUnknownCreate(t *testing.T) {
 	finished := slices.Index(l.log, queryLogSQL)
 	require.True(t, finished >= 0 && drop > finished, "the DROP runs after the CREATE is known to be over: %q", l.log)
 
-	// Never seen anywhere: the CREATE never arrived or query_log is off. The
-	// wait is bounded, and the DROP still runs.
-	l = &lateCreate{}
+	// The CREATE ended in failure: that also proves it is over.
+	l = &lateCreate{logRow: "ExceptionBeforeStart"}
 	require.NoError(t, cleanup(l).run(context.Background()))
-	require.Equal(t, probeSettlePolls, countOf(l.log, queryLogSQL), "a bounded number of outcome reads")
-	require.Contains(t, l.log, "DROP TABLE IF EXISTS `scratch_db`.`_rudder_probe_0123456789abcdef` SYNC")
 
-	// Still running after every poll: the DROP runs, and the cleanup fails,
-	// because the CREATE can still land.
-	l = &lateCreate{running: probeSettlePolls + 5}
-	err := cleanup(l).run(context.Background())
+	// Never seen, or still running after every poll: the CREATE can still
+	// land. The wait is bounded, the DROP still runs, and the cleanup fails.
+	for name, l := range map[string]*lateCreate{"not found": {}, "running": {running: probeSettlePolls + 5}} {
+		err := cleanup(l).run(context.Background())
+		requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
+		requireStage(t, err, 4, "scratch_cleanup")
+		require.Contains(t, l.log, "DROP TABLE IF EXISTS `scratch_db`.`_rudder_probe_0123456789abcdef` SYNC", name)
+		require.LessOrEqual(t, countOf(l.log, processesSQL), probeSettlePolls, name+": a bounded number of outcome reads")
+	}
+
+	// The outcome read is refused: the DROP runs at once, and the outcome
+	// stays open.
+	refused := scripted(t, failWith(&ch.Exception{Code: 497}), execOK, noRow)
+	err := probeCleanup{db: db, ref: ref, createID: "retl-create", exec: refused}.run(context.Background())
 	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
-	requireStage(t, err, 4, "scratch_cleanup")
-	require.Contains(t, l.log, "DROP TABLE IF EXISTS `scratch_db`.`_rudder_probe_0123456789abcdef` SYNC")
-
-	// The outcome read is refused: drop at once, as before.
-	refused := probeCleanup{db: db, ref: ref, createID: "retl-create", exec: scripted(t, failWith(&ch.Exception{Code: 497}), execOK, noRow)}
-	require.NoError(t, refused.run(context.Background()))
+	require.True(t, strings.HasPrefix(refused.lastExec, "DROP TABLE IF EXISTS "), refused.lastExec)
 }
 
 func countOf(list []string, s string) int {
@@ -504,7 +506,7 @@ func unknownLastExec(t *testing.T) string {
 		}
 		return nil
 	}).ValidateContext(context.Background())
-	requireStage(t, err, 4, "scratch_write")
+	requireStage(t, err, 4, "scratch_cleanup") // the stub answers no outcome read, so the outcome stays open
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.execs[len(s.execs)-1]

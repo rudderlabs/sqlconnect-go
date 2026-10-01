@@ -514,7 +514,7 @@ func (c probeCleanup) run(parent context.Context) error {
 			return failed(err)
 		}
 	}
-	stillRunning := c.createID != "" && !c.createSettled(ctx, ex)
+	unresolved := c.createID != "" && !c.createSettled(ctx, ex)
 	_, err := ex.ExecContext(ctx, stmt)
 	if errors.Is(err, sql.ErrConnDone) && !c.broken {
 		// An earlier read lost the connection, and its bounded error no longer
@@ -531,33 +531,35 @@ func (c probeCleanup) run(parent context.Context) error {
 	if err := c.db.AwaitTableAbsent(ctx, ex, c.ref, c.policy); err != nil {
 		return failed(err)
 	}
-	if stillRunning {
-		return failed(cherr.New(cherr.CodeOutcomeUnknown, "", "the probe CREATE was still running after the cleanup wait"))
+	if unresolved {
+		// The DROP ran, but the CREATE can still land after it.
+		return failed(cherr.New(cherr.CodeOutcomeUnknown, "", "the probe CREATE outcome is still unknown, so the probe table can still appear"))
 	}
 	return nil
 }
 
 // createSettled waits until the unknown-outcome CREATE has finished or
 // failed, so it cannot create the table after the DROP. It polls at most
-// probeSettlePolls times. A CREATE that is never seen either never arrived
-// or ran with query_log off; a failed outcome read gives up at once. Both
-// return true, and the DROP runs. It returns false only when the CREATE was
-// still running at the last poll.
+// probeSettlePolls times. Only a finished or failed outcome proves that the
+// CREATE is over. A CREATE that is still running or never seen, or an
+// outcome read that fails, leaves the outcome open, and it returns false.
 func (c probeCleanup) createSettled(ctx context.Context, ex sqlconnect.QueryExecutor) bool {
 	row := func(q string, args ...any) *sql.Row { return ex.QueryRowContext(ctx, q, args...) }
 	for i := range probeSettlePolls {
 		o, err := queryOutcome(row, c.createID, "Create")
 		switch {
-		case err != nil, o == sqlconnect.QueryFinished, o == sqlconnect.QueryFailed:
+		case err != nil:
+			return false
+		case o == sqlconnect.QueryFinished, o == sqlconnect.QueryFailed:
 			return true
 		case i == probeSettlePolls-1:
-			return o != sqlconnect.QueryRunning
+			return false
 		}
 		if sleep(ctx, probeSettleInterval) != nil {
-			return o != sqlconnect.QueryRunning
+			return false
 		}
 	}
-	return true
+	return false
 }
 
 // probe creates, fills, reads and drops one table with a random name. The

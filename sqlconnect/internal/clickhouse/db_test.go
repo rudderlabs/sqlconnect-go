@@ -111,8 +111,8 @@ func TestSettingsMaps(t *testing.T) {
 	r := driverReadSettings()
 	require.Equal(t, 2, r["readonly"])
 	require.NotContains(t, r, "async_insert")
-	require.Equal(t, []any{256 << 20, 2 << 30}, []any{r["max_result_bytes"], r["max_memory_usage"]},
-		"a driver read cannot stream an unbounded result or hold unbounded server memory")
+	require.Equal(t, 256<<20, r["max_result_bytes"], "a driver read cannot stream an unbounded result")
+	require.NotContains(t, r, "max_memory_usage", "the customer profile bounds server memory")
 	require.NotContains(t, s, "max_result_bytes", "the scratch map fills tables of any size")
 	require.NotContains(t, s, "readonly", "the scratch map writes")
 	require.Equal(t, map[string]any{"send_progress_in_http_headers": 0}, controlSettings())

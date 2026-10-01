@@ -26,15 +26,13 @@ func driverScratchSettings() map[string]any {
 	return m
 }
 
-// Driver reads are metadata reads, counts and validation checks, never a
-// customer result: a caller that streams a model result passes its own map.
-// These bounds stop a runaway driver read on the server.
-// result_overflow_mode=throw turns the result bound into an error instead of
-// a truncated answer.
-const (
-	driverMaxResultBytes = 256 << 20
-	driverMaxMemoryUsage = 2 << 30
-)
+// driverMaxResultBytes bounds the result of a driver read. Driver reads are
+// metadata reads, counts and validation checks, never a customer result: a
+// caller that streams a model result passes its own map. The bound stops a
+// runaway driver read from sending the client an unbounded result.
+// result_overflow_mode=throw turns it into an error instead of a truncated
+// answer.
+const driverMaxResultBytes = 256 << 20
 
 // driverReadSettings is the map for a read. readonly=2 refuses writes and still
 // lets the statement send its own settings.
@@ -45,7 +43,6 @@ func driverReadSettings() map[string]any {
 	m["readonly"] = 2
 	m["cancel_http_readonly_queries_on_client_close"] = 1
 	m["max_result_bytes"] = driverMaxResultBytes
-	m["max_memory_usage"] = driverMaxMemoryUsage
 	return m
 }
 
