@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -370,4 +371,133 @@ func createTableWith(t *testing.T, db *clickhouse.DB, settings map[string]any, c
 	_, err = conn.ExecContext(ctx, strings.ReplaceAll(create, "{{t}}", db.QuoteTable(ref)))
 	require.NoError(t, err, create)
 	return ref
+}
+
+// scopedExec is a caller executor: one pinned connection of db. Statements
+// without their own map get the driver map from the connection wrapper.
+func scopedExec(t *testing.T, db *clickhouse.DB) *sql.Conn {
+	t.Helper()
+	conn, err := db.Conn(context.Background())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	return conn
+}
+
+// recExec runs every statement on one pinned connection under the driver
+// write map and a fresh query id, and records both.
+type recExec struct {
+	conn   *sql.Conn
+	mu     sync.Mutex
+	stmts  []struct{ ID, SQL string }
+	closed bool
+}
+
+var _ sqlconnect.QueryExecutor = (*recExec)(nil)
+
+func recordingExec(t *testing.T, db *clickhouse.DB) *recExec {
+	t.Helper()
+	return &recExec{conn: scopedExec(t, db)}
+}
+
+func (e *recExec) stmt(ctx context.Context, q string) context.Context {
+	id := clickhousequery.NewQueryID()
+	e.mu.Lock()
+	e.stmts = append(e.stmts, struct{ ID, SQL string }{id, q})
+	e.mu.Unlock()
+	return clickhousequery.WithStatement(ctx, clickhouse.DriverScratchSettings(), id)
+}
+
+func (e *recExec) ExecContext(ctx context.Context, q string, args ...any) (sql.Result, error) {
+	return e.conn.ExecContext(e.stmt(ctx, q), q, args...)
+}
+
+func (e *recExec) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
+	return e.conn.QueryContext(e.stmt(ctx, q), q, args...)
+}
+
+func (e *recExec) QueryRowContext(ctx context.Context, q string, args ...any) *sql.Row {
+	return e.conn.QueryRowContext(e.stmt(ctx, q), q, args...)
+}
+
+// Close marks the executor closed. The driver must never call it.
+func (e *recExec) Close() error {
+	e.closed = true
+	return nil
+}
+
+// idExec runs every statement on conn under the driver write map. A statement
+// that starts with a listed prefix gets the caller-chosen query id.
+type idExec struct {
+	conn     *sql.Conn
+	prefixes map[string]string
+}
+
+func fixedIDExec(conn *sql.Conn, prefixes map[string]string) sqlconnect.QueryExecutor {
+	return idExec{conn: conn, prefixes: prefixes}
+}
+
+func (e idExec) stmt(ctx context.Context, q string) context.Context {
+	id := clickhousequery.NewQueryID()
+	for p, fixed := range e.prefixes {
+		if strings.HasPrefix(q, p) {
+			id = fixed
+		}
+	}
+	m := clickhouse.DriverScratchSettings()
+	m["max_query_size"] = 16 << 20 // room for the padded test queries
+	return clickhousequery.WithStatement(ctx, m, id)
+}
+
+func (e idExec) ExecContext(ctx context.Context, q string, args ...any) (sql.Result, error) {
+	return e.conn.ExecContext(e.stmt(ctx, q), q, args...)
+}
+
+func (e idExec) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
+	return e.conn.QueryContext(e.stmt(ctx, q), q, args...)
+}
+
+func (e idExec) QueryRowContext(ctx context.Context, q string, args ...any) *sql.Row {
+	return e.conn.QueryRowContext(e.stmt(ctx, q), q, args...)
+}
+
+// openAs opens a DB as u on the database "default".
+func openAs(t *testing.T, srv *chtest.Server, u chtest.User) *clickhouse.DB {
+	t.Helper()
+	return openWith(t, srv.Config(u.Name, u.Password, "default", "scratch_db", true), srv)
+}
+
+// openScopedOn opens a DB as user with database as the customer database.
+func openScopedOn(t *testing.T, srv *chtest.Server, user, password, database string) *clickhouse.DB {
+	t.Helper()
+	return openWith(t, srv.Config(user, password, database, "scratch_db", true), srv)
+}
+
+// mkSchema creates a fresh database named prefix_<random> and drops it when
+// the test ends.
+func mkSchema(t *testing.T, db *clickhouse.DB, prefix string) sqlconnect.SchemaRef {
+	t.Helper()
+	schema := sqlconnect.SchemaRef{Name: prefix + "_" + strings.ToLower(rand.String(8))}
+	require.NoError(t, db.CreateSchema(context.Background(), schema))
+	t.Cleanup(func() { _ = db.DropSchema(context.Background(), schema) })
+	return schema
+}
+
+// countRequests counts the requests p received that match.
+func countRequests(p *chtest.Proxy, match func(chtest.Request) bool) int {
+	n := 0
+	for _, r := range p.Requests() {
+		if match(r) {
+			n++
+		}
+	}
+	return n
+}
+
+// rawTypes returns the RawType of each column.
+func rawTypes(cols []sqlconnect.ColumnRef) []string {
+	out := make([]string, len(cols))
+	for i, c := range cols {
+		out[i] = c.RawType
+	}
+	return out
 }

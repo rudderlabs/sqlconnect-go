@@ -61,3 +61,7 @@ func InspectTransport(db *DB) *http.Transport {
 	}
 	return rt
 }
+
+// DriverScratchSettings exposes the driver write map, so test executors can
+// attach it with their own query ids.
+var DriverScratchSettings = driverScratchSettings

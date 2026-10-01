@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -285,11 +286,17 @@ func (s *Server) adminDo(t *testing.T, sql string) string {
 // post sends sql as the admin to u and returns the body of a 200 answer.
 func (s *Server) post(t *testing.T, client *http.Client, u, sql string) string {
 	t.Helper()
+	return s.postAs(t, client, u, s.AdminUser, s.AdminPassword, sql)
+}
+
+// postAs sends sql as user to u and returns the body of a 200 answer.
+func (s *Server) postAs(t *testing.T, client *http.Client, u, user, password, sql string) string {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, strings.NewReader(sql))
 	require.NoError(t, err)
-	req.SetBasicAuth(s.AdminUser, s.AdminPassword)
+	req.SetBasicAuth(user, password)
 	resp, err := client.Do(req)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
@@ -330,6 +337,48 @@ func (s *Server) CreateScopedUser(t *testing.T, name, password, customerDB, scra
 	for _, stmt := range stmts {
 		s.AdminExec(t, stmt)
 	}
+}
+
+// User is a runtime user that a test created.
+type User struct {
+	Name, Password string
+}
+
+// CreateUserWithProfile creates a user whose settings profile sets each
+// setting to its value, quoted as a string literal.
+func (s *Server) CreateUserWithProfile(t *testing.T, settings map[string]string) User {
+	t.Helper()
+	u := User{Name: "u_" + strings.ToLower(randomString(t, 10)), Password: "pw_" + randomString(t, 16)}
+	profile := quoteIdent("p_" + u.Name)
+	var parts []string
+	for k, v := range settings {
+		parts = append(parts, quoteIdent(k)+" = "+quoteString(v))
+	}
+	stmt := "CREATE SETTINGS PROFILE " + profile
+	if len(parts) > 0 {
+		slices.Sort(parts)
+		stmt += " SETTINGS " + strings.Join(parts, ", ")
+	}
+	s.AdminExec(t, stmt)
+	s.AdminExec(t, fmt.Sprintf("CREATE USER %s IDENTIFIED WITH sha256_password BY %s SETTINGS PROFILE %s",
+		quoteIdent(u.Name), quoteString(u.Password), profile))
+	return u
+}
+
+// QueryAs runs one statement as u over plain HTTP on loopback and returns the
+// TSV body.
+func (s *Server) QueryAs(t *testing.T, u User, sql string) string {
+	t.Helper()
+	return s.postAs(t, s.httpClient, s.plainURL("/", url.Values{"default_format": {"TabSeparated"}}), u.Name, u.Password, sql)
+}
+
+// Show returns SHOW CREATE TABLE for table, run as the admin. table is
+// "db.name" and is sent as written.
+func (s *Server) Show(t *testing.T, table string) string {
+	t.Helper()
+	rows := s.AdminQuery(t, "SHOW CREATE TABLE "+table)
+	require.Len(t, rows, 1, "SHOW CREATE TABLE answer shape")
+	return rows[0][0]
 }
 
 func (s *Server) plainURL(path string, q url.Values) string {
