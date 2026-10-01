@@ -358,3 +358,33 @@ func TestQueryGuard_TableFunctionNamesAnywhere(t *testing.T) {
 		require.NoError(t, err, sql)
 	}
 }
+
+// TestQueryGuard_PinnedTableFunctionCatalog checks the name rule against the
+// table function list of the pinned 26.3 image
+// (SELECT name FROM system.table_functions), kept apart from the code: every
+// listed name is refused, and the shared corpus has a refusal row for it.
+func TestQueryGuard_PinnedTableFunctionCatalog(t *testing.T) {
+	raw, err := os.ReadFile("testdata/table-functions-26.3.txt")
+	require.NoError(t, err)
+	names := strings.Fields(string(raw))
+	require.Greater(t, len(names), 80, "the pinned catalog is complete")
+	corpus, err := os.ReadFile("testdata/audience-sql.json")
+	require.NoError(t, err)
+	var c struct {
+		Cases []sqlCase `json:"cases"`
+	}
+	require.NoError(t, json.Unmarshal(corpus, &c))
+	rows := map[string]sqlCase{}
+	for _, r := range c.Cases {
+		rows[r.Name] = r
+	}
+	for _, name := range names {
+		_, err := clickhousequery.CheckAudienceSQL("SELECT " + name + "('x') AS v FROM db.users")
+		d, ok := clickhousequery.Describe(err)
+		require.True(t, ok, name)
+		require.Equal(t, "TABLE FUNCTION", d.Field, name)
+		row, ok := rows["refuse_table_function_name_"+strings.ToLower(name)]
+		require.True(t, ok, "corpus row for %s", name)
+		require.Equal(t, "TABLE FUNCTION", row.Clause, name)
+	}
+}

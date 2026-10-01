@@ -446,6 +446,528 @@
       "clause": "TABLE FUNCTION"
     },
     {
+      "name": "refuse_table_function_name_arrowflight",
+      "sql": "SELECT arrowFlight('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_azureblobstorage",
+      "sql": "SELECT azureBlobStorage('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_azureblobstoragecluster",
+      "sql": "SELECT azureBlobStorageCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_cluster",
+      "sql": "SELECT cluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_clusterallreplicas",
+      "sql": "SELECT clusterAllReplicas('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_cosn",
+      "sql": "SELECT cosn('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalake",
+      "sql": "SELECT deltaLake('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakeazure",
+      "sql": "SELECT deltaLakeAzure('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakeazurecluster",
+      "sql": "SELECT deltaLakeAzureCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakecluster",
+      "sql": "SELECT deltaLakeCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakelocal",
+      "sql": "SELECT deltaLakeLocal('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakes3",
+      "sql": "SELECT deltaLakeS3('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakes3cluster",
+      "sql": "SELECT deltaLakeS3Cluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_dictionary",
+      "sql": "SELECT dictionary('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_executable",
+      "sql": "SELECT executable('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_file",
+      "sql": "SELECT file('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_filecluster",
+      "sql": "SELECT fileCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_format",
+      "sql": "SELECT format('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_fuzzjson",
+      "sql": "SELECT fuzzJSON('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_fuzzquery",
+      "sql": "SELECT fuzzQuery('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_gcs",
+      "sql": "SELECT gcs('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_generate_series",
+      "sql": "SELECT generate_series('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_generaterandom",
+      "sql": "SELECT generateRandom('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_generateseries",
+      "sql": "SELECT generateSeries('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_hdfs",
+      "sql": "SELECT hdfs('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_hdfscluster",
+      "sql": "SELECT hdfsCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_hive",
+      "sql": "SELECT hive('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_hudi",
+      "sql": "SELECT hudi('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_hudicluster",
+      "sql": "SELECT hudiCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_iceberg",
+      "sql": "SELECT iceberg('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_icebergazure",
+      "sql": "SELECT icebergAzure('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_icebergazurecluster",
+      "sql": "SELECT icebergAzureCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_icebergcluster",
+      "sql": "SELECT icebergCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_iceberghdfs",
+      "sql": "SELECT icebergHDFS('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_iceberghdfscluster",
+      "sql": "SELECT icebergHDFSCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_iceberglocal",
+      "sql": "SELECT icebergLocal('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_iceberglocalcluster",
+      "sql": "SELECT icebergLocalCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_icebergs3",
+      "sql": "SELECT icebergS3('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_icebergs3cluster",
+      "sql": "SELECT icebergS3Cluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_input",
+      "sql": "SELECT input('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_jdbc",
+      "sql": "SELECT jdbc('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_loop",
+      "sql": "SELECT loop('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_merge",
+      "sql": "SELECT merge('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mergetreeanalyzeindexes",
+      "sql": "SELECT mergeTreeAnalyzeIndexes('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mergetreeanalyzeindexesuuid",
+      "sql": "SELECT mergeTreeAnalyzeIndexesUUID('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mergetreeindex",
+      "sql": "SELECT mergeTreeIndex('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mergetreeprojection",
+      "sql": "SELECT mergeTreeProjection('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mergetreetextindex",
+      "sql": "SELECT mergeTreeTextIndex('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mongodb",
+      "sql": "SELECT mongodb('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mysql",
+      "sql": "SELECT mysql('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_null",
+      "sql": "SELECT null('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_numbers",
+      "sql": "SELECT numbers('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_numbers_mt",
+      "sql": "SELECT numbers_mt('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_odbc",
+      "sql": "SELECT odbc('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_oss",
+      "sql": "SELECT oss('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimon",
+      "sql": "SELECT paimon('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimonazure",
+      "sql": "SELECT paimonAzure('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimonazurecluster",
+      "sql": "SELECT paimonAzureCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimoncluster",
+      "sql": "SELECT paimonCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimonhdfs",
+      "sql": "SELECT paimonHDFS('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimonhdfscluster",
+      "sql": "SELECT paimonHDFSCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimonlocal",
+      "sql": "SELECT paimonLocal('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimons3",
+      "sql": "SELECT paimonS3('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimons3cluster",
+      "sql": "SELECT paimonS3Cluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_postgresql",
+      "sql": "SELECT postgresql('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_primes",
+      "sql": "SELECT primes('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_prometheusquery",
+      "sql": "SELECT prometheusQuery('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_prometheusqueryrange",
+      "sql": "SELECT prometheusQueryRange('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_redis",
+      "sql": "SELECT redis('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_remote",
+      "sql": "SELECT remote('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_remotesecure",
+      "sql": "SELECT remoteSecure('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_s3",
+      "sql": "SELECT s3('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_s3cluster",
+      "sql": "SELECT s3Cluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_sqlite",
+      "sql": "SELECT sqlite('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_timeseriesdata",
+      "sql": "SELECT timeSeriesData('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_timeseriesmetrics",
+      "sql": "SELECT timeSeriesMetrics('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_timeseriesselector",
+      "sql": "SELECT timeSeriesSelector('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_timeseriestags",
+      "sql": "SELECT timeSeriesTags('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_url",
+      "sql": "SELECT url('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_urlcluster",
+      "sql": "SELECT urlCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_values",
+      "sql": "SELECT values('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_view",
+      "sql": "SELECT view('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_viewexplain",
+      "sql": "SELECT viewExplain('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_viewifpermitted",
+      "sql": "SELECT viewIfPermitted('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_ytsaurus",
+      "sql": "SELECT ytsaurus('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_zeros",
+      "sql": "SELECT zeros('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_zeros_mt",
+      "sql": "SELECT zeros_mt('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
       "name": "refuse_table_function_not_in_after_param",
       "sql": "SELECT 1 WHERE {p1:String} NOT IN (remote('host.example', db.t))",
       "verdict": "refuse",
