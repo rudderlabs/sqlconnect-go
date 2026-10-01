@@ -250,57 +250,57 @@ func TestProbeCleanup_BadConnOnOutcomeRead(t *testing.T) {
 }
 
 func TestProbeCleanup_ReusesValidationConnection(t *testing.T) {
+	cfg, err := parseConfig(validJSONInternal(), false)
+	require.NoError(t, err)
+	var execs atomic.Int32
+	pool := sql.OpenDB(stubConnector{
+		query: func(context.Context, string, []driver.NamedValue) (driver.Rows, error) { return nil, io.EOF },
+		exec: func(context.Context, string, []driver.NamedValue) (driver.Result, error) {
+			if execs.Add(1) == 1 {
+				return nil, driver.ErrBadConn // a lost response on the validation connection
+			}
+			return driver.RowsAffected(0), nil
+		},
+	})
+	db := &DB{cfg: cfg}
+	db.DB = base.NewDB(pool, func() error { return nil }, base.WithDialect(newDialect()))
+	t.Cleanup(func() { _ = db.Close() })
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	own := driverExec{conn: conn, settings: driverScratchSettings}
+	acquire := db.cleanupAcquire(own)
+
+	ex, done, err := acquire(ctx)
+	require.NoError(t, err)
+	require.Same(t, conn, ex.(driverExec).conn, "a usable validation connection serves the cleanup")
+	_, err = ex.ExecContext(ctx, "DROP TABLE t SYNC")
+	require.ErrorIs(t, err, driver.ErrBadConn)
+	done()
+	require.EqualValues(t, 1, execs.Load(), "the failed statement is not replayed")
+
+	ex, done, err = acquire(ctx)
+	require.NoError(t, err)
+	defer done()
+	require.NotSame(t, conn, ex.(driverExec).conn, "a connection database/sql closed is replaced by a fresh one")
+	_, err = ex.ExecContext(ctx, "SELECT 1")
+	require.NoError(t, err)
+}
+
+func TestProbeCleanup_RefusedDropRunsOnce(t *testing.T) {
 	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("scratch_db"))
-	// The cleanup runs on the validation's own connection, so it takes no
-	// pool connection while the pool is busy.
-	own := scripted(t, execOK, noRow)
-	freshTaken := 0
-	fresh := func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
-		freshTaken++
-		return nil, nil, errors.New("pool exhausted")
-	}
-	require.NoError(t, probeCleanup{db: unitDB(t), ref: ref, created: true, acquire: fixed(own), fallback: fresh}.run(context.Background()))
-	require.Zero(t, freshTaken, "a healthy validation connection needs no pool connection")
-	require.True(t, strings.HasPrefix(own.lastExec, "DROP TABLE `scratch_db`.`_rudder_probe_"), own.lastExec)
-
-	// A broken validation connection falls back to a fresh one for the DROP.
-	for _, broken := range []error{sql.ErrConnDone, driver.ErrBadConn} {
-		good := scripted(t, execOK, noRow)
-		require.NoError(t, probeCleanup{
-			db: unitDB(t), ref: ref, created: true, broken: new(bool),
-			acquire:  fixed(scripted(t, failWith(broken))),
-			fallback: fixed(good),
-		}.run(context.Background()), broken.Error())
-		require.True(t, strings.HasPrefix(good.lastExec, "DROP TABLE `scratch_db`.`_rudder_probe_"), good.lastExec)
-	}
-
-	// A DROP the server or a proxy refuses runs once and stays fatal.
 	for _, refused := range []error{
 		&cherr.Error{Code: cherr.CodeNetwork, Detail: "HTTP 403 from a proxy"},
 		&cherr.Error{Code: cherr.CodeRateLimited},
 		&cherr.Error{Code: cherr.CodeRedirectRefused},
+		&cherr.Error{Code: cherr.CodePermission, ServerCode: 497},
 	} {
 		once := scripted(t, failWith(refused))
-		err := probeCleanup{
-			db: unitDB(t), ref: ref, created: true, broken: new(bool), acquire: fixed(once),
-			fallback: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
-				t.Error("a refused DROP must not take the fallback")
-				return nil, nil, errors.New("unexpected")
-			},
-		}.run(context.Background())
+		err := probeCleanup{db: unitDB(t), ref: ref, created: true, acquire: fixed(once)}.run(context.Background())
 		requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
-		require.Equal(t, 1, once.calls, "the refused DROP ran once")
+		require.Equal(t, 1, once.calls, "%v: the failed DROP ran once and stays fatal", refused)
 	}
-	denied := scripted(t, failWith(&cherr.Error{Code: cherr.CodePermission, ServerCode: 497}))
-	err := probeCleanup{
-		db: unitDB(t), ref: ref, created: true, acquire: fixed(denied),
-		fallback: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
-			t.Error("a denied DROP must not take the fallback")
-			return nil, nil, errors.New("unexpected")
-		},
-	}.run(context.Background())
-	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
-	require.Equal(t, 1, denied.calls, "the denied DROP ran once")
 }
 
 func countOf(list []string, s string) int {

@@ -479,15 +479,12 @@ type probeCleanup struct {
 	// createID is the query id of a CREATE with an unknown outcome. That
 	// CREATE can still be in transit, so the DROP waits until it is over.
 	createID string
-	// acquire gives the connection each step runs on: the validation's own
-	// connection, so a busy pool cannot starve the cleanup. fallback, when
-	// set, gives a fresh pool connection for a step whose connection broke.
-	acquire  func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
-	fallback func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
-	// broken is set once a step finds the acquired connection unusable;
-	// later steps then go straight to the fallback.
-	broken *bool
-	policy sqlconnect.VisibilityPolicy
+	// acquire gives the connection for each step. In production it is the
+	// validation's own connection while that stays usable, so a busy pool
+	// cannot starve the cleanup, and a fresh pool connection after
+	// database/sql has closed it.
+	acquire func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
+	policy  sqlconnect.VisibilityPolicy
 }
 
 // run drops the probe on a context detached from the caller, so a caller
@@ -521,27 +518,11 @@ func (c probeCleanup) run(parent context.Context) error {
 	return nil
 }
 
-// step runs fn on the connection from acquire. When that connection is
-// unusable before the statement runs (sql.ErrConnDone or driver.ErrBadConn)
-// and a fallback is set, it runs fn on a fresh connection, and later steps
-// use the fallback too. Any other failure, including one the server or a
-// proxy answered, stays fatal and runs once.
+// step runs fn on the connection from acquire and releases it after. It
+// never replays a statement: each step asks acquire again, so a connection
+// that an earlier step broke is not reused.
 func (c probeCleanup) step(ctx context.Context, fn func(ex sqlconnect.QueryExecutor) error) error {
-	if c.fallback != nil && c.broken != nil && *c.broken {
-		return c.run1(ctx, c.fallback, fn)
-	}
-	err := c.run1(ctx, c.acquire, fn)
-	if c.fallback == nil || !(errors.Is(err, sql.ErrConnDone) || errors.Is(err, driver.ErrBadConn)) {
-		return err
-	}
-	if c.broken != nil {
-		*c.broken = true
-	}
-	return c.run1(ctx, c.fallback, fn)
-}
-
-func (c probeCleanup) run1(ctx context.Context, acquire func(context.Context) (sqlconnect.QueryExecutor, func(), error), fn func(ex sqlconnect.QueryExecutor) error) error {
-	ex, done, err := acquire(ctx)
+	ex, done, err := c.acquire(ctx)
 	if err != nil {
 		return err
 	}
@@ -584,6 +565,24 @@ func (c probeCleanup) createSettled(ctx context.Context) bool {
 	return false
 }
 
+// cleanupAcquire returns the probe cleanup's connection source: the
+// validation's own connection while it stays usable, so a busy pool cannot
+// starve the cleanup, else a fresh pool connection. database/sql closes a
+// connection whose driver returned driver.ErrBadConn, and Raw then reports
+// sql.ErrConnDone.
+func (db *DB) cleanupAcquire(own driverExec) func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
+	return func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error) {
+		if own.conn.Raw(func(any) error { return nil }) == nil {
+			return own, func() {}, nil
+		}
+		fresh, err := db.Conn(ctx)
+		if err != nil {
+			return nil, nil, err
+		}
+		return driverExec{conn: fresh, settings: driverScratchSettings}, func() { _ = fresh.Close() }, nil
+	}
+}
+
 // probe creates, fills, reads and drops one table with a random name. The
 // CREATE is plain: an existing table with the name fails the stage.
 func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
@@ -593,17 +592,7 @@ func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 	t := db.QuoteTable(ref)
 	cleanup := probeCleanup{
 		db: db, ref: ref,
-		acquire: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
-			return ex, func() {}, nil
-		},
-		broken: new(bool),
-		fallback: func(actx context.Context) (sqlconnect.QueryExecutor, func(), error) {
-			fresh, err := db.Conn(actx)
-			if err != nil {
-				return nil, nil, err
-			}
-			return driverExec{conn: fresh, settings: driverScratchSettings}, func() { _ = fresh.Close() }, nil
-		},
+		acquire: db.cleanupAcquire(ex),
 	}
 	registered := false
 	defer func() {
