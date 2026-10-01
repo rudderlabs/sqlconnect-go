@@ -85,11 +85,12 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 	case <-ctx.Done():
 		return res, stageErr(0, "network", ctx.Err())
 	}
+	refused := func(code int32) string { return db.refusedOpenSetting(ctx, code) }
 	openCtx, cancel := context.WithTimeout(ctx, validationOpenTimeout)
 	defer cancel()
 	conn, err := db.Conn(openCtx)
 	if err != nil {
-		return res, openFailure(err)
+		return res, openFailure(err, refused)
 	}
 	defer func() { _ = conn.Close() }()
 	ex := driverExec{conn: conn, settings: driverScratchSettings}
@@ -99,7 +100,7 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 	control := driverExec{conn: conn, settings: controlSettings}
 	var version, current string
 	if err := control.QueryRowContext(ctx, "SELECT version(), currentDatabase()").Scan(&version, &current); err != nil {
-		return res, openFailure(err)
+		return res, openFailure(err, refused)
 	}
 	if v, err := parseVersion(version); err != nil || less(v, versionFloor) {
 		return res, stageErr(1, "version", cherr.New(cherr.CodeVersionBelowFloor, "",
@@ -251,12 +252,11 @@ func (db *DB) sameHost(ctx context.Context, ex sqlconnect.QueryExecutor) error {
 }
 
 // openFailure maps a failure of the first request to its stage and tag.
-func openFailure(err error) error {
+// refused names the setting behind server code 164 or 452.
+func openFailure(err error, refused func(code int32) string) error {
 	i := classify(err)
 	if i.ServerCode == 164 || i.ServerCode == 452 {
-		// The hello carries max_execution_time from the open deadline, so a
-		// readonly=1 profile or a constraint on it fails here.
-		e := wrap(cherr.CodePermission, "max_execution_time", fixedMessages[cherr.CodePermission], err)
+		e := wrap(cherr.CodePermission, refused(i.ServerCode), fixedMessages[cherr.CodePermission], err)
 		e.ServerCode = i.ServerCode
 		return stageErr(1, "settings", e)
 	}
@@ -271,6 +271,31 @@ func openFailure(err error) error {
 	default:
 		return stageErr(1, "configuration", err)
 	}
+}
+
+// refusedOpenSetting names the setting that a connection open refused with
+// code. The hello carries send_progress_in_http_headers, plus
+// max_execution_time when its context has a deadline. It opens one more
+// connection under a context that ends by cancellation, not by deadline, so
+// the hello leaves max_execution_time out. A success names
+// max_execution_time; the same code names send_progress_in_http_headers. The
+// result is always one of the two names, or "".
+func (db *DB) refusedOpenSetting(ctx context.Context, code int32) string {
+	octx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	defer cancel()
+	stop := context.AfterFunc(ctx, cancel)
+	defer stop()
+	timer := time.AfterFunc(validationOpenTimeout, cancel)
+	defer timer.Stop()
+	conn, err := db.Conn(octx)
+	if err == nil {
+		_ = conn.Close()
+		return "max_execution_time"
+	}
+	if classify(err).ServerCode == code {
+		return "send_progress_in_http_headers"
+	}
+	return ""
 }
 
 // settingFailure maps a stage 2 failure. Codes 164 and 452 are CH_PERMISSION

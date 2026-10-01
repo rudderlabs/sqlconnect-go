@@ -22,7 +22,8 @@ import (
 
 func TestValidation_RoleClosure(t *testing.T) {
 	res := &sqlconnect.ValidationResult{} // current role a; a->b, b->c, c->a (cycle), a->c (duplicate path)
-	w := unitDB(t).diagnostics(context.Background(), scriptedRoles(t, map[string][]string{"a": {"b", "c"}, "b": {"c"}, "c": {"a"}}, nil), res)
+	// z is granted to the user but not current: it stays out of the closure.
+	w := unitDB(t).diagnostics(context.Background(), scriptedRoles(t, map[string][]string{"a": {"b", "c"}, "b": {"c"}, "c": {"a"}, "z": {"a"}}, nil), res)
 	require.True(t, res.GrantsChecked)
 	require.Empty(t, filterOp(w, "inspect_grants"))
 	require.Equal(t, []string{"a", "b", "c"}, scriptedRolesVisited(t), "each role read once; the cycle stops")
@@ -95,11 +96,13 @@ func TestValidation_VersionAndStages(t *testing.T) {
 		{cherr.New(cherr.CodeTLS, "", "x"), 1, "tls"},
 		{io.ErrUnexpectedEOF, 0, "network"},
 	} {
-		requireStage(t, openFailure(c.err), c.stage, c.tag)
+		requireStage(t, openFailure(c.err, func(int32) string { return "max_execution_time" }), c.stage, c.tag)
 	}
 	var ce *cherr.Error
-	require.ErrorAs(t, openFailure(&ch.Exception{Code: 164}), &ce)
-	require.Equal(t, []any{cherr.CodePermission, "max_execution_time", int32(164)}, []any{ce.Code, ce.Field, ce.ServerCode})
+	var asked int32
+	require.ErrorAs(t, openFailure(&ch.Exception{Code: 452}, func(c int32) string { asked = c; return "send_progress_in_http_headers" }), &ce)
+	require.Equal(t, []any{cherr.CodePermission, "send_progress_in_http_headers", int32(452), int32(452)}, []any{ce.Code, ce.Field, ce.ServerCode, asked},
+		"the field comes from the refused-setting lookup, never a fixed name")
 }
 
 func TestValidation_ScriptedPass(t *testing.T) {
@@ -137,6 +140,20 @@ func TestValidation_ScriptedPass(t *testing.T) {
 	_, err = runValidationScriptErr(t, map[string]any{"SELECT hostName()": hostSeq{"h1", "h2"}})
 	requireCode(t, err, "CH_CLUSTER_UNSUPPORTED")
 	requireStage(t, err, 3, "engine")
+}
+
+func TestValidation_RefusedCreateSendsNoDrop(t *testing.T) {
+	s := &validationStub{}
+	_, err := s.db(t, nil, func(q string) error {
+		if strings.HasPrefix(q, "CREATE TABLE ") {
+			return &ch.Exception{Code: 57} // TABLE_ALREADY_EXISTS: the name belongs to someone else
+		}
+		return nil
+	}).ValidateContext(context.Background())
+	requireStage(t, err, 4, "scratch_write")
+	for _, q := range s.execs {
+		require.False(t, strings.HasPrefix(q, "DROP"), "a refused CREATE leaves the existing table alone: %s", q)
+	}
 }
 
 func TestValidation_CancelledBeforeSlot(t *testing.T) {
