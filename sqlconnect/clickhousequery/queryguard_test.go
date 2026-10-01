@@ -309,6 +309,9 @@ func TestQueryGuard_ParenthesisedJoinLists(t *testing.T) {
 		"SELECT count() FROM ((system.one AS a, numbers(2) AS b))",
 		"SELECT count() FROM db.t AS t JOIN (s3('x') AS a CROSS JOIN system.one AS b) ON 1",
 		"SELECT count() FROM (system.one AS a JOIN (url('x') AS c JOIN system.one AS d ON 1) ON 1)",
+		"SELECT count() FROM ((SELECT 1 AS id) AS a, url('x') AS b)",
+		"SELECT count() FROM (((SELECT 1 AS id)) AS a, url('x') AS b)",
+		"SELECT count() FROM ((SELECT 1 AS id) AS a JOIN url('x') AS b ON 1)",
 	} {
 		_, err := clickhousequery.CheckAudienceSQL(sql)
 		d, ok := clickhousequery.Describe(err)
@@ -320,6 +323,7 @@ func TestQueryGuard_ParenthesisedJoinLists(t *testing.T) {
 		"SELECT a.id FROM (db.a AS a, db.b AS b)",
 		"SELECT s.id FROM (SELECT id FROM db.users) AS s",
 		"SELECT s.id FROM ((SELECT id FROM db.users)) AS s",
+		"SELECT a.id FROM ((SELECT id FROM db.users) AS a, db.orders AS b)",
 		"SELECT id FROM db.users WHERE (a, b) IN (SELECT a, b FROM db.t)",
 	} {
 		_, err := clickhousequery.CheckAudienceSQL(sql)

@@ -80,6 +80,18 @@
       "normalized": "SELECT id FROM db.users WHERE id IN db.vip"
     },
     {
+      "name": "accept_paren_list_subquery_then_table",
+      "sql": "SELECT a.id FROM ((SELECT id FROM db.users) AS a, db.orders AS b)",
+      "verdict": "accept",
+      "normalized": "SELECT a.id FROM ((SELECT id FROM db.users) AS a, db.orders AS b)"
+    },
+    {
+      "name": "accept_paren_list_tables",
+      "sql": "SELECT a.id FROM (db.users AS a, db.orders AS b)",
+      "verdict": "accept",
+      "normalized": "SELECT a.id FROM (db.users AS a, db.orders AS b)"
+    },
+    {
       "name": "accept_plain_limit",
       "sql": "SELECT id FROM db.users LIMIT 10",
       "verdict": "accept",
@@ -180,6 +192,108 @@
       "sql": "SELECT 1; SELECT 2",
       "verdict": "refuse",
       "clause": "MULTIPLE STATEMENTS"
+    },
+    {
+      "name": "refuse_paren_list_after_subquery_url",
+      "sql": "SELECT count() FROM ((SELECT 1 AS id) AS a, url('https://attacker.example/x', 'LineAsString') AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_executable",
+      "sql": "SELECT a.id FROM (executable('x.sh', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_file",
+      "sql": "SELECT a.id FROM (file('x.csv', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_hdfs",
+      "sql": "SELECT a.id FROM (hdfs('hdfs://internal-host:9000/x', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_mysql",
+      "sql": "SELECT a.id FROM (mysql('internal-host:3306', 'db', 't', 'u', 'p') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_numbers",
+      "sql": "SELECT a.id FROM (numbers(2) AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_postgresql",
+      "sql": "SELECT a.id FROM (postgresql('internal-host:5432', 'db', 't', 'u', 'p') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_remote",
+      "sql": "SELECT a.id FROM (remote('internal-host:9000', db.users) AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_remote_secure",
+      "sql": "SELECT a.id FROM (remoteSecure('internal-host:9440', db.users) AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_s3",
+      "sql": "SELECT a.id FROM (s3('https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_s3_cluster",
+      "sql": "SELECT a.id FROM (s3Cluster('default', 'https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_url",
+      "sql": "SELECT a.id FROM (url('https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_url_cluster",
+      "sql": "SELECT a.id FROM (urlCluster('default', 'https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_in_cte_url",
+      "sql": "WITH s AS (SELECT a.id FROM (url('https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b)) SELECT id FROM s",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_in_subquery_url",
+      "sql": "SELECT id FROM db.users WHERE id IN (SELECT a.id FROM (url('https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b))",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_numbers_pair",
+      "sql": "SELECT * FROM (numbers(2) AS a, numbers(2) AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_second_url",
+      "sql": "SELECT a.id FROM (db.users AS b, url('https://attacker.example/x', CSV, 'id UInt64') AS a)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
     },
     {
       "name": "refuse_prewhere",

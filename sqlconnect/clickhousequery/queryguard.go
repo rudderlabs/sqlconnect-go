@@ -258,20 +258,24 @@ func (g *guard) tableFunctionAt(i int) int {
 // or comma at i. ClickHouse reads a parenthesised list such as
 // FROM (url(...) AS a CROSS JOIN t) as a join, so the check skips the opening
 // parentheses and marks each depth it skips as a FROM list, which makes the
-// commas inside it item separators too. A parenthesis that starts a query
+// commas inside it item separators too. The parenthesis right before a query
 // opens a subquery, which the scan checks on its own.
 func (g *guard) fromItemReadsTableFunction(i int, inFrom map[int]bool) bool {
 	k := 0
 	for isOpener(g.at(i + 1 + k)) {
 		k++
 	}
-	if k > 0 && g.startsQuery(i+1+k) {
-		return false
+	// A query right after the openers makes the innermost one a subquery;
+	// the outer ones still open join lists, as in FROM ((SELECT 1) AS a, f()).
+	query := k > 0 && g.startsQuery(i+1+k)
+	lists := k
+	if query {
+		lists = k - 1
 	}
-	for j := 1; j <= k; j++ {
+	for j := 1; j <= lists; j++ {
 		inFrom[g.at(i+j).Depth] = true
 	}
-	return g.tableFunctionAt(i+1+k) >= 0
+	return !query && g.tableFunctionAt(i+1+k) >= 0
 }
 
 // wrappedTableFunction reports a table function call at i, alone inside any
