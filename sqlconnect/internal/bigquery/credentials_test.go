@@ -65,3 +65,70 @@ func TestConfigCredentials(t *testing.T) {
 		}
 	})
 }
+
+func TestConfigCredentialEndpoints(t *testing.T) {
+	tests := []struct {
+		name          string
+		doc           string
+		wantError     string
+		rejectedValue string
+	}{
+		{name: "empty string", doc: ``},
+		{name: "empty object", doc: `{}`},
+		{name: "whitespace", doc: `  `},
+		{name: "service account without endpoints", doc: `{"type":"service_account"}`},
+		{name: "OAuth token endpoint", doc: `{"type":"service_account","token_uri":"https://oauth2.googleapis.com/token"}`},
+		{name: "STS token endpoint", doc: `{"type":"service_account","token_uri":"https://sts.googleapis.com/v1/token"}`},
+		{name: "Google universe domain", doc: `{"type":"service_account","universe_domain":"googleapis.com"}`},
+		{
+			name:          "host with Google prefix",
+			doc:           `{"type":"service_account","token_uri":"https://oauth2.googleapis.com.evil.example/token"}`,
+			wantError:     "unsupported bigquery credential endpoint",
+			rejectedValue: "oauth2.googleapis.com.evil.example",
+		},
+		{
+			name:          "IP token endpoint",
+			doc:           `{"type":"service_account","token_uri":"https://10.0.0.1/token"}`,
+			wantError:     "unsupported bigquery credential endpoint",
+			rejectedValue: "10.0.0.1",
+		},
+		{
+			name:          "HTTP token endpoint",
+			doc:           `{"type":"service_account","token_uri":"http://oauth2.googleapis.com/token"}`,
+			wantError:     "unsupported bigquery credential endpoint",
+			rejectedValue: "oauth2.googleapis.com",
+		},
+		{
+			name:          "unparseable token endpoint",
+			doc:           `{"type":"service_account","token_uri":"://broken"}`,
+			wantError:     "unsupported bigquery credential endpoint",
+			rejectedValue: "://broken",
+		},
+		{
+			name:          "unsupported universe domain",
+			doc:           `{"type":"service_account","universe_domain":"evil.example"}`,
+			wantError:     "unsupported bigquery universe domain",
+			rejectedValue: "evil.example",
+		},
+		{
+			name:      "other credential type",
+			doc:       `{"type":"authorized_user"}`,
+			wantError: "unsupported credential type",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var config bigquery.Config
+			err := config.Parse(sourceConfig(t, tt.doc))
+			if tt.wantError == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.ErrorContains(t, err, tt.wantError)
+			if tt.rejectedValue != "" {
+				require.NotContains(t, err.Error(), tt.rejectedValue)
+			}
+		})
+	}
+}
