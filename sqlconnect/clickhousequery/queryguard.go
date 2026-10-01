@@ -119,6 +119,11 @@ func (g *guard) scan() string {
 		return "NOT SELECT"
 	}
 	inFrom := map[int]bool{} // per nesting depth: inside a FROM list
+	// open holds the enclosing brackets. args is true for a function call's
+	// argument list that has held no query keyword yet: a FROM there is part
+	// of the call, as in EXTRACT(YEAR FROM d), not a FROM clause.
+	type bracket struct{ args bool }
+	var open []bracket
 	// listOK tracks the nearest depth-0 clause keyword: true after one that
 	// opens a comma list (select, BY, CTE, WINDOW or LIMIT n, m list). It is
 	// kept as the scan goes, so a wide list costs linear time.
@@ -132,7 +137,12 @@ func (g *guard) scan() string {
 				listOK = false
 			}
 		}
+		if len(open) > 0 && g.startsQuery(i) {
+			open[len(open)-1].args = false
+		}
 		switch {
+		case tk.Kind == chsql.Punct && closerFor[tk.Text] != "":
+			open = append(open, bracket{args: tk.Text == "(" && isName(g.at(i-1))})
 		case tk.Kind == chsql.Punct && tk.Text == ",":
 			if inFrom[tk.Depth] && g.tableFunctionAt(i+1) >= 0 {
 				return "TABLE FUNCTION"
@@ -142,7 +152,9 @@ func (g *guard) scan() string {
 			}
 		case tk.Kind == chsql.Punct && (tk.Text == ")" || tk.Text == "]" || tk.Text == "}"):
 			delete(inFrom, tk.Depth) // a closer carries the inner depth
+			open = open[:len(open)-1]
 		case tk.Kind != chsql.Word:
+		case tk.Upper == "FROM" && len(open) > 0 && open[len(open)-1].args:
 		case tk.Upper == "FROM" || tk.Upper == "JOIN":
 			inFrom[tk.Depth] = true
 			if g.tableFunctionAt(i+1) >= 0 {
@@ -180,6 +192,17 @@ func isName(tk chsql.Token) bool {
 		return true
 	}
 	return tk.Kind == chsql.Word && tk.Upper != "SELECT" && tk.Upper != "WITH"
+}
+
+// startsQuery reports a query keyword at i inside brackets: SELECT or WITH
+// anywhere, or FROM right after the opener, because ClickHouse also reads
+// "FROM t SELECT x".
+func (g *guard) startsQuery(i int) bool {
+	tk := g.w[i]
+	if tk.Kind != chsql.Word {
+		return false
+	}
+	return tk.Upper == "SELECT" || tk.Upper == "WITH" || tk.Upper == "FROM" && isOpener(g.at(i-1))
 }
 
 func isOpener(tk chsql.Token) bool { return tk.Kind == chsql.Punct && tk.Text == "(" }

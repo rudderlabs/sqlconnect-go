@@ -136,6 +136,66 @@ func TestQueryGuard_TableFunctionForms(t *testing.T) {
 	}
 }
 
+// TestQueryGuard_FromInFunctionArguments covers FROM inside a function call's
+// argument list. It is part of the call, not a FROM clause, unless the
+// argument is a query: ClickHouse also reads a query that starts with FROM.
+func TestQueryGuard_FromInFunctionArguments(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT EXTRACT(YEAR FROM now()) AS y FROM db.users",
+		"SELECT substring(email FROM 2 FOR 3) AS s FROM db.users",
+		"SELECT trim(BOTH ' ' FROM lower(email)) AS e FROM db.users",
+		"SELECT id FROM db.users WHERE EXTRACT(YEAR FROM toDate(created_at)) = 2026",
+	} {
+		out, err := clickhousequery.CheckAudienceSQL(sql)
+		require.NoError(t, err, sql)
+		require.Equal(t, sql, out)
+	}
+	for _, sql := range []string{
+		"SELECT exists(SELECT 1 FROM url('https://example.test/x')) AS e FROM db.users",
+		"SELECT has((SELECT groupArray(id) FROM s3('x')), 1) AS h FROM db.users",
+		"SELECT exists(WITH 1 AS x SELECT x FROM url('x')) AS e FROM db.users",
+		"SELECT exists(FROM url('https://example.test/x') SELECT 1) AS e FROM db.users",
+		"SELECT id FROM db.users WHERE id IN (FROM url('x') SELECT id)",
+		"SELECT f(1, (SELECT id FROM db.t, url('x'))) FROM db.users",
+		"WITH a AS (FROM url('x') SELECT id) SELECT id FROM a",
+		"SELECT id FROM db.users WHERE id = any((FROM s3('x') SELECT id))",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		d, ok := clickhousequery.Describe(err)
+		require.True(t, ok, sql)
+		require.Equal(t, "TABLE FUNCTION", d.Field, sql)
+	}
+}
+
+// TestQueryGuard_InOperandShapes pins what may follow IN: a subquery, a
+// literal list or a table name passes; any call fails, whatever its name.
+func TestQueryGuard_InOperandShapes(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT id FROM db.users WHERE id IN (SELECT id FROM db.vip)",
+		"SELECT id FROM db.users WHERE id IN (WITH 1 AS x SELECT x)",
+		"SELECT id FROM db.users WHERE id IN (1, 2)",
+		"SELECT id FROM db.users WHERE id IN ((1), (2))",
+		"SELECT id FROM db.users WHERE id IN db.vip",
+		"SELECT id FROM db.users WHERE id NOT IN `db`.`vip`",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		require.NoError(t, err, sql)
+	}
+	for _, sql := range []string{
+		"SELECT id FROM db.users WHERE id IN numbers_mt(10)",
+		"SELECT id FROM db.users WHERE id GLOBAL IN customFunction(1)",
+		"SELECT id FROM db.users WHERE id NOT IN `anything`(1)",
+		"SELECT id FROM db.users WHERE id IN db.anything(1)",
+		"SELECT id FROM db.users WHERE id GLOBAL NOT IN ((anything(1)))",
+		"SELECT id FROM db.users WHERE globalIn(id, anything(1))",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		d, ok := clickhousequery.Describe(err)
+		require.True(t, ok, sql)
+		require.Equal(t, "TABLE FUNCTION", d.Field, sql)
+	}
+}
+
 func TestQueryGuard_RefusedClauseForms(t *testing.T) {
 	for sql, clause := range map[string]string{
 		"SELECT id FROM db.users AS u GLOBAL ANY LEFT ARRAY JOIN u.tags AS t":  "ARRAY JOIN",

@@ -26,6 +26,12 @@
       "normalized": "SELECT id FROM db.users -- members"
     },
     {
+      "name": "accept_extract_from_in_function",
+      "sql": "SELECT EXTRACT(YEAR FROM now()) AS y FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT EXTRACT(YEAR FROM now()) AS y FROM db.users"
+    },
+    {
       "name": "accept_final_quoted_column",
       "sql": "SELECT `FINAL` FROM db.users",
       "verdict": "accept",
@@ -84,6 +90,12 @@
       "sql": "SELECT s.id FROM (SELECT id FROM db.users) AS s, db.orders AS o",
       "verdict": "accept",
       "normalized": "SELECT s.id FROM (SELECT id FROM db.users) AS s, db.orders AS o"
+    },
+    {
+      "name": "accept_substring_from_in_function",
+      "sql": "SELECT substring(email FROM 2) AS s FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT substring(email FROM 2) AS s FROM db.users"
     },
     {
       "name": "accept_trailing_semicolon",
@@ -200,6 +212,12 @@
       "clause": "TABLE FUNCTION"
     },
     {
+      "name": "refuse_table_function_in_any_name",
+      "sql": "SELECT id FROM db.users WHERE id IN numbers_mt(10)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
       "name": "refuse_table_function_in_file",
       "sql": "SELECT id FROM db.users WHERE id IN file('/etc/passwd', CSV, 'id UInt64')",
       "verdict": "refuse",
@@ -208,6 +226,12 @@
     {
       "name": "refuse_table_function_in_input",
       "sql": "SELECT id FROM db.users WHERE id IN input('id UInt64')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_merge",
+      "sql": "SELECT id FROM db.users WHERE id IN merge('db', 'users.*')",
       "verdict": "refuse",
       "clause": "TABLE FUNCTION"
     },
