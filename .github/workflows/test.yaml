@@ -71,7 +71,9 @@ jobs:
           SNOWFLAKE_TEST_AUTH_KEYPAIR_UNENCRYPTED_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_AUTH_KEYPAIR_UNENCRYPTED_CREDENTIALS }}
       - name: ClickHouse evidence run
         if: matrix.package == 'sqlconnect/internal/clickhouse'
+        shell: bash
         run: |
+          set -euo pipefail
           go test -json -count=1 -timeout 60m ./sqlconnect/internal/clickhouse/... | tee clickhouse-test.json > /dev/null
           grep -ho 'clickhouse image=[^ ]* version=[^ "\\]*' clickhouse-test.json | sort -u | tee clickhouse-images.log
           bash internal/scripts/assert-no-skip.sh clickhouse-test.json
