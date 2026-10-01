@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -43,6 +44,11 @@ func TestValidation_EngineRules(t *testing.T) {
 		require.False(t, strings.HasPrefix(q, "CREATE TABLE"), "no probe after an engine refusal")
 	}
 	require.NotContains(t, runValidationScript(t, map[string]any{engineSQL: "Shared"}), "SELECT hostName()", "Shared skips the host comparison")
+	_, err = runValidationScriptErr(t, map[string]any{engineSQL: "pw_Retl_123"}) // a hostile server echoes a credential as the engine
+	requireCode(t, err, "CH_CONFIG_INVALID")
+	for e := err; e != nil; e = errors.Unwrap(e) {
+		require.NotContains(t, fmt.Sprintf("%v %+v %#v", e, e, e), "pw_Retl_123")
+	}
 }
 
 func TestProbeCleanup_Codes(t *testing.T) {
@@ -81,6 +87,8 @@ func TestValidation_VersionAndStages(t *testing.T) {
 	require.True(t, less([3]int{25, 8, 99}, versionFloor))
 	require.False(t, less([3]int{26, 3, 0}, versionFloor))
 	require.Equal(t, "25.8.1.2", sanitizeVersion("25.8.1.2<script>secret"))
+	require.Equal(t, []string{"Replicated", "(unrecognized)"}, []string{engineLabel("Replicated"), engineLabel("pw_Retl_123")},
+		"an unknown engine answer is server text and is never repeated")
 
 	for _, c := range []struct {
 		err   error

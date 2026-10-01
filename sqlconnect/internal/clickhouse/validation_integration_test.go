@@ -62,6 +62,9 @@ func TestSQ14_ReadonlyAndConstraints(t *testing.T) {
 	d, _ = clickhousequery.Describe(err)
 	require.Equal(t, [2]any{"send_progress_in_http_headers", int32(452)}, [2]any{d.Field, d.ServerCode}, "the open names the setting it refused")
 	requireStage(t, err, 1, "settings")
+	_, err = openAs(t, srv, srv.CreateUserWithProfile(t, map[string]string{"offset": "1", "limit": "1"})).ValidateContext(context.Background())
+	stage, _ := stageOf(err)
+	require.Equal(t, 3, stage, "a profile offset cannot hide the hello row or the version row: %v", err)
 }
 
 func TestValidation_Grants(t *testing.T) {

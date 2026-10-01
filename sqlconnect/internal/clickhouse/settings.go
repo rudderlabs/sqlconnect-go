@@ -52,3 +52,12 @@ func stage2UnionSettings(budgetSeconds int) map[string]any {
 	m["max_execution_time"] = budgetSeconds
 	return m
 }
+
+// helloSettings is the map for the connection-open hello and the validation
+// stage 1 read. It keeps a profile default from hiding their one row. Each
+// value equals the server default, so a readonly=1 profile accepts it. It
+// sends no other driver setting: validation stage 2 checks those, so a
+// constraint on one of them is named there and does not fail the open.
+func helloSettings() map[string]any {
+	return map[string]any{"send_progress_in_http_headers": 0, "limit": 0, "offset": 0, "additional_result_filter": ""}
+}

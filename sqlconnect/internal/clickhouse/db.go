@@ -37,6 +37,9 @@ type DB struct {
 	opts *ch.Options
 	// validateSem bounds concurrent ValidateContext calls.
 	validateSem chan struct{}
+	// connector opens connections outside the pool, for the validation
+	// lookup of a refused hello setting.
+	connector *connectGuard
 }
 
 // openEnv is what NewDB takes from the process. Tests replace it.
@@ -91,11 +94,12 @@ func newDB(configJSON json.RawMessage, env openEnv) (*DB, error) {
 		Compression:      &ch.Compression{Method: ch.CompressionLZ4},
 		TransportFunc:    newTransportFunc(),
 	}
-	sqldb := sql.OpenDB(&connectGuard{next: ch.Connector(opts)})
+	connector := &connectGuard{next: ch.Connector(opts)}
+	sqldb := sql.OpenDB(connector)
 	sqldb.SetMaxOpenConns(maxOpenConns)
 	sqldb.SetMaxIdleConns(maxIdleConns)
 	sqldb.SetConnMaxLifetime(connMaxLifetime)
-	d := &DB{cfg: cfg, env: env, opts: opts, validateSem: make(chan struct{}, maxConcurrentValidations)}
+	d := &DB{cfg: cfg, env: env, opts: opts, validateSem: make(chan struct{}, maxConcurrentValidations), connector: connector}
 	d.DB = base.NewDB(sqldb, func() error { return nil },
 		base.WithDialect(newDialect()),
 		base.WithColumnTypeMapper(func(c base.ColumnType) string { return canonicalType(c.DatabaseTypeName()) }),
@@ -104,11 +108,8 @@ func newDB(configJSON json.RawMessage, env openEnv) (*DB, error) {
 }
 
 // connectGuard opens every pool connection. The fork sends a hello query when
-// it opens a connection; the guard gives that query the control map and a
-// fresh query id, never the caller's statement map, and bounds any error.
-// The hello reads only constants. Validation stage 2 checks the driver
-// settings, so a constraint on one of them names that setting there and does
-// not fail the open.
+// it opens a connection; the guard gives that query the hello map and a fresh
+// query id, never the caller's statement map, and bounds any error.
 type connectGuard struct{ next driver.Connector }
 
 func (g *connectGuard) Connect(parent context.Context) (driver.Conn, error) {
@@ -122,13 +123,21 @@ func (g *connectGuard) Connect(parent context.Context) (driver.Conn, error) {
 	// The caller's cancellation still ends the dial and the hello.
 	stop := context.AfterFunc(parent, cancel)
 	defer stop()
-	ctx = ch.Context(ctx, ch.WithSettings(ch.Settings(controlSettings())), ch.WithQueryID(clickhousequery.NewQueryID()))
+	hello := helloSettings()
+	if m, ok := parent.Value(helloOverrideKey{}).(map[string]any); ok {
+		hello = m
+	}
+	ctx = ch.Context(ctx, ch.WithSettings(ch.Settings(hello)), ch.WithQueryID(clickhousequery.NewQueryID()))
 	conn, err := g.next.Connect(ctx)
 	if err != nil {
 		return nil, bound("connect", "", err)
 	}
 	return &guardConn{inner: conn}, nil
 }
+
+// helloOverrideKey replaces the hello map of one connection open. Only the
+// validation lookup of a refused hello setting sets it.
+type helloOverrideKey struct{}
 
 func (g *connectGuard) Driver() driver.Driver { return g.next.Driver() }
 

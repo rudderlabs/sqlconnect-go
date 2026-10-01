@@ -97,7 +97,7 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 
 	// Stage 1: connect and version. It carries the control map, as the hello
 	// does, so a refused driver setting is named by stage 2.
-	control := driverExec{conn: conn, settings: controlSettings}
+	control := driverExec{conn: conn, settings: helloSettings}
 	var version, current string
 	if err := control.QueryRowContext(ctx, "SELECT version(), currentDatabase()").Scan(&version, &current); err != nil {
 		return res, openFailure(err, refused)
@@ -215,7 +215,7 @@ func (db *DB) checkEngine(ctx context.Context, ex sqlconnect.QueryExecutor) erro
 		return nil
 	default:
 		return stageErr(3, "engine", cherr.New(cherr.CodeConfigInvalid, "scratchDatabase",
-			"the scratch database engine "+safeName(engine)+" is not Atomic or Shared"))
+			"the scratch database engine "+engineLabel(engine)+" is not Atomic or Shared"))
 	}
 }
 
@@ -274,26 +274,39 @@ func openFailure(err error, refused func(code int32) string) error {
 }
 
 // refusedOpenSetting names the setting that a connection open refused with
-// code. The hello carries send_progress_in_http_headers, plus
-// max_execution_time when its context has a deadline. It opens one more
-// connection under a context that ends by cancellation, not by deadline, so
-// the hello leaves max_execution_time out. A success names
-// max_execution_time; the same code names send_progress_in_http_headers. The
-// result is always one of the two names, or "".
+// code. The error text is redacted, so it opens connections outside the pool,
+// one per hello setting with only that setting and no deadline, and returns
+// the first one refused with the same code. If none is, it opens one with an
+// empty map and a deadline, which adds max_execution_time. The result is
+// always a fixed name, or "".
 func (db *DB) refusedOpenSetting(ctx context.Context, code int32) string {
+	if db.connector == nil {
+		return ""
+	}
+	refusedWith := func(octx context.Context, m map[string]any) bool {
+		c, err := db.connector.Connect(context.WithValue(octx, helloOverrideKey{}, m))
+		if err == nil {
+			_ = c.Close()
+			return false
+		}
+		return classify(err).ServerCode == code
+	}
 	octx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer cancel()
 	stop := context.AfterFunc(ctx, cancel)
 	defer stop()
-	timer := time.AfterFunc(validationOpenTimeout, cancel)
+	timer := time.AfterFunc(validationOpenTimeout, cancel) // a deadline would add max_execution_time
 	defer timer.Stop()
-	conn, err := db.Conn(octx)
-	if err == nil {
-		_ = conn.Close()
-		return "max_execution_time"
+	hello := helloSettings()
+	for _, k := range slices.Sorted(maps.Keys(hello)) {
+		if refusedWith(octx, map[string]any{k: hello[k]}) {
+			return k
+		}
 	}
-	if classify(err).ServerCode == code {
-		return "send_progress_in_http_headers"
+	dctx, dcancel := context.WithTimeout(octx, validationOpenTimeout)
+	defer dcancel()
+	if refusedWith(dctx, map[string]any{}) {
+		return "max_execution_time"
 	}
 	return ""
 }
@@ -583,17 +596,20 @@ func sanitizeVersion(s string) string {
 	return b.String()
 }
 
-// safeName keeps only identifier characters, at most 64 bytes, so a server
-// answer cannot put arbitrary text into an error.
-func safeName(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		if b.Len() >= 64 {
-			break
-		}
-		if r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' {
-			b.WriteRune(r)
-		}
+// knownEngines are the database engine names an error may repeat. Any other
+// answer is server-controlled text and is never shown.
+var knownEngines = map[string]bool{
+	"Ordinary": true, "Lazy": true, "Memory": true, "Replicated": true, "MySQL": true,
+	"MaterializedMySQL": true, "PostgreSQL": true, "MaterializedPostgreSQL": true, "SQLite": true,
+	"DataLakeCatalog": true, "Backup": true, "Filesystem": true, "S3": true, "HDFS": true,
+	"Dictionary": true, "Overlay": true,
+}
+
+// engineLabel returns the engine name when it is a known engine, else a fixed
+// label.
+func engineLabel(engine string) string {
+	if knownEngines[engine] {
+		return engine
 	}
-	return b.String()
+	return "(unrecognized)"
 }
