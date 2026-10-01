@@ -479,7 +479,11 @@ type probeCleanup struct {
 	// createID is the query id of a CREATE with an unknown outcome. That
 	// CREATE can still be in transit, so the DROP waits until it is over.
 	createID string
+	// acquire gives the connection each step runs on: the validation's own
+	// connection, so a busy pool cannot starve the cleanup. fallback, when
+	// set, gives a fresh pool connection for a step whose connection broke.
 	acquire  func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
+	fallback func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
 	policy   sqlconnect.VisibilityPolicy
 }
 
@@ -514,10 +518,22 @@ func (c probeCleanup) run(parent context.Context) error {
 	return nil
 }
 
-// step runs fn on a fresh pool connection and releases it after. A
-// connection that an earlier step broke therefore never blocks a later one.
+// step runs fn on the connection from acquire. When that fails and a
+// fallback is set, it runs fn once more on a fresh connection, so a broken
+// validation connection never blocks the DROP. The error check cannot tell a
+// broken connection apart, because bounded errors drop the cause, so any
+// failure retries once. Every step is safe to repeat: a repeated plain DROP
+// at worst reports the cleanup as failed.
 func (c probeCleanup) step(ctx context.Context, fn func(ex sqlconnect.QueryExecutor) error) error {
 	ex, done, err := c.acquire(ctx)
+	if err == nil {
+		err = fn(ex)
+		done()
+	}
+	if err == nil || c.fallback == nil {
+		return err
+	}
+	ex, done, err = c.fallback(ctx)
 	if err != nil {
 		return err
 	}
@@ -569,7 +585,10 @@ func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 	t := db.QuoteTable(ref)
 	cleanup := probeCleanup{
 		db: db, ref: ref,
-		acquire: func(actx context.Context) (sqlconnect.QueryExecutor, func(), error) {
+		acquire: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
+			return ex, func() {}, nil
+		},
+		fallback: func(actx context.Context) (sqlconnect.QueryExecutor, func(), error) {
 			fresh, err := db.Conn(actx)
 			if err != nil {
 				return nil, nil, err

@@ -249,6 +249,32 @@ func TestProbeCleanup_BadConnOnOutcomeRead(t *testing.T) {
 	require.True(t, strings.HasPrefix(good.lastExec, "DROP TABLE IF EXISTS "), good.lastExec)
 }
 
+func TestProbeCleanup_ReusesValidationConnection(t *testing.T) {
+	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("scratch_db"))
+	// The cleanup runs on the validation's own connection, so it takes no
+	// pool connection while the pool is busy.
+	own := scripted(t, execOK, noRow)
+	freshTaken := 0
+	fresh := func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
+		freshTaken++
+		return nil, nil, errors.New("pool exhausted")
+	}
+	require.NoError(t, probeCleanup{db: unitDB(t), ref: ref, created: true, acquire: fixed(own), fallback: fresh}.run(context.Background()))
+	require.Zero(t, freshTaken, "a healthy validation connection needs no pool connection")
+	require.True(t, strings.HasPrefix(own.lastExec, "DROP TABLE `scratch_db`.`_rudder_probe_"), own.lastExec)
+
+	// A broken validation connection falls back to a fresh one for the DROP.
+	for _, broken := range []error{sql.ErrConnDone, driver.ErrBadConn} {
+		good := scripted(t, execOK, noRow)
+		require.NoError(t, probeCleanup{
+			db: unitDB(t), ref: ref, created: true,
+			acquire:  fixed(scripted(t, failWith(broken), failWith(broken))),
+			fallback: fixed(good),
+		}.run(context.Background()), broken.Error())
+		require.True(t, strings.HasPrefix(good.lastExec, "DROP TABLE `scratch_db`.`_rudder_probe_"), good.lastExec)
+	}
+}
+
 func countOf(list []string, s string) int {
 	n := 0
 	for _, v := range list {
