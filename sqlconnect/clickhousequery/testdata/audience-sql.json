@@ -26,6 +26,18 @@
       "normalized": "SELECT url FROM db.users"
     },
     {
+      "name": "accept_columns_named_s3_and_url",
+      "sql": "SELECT s3, url FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT s3, url FROM db.users"
+    },
+    {
+      "name": "accept_cut_url_parameter_function",
+      "sql": "SELECT cutURLParameter(url, 'a') AS u FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT cutURLParameter(url, 'a') AS u FROM db.users"
+    },
+    {
       "name": "accept_ends_in_line_comment",
       "sql": "SELECT id FROM db.users -- members",
       "verdict": "accept",
@@ -36,6 +48,12 @@
       "sql": "SELECT EXTRACT(YEAR FROM now()) AS y FROM db.users",
       "verdict": "accept",
       "normalized": "SELECT EXTRACT(YEAR FROM now()) AS y FROM db.users"
+    },
+    {
+      "name": "accept_file_and_url_as_aliases",
+      "sql": "SELECT id AS file, email AS url FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT id AS file, email AS url FROM db.users"
     },
     {
       "name": "accept_final_quoted_column",
@@ -74,6 +92,12 @@
       "normalized": "SELECT id FROM db.users WHERE id IN (1, 2, 3)"
     },
     {
+      "name": "accept_in_one_cast",
+      "sql": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String))"
+    },
+    {
       "name": "accept_in_subquery",
       "sql": "SELECT id FROM db.users WHERE id IN (SELECT id FROM db.vip)",
       "verdict": "accept",
@@ -84,6 +108,54 @@
       "sql": "SELECT id FROM db.users WHERE id IN db.vip",
       "verdict": "accept",
       "normalized": "SELECT id FROM db.users WHERE id IN db.vip"
+    },
+    {
+      "name": "accept_in_two_casts",
+      "sql": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String), CAST('gold' AS String))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String), CAST('gold' AS String))"
+    },
+    {
+      "name": "accept_keyword_column_by",
+      "sql": "SELECT u.by FROM db.users AS u",
+      "verdict": "accept",
+      "normalized": "SELECT u.by FROM db.users AS u"
+    },
+    {
+      "name": "accept_keyword_column_final",
+      "sql": "SELECT t.final FROM db.t AS t",
+      "verdict": "accept",
+      "normalized": "SELECT t.final FROM db.t AS t"
+    },
+    {
+      "name": "accept_keyword_column_format",
+      "sql": "SELECT u.id FROM db.users AS u WHERE u.format = 'csv'",
+      "verdict": "accept",
+      "normalized": "SELECT u.id FROM db.users AS u WHERE u.format = 'csv'"
+    },
+    {
+      "name": "accept_keyword_column_settings",
+      "sql": "SELECT t.settings FROM db.t AS t",
+      "verdict": "accept",
+      "normalized": "SELECT t.settings FROM db.t AS t"
+    },
+    {
+      "name": "accept_keyword_table_sample",
+      "sql": "SELECT u.id FROM db.sample u",
+      "verdict": "accept",
+      "normalized": "SELECT u.id FROM db.sample u"
+    },
+    {
+      "name": "accept_not_in_one_value",
+      "sql": "SELECT id FROM db.users WHERE plan NOT IN ('gold')",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan NOT IN ('gold')"
+    },
+    {
+      "name": "accept_not_in_two_casts",
+      "sql": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String), CAST('silver' AS String))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String), CAST('silver' AS String))"
     },
     {
       "name": "accept_paren_list_subquery_then_table",
@@ -102,6 +174,12 @@
       "sql": "SELECT id FROM db.users LIMIT 10",
       "verdict": "accept",
       "normalized": "SELECT id FROM db.users LIMIT 10"
+    },
+    {
+      "name": "accept_quoted_identifier_file",
+      "sql": "SELECT \"file\" FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT \"file\" FROM db.users"
     },
     {
       "name": "accept_subquery_in_from",
@@ -126,6 +204,18 @@
       "sql": "SELECT encodeURLComponent(url) AS u FROM db.users",
       "verdict": "accept",
       "normalized": "SELECT encodeURLComponent(url) AS u FROM db.users"
+    },
+    {
+      "name": "accept_url_hash_function",
+      "sql": "SELECT URLHash(url) AS h FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT URLHash(url) AS h FROM db.users"
+    },
+    {
+      "name": "accept_url_hierarchy_function",
+      "sql": "SELECT URLHierarchy(url) AS h FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT URLHierarchy(url) AS h FROM db.users"
     },
     {
       "name": "refuse_array_join_left_in_cte",

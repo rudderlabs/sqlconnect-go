@@ -170,6 +170,9 @@ func TestQueryGuard_FromInFunctionArguments(t *testing.T) {
 // TestQueryGuard_InOperandShapes pins what may follow IN: a subquery, a
 // literal list or a table name passes; any call fails, whatever its name.
 func TestQueryGuard_InOperandShapes(t *testing.T) {
+	// The operator spelling never runs its set as a table function on 26.3
+	// (UNKNOWN_FUNCTION), so only the name rule applies after IN: scalar
+	// calls such as CAST stay accepted, table function names fail.
 	for _, sql := range []string{
 		"SELECT id FROM db.users WHERE id IN (SELECT id FROM db.vip)",
 		"SELECT id FROM db.users WHERE id IN (WITH 1 AS x SELECT x)",
@@ -177,16 +180,18 @@ func TestQueryGuard_InOperandShapes(t *testing.T) {
 		"SELECT id FROM db.users WHERE id IN ((1), (2))",
 		"SELECT id FROM db.users WHERE id IN db.vip",
 		"SELECT id FROM db.users WHERE id NOT IN `db`.`vip`",
+		"SELECT id FROM db.users WHERE id IN (CAST(1 AS UInt8))",
+		"SELECT id FROM db.users WHERE id GLOBAL IN customFunction(1)",
+		"SELECT id FROM db.users WHERE id GLOBAL NOT IN ((anything(1)))",
 	} {
 		_, err := clickhousequery.CheckAudienceSQL(sql)
 		require.NoError(t, err, sql)
 	}
 	for _, sql := range []string{
 		"SELECT id FROM db.users WHERE id IN numbers_mt(10)",
-		"SELECT id FROM db.users WHERE id GLOBAL IN customFunction(1)",
-		"SELECT id FROM db.users WHERE id NOT IN `anything`(1)",
-		"SELECT id FROM db.users WHERE id IN db.anything(1)",
-		"SELECT id FROM db.users WHERE id GLOBAL NOT IN ((anything(1)))",
+		"SELECT id FROM db.users WHERE id NOT IN `url`('x')",
+		"SELECT id FROM db.users WHERE id GLOBAL NOT IN ((s3('x')))",
+		"SELECT id FROM db.users WHERE id IN (1, file('x'))",
 		"SELECT id FROM db.users WHERE globalIn(id, anything(1))",
 	} {
 		_, err := clickhousequery.CheckAudienceSQL(sql)
@@ -386,5 +391,29 @@ func TestQueryGuard_PinnedTableFunctionCatalog(t *testing.T) {
 		row, ok := rows["refuse_table_function_name_"+strings.ToLower(name)]
 		require.True(t, ok, "corpus row for %s", name)
 		require.Equal(t, "TABLE FUNCTION", row.Clause, name)
+	}
+}
+
+// TestQueryGuard_InSpellings pins the two-argument rule to the function
+// spelling in(x, set); the operator spelling x IN (a, b) is a tuple.
+func TestQueryGuard_InSpellings(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT id FROM db.users WHERE in(id, someTable(1))",
+		"SELECT id FROM db.users WHERE id = 1 AND notIn(id, someTable(1))",
+		"SELECT id FROM db.users WHERE (in(id, someTable(1)))",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		d, ok := clickhousequery.Describe(err)
+		require.True(t, ok, sql)
+		require.Equal(t, "TABLE FUNCTION", d.Field, sql)
+	}
+	for _, sql := range []string{
+		"SELECT id FROM db.users WHERE id IN (1, lower('a'))",
+		"SELECT id FROM db.users WHERE id GLOBAL NOT IN (CAST(1 AS UInt8), CAST(2 AS UInt8))",
+		"SELECT id FROM db.users WHERE (id) IN (CAST(1 AS UInt8), CAST(2 AS UInt8))",
+		"SELECT id FROM db.users WHERE {p:UInt8} IN (CAST(1 AS UInt8), CAST(2 AS UInt8))",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		require.NoError(t, err, sql)
 	}
 }

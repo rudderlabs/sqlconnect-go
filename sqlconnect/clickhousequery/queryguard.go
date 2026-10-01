@@ -131,6 +131,12 @@ func (g *guard) scan() string {
 	// kept as the scan goes, so a wide list costs linear time.
 	listOK := false
 	for i, tk := range w {
+		if tk.Kind == chsql.Word && isDot(g.at(i-1)) && !isOpener(g.at(i+1)) {
+			// A word after a dot names a column or table, as in u.format or
+			// db.sample: it is never a clause keyword. A call after a dot
+			// still goes through the name rule below.
+			continue
+		}
 		if tk.Kind == chsql.Word && tk.Depth == 0 {
 			switch tk.Upper {
 			case "SELECT", "BY", "WITH", "DISTINCT", "LIMIT", "WINDOW":
@@ -174,7 +180,7 @@ func (g *guard) scan() string {
 			case tk.Upper == "INTO" && g.at(i+1).Upper == "OUTFILE":
 				return "INTO OUTFILE"
 			}
-		case inFunctions[tk.Upper] && g.inReadsTableFunction(i):
+		case inFunctions[tk.Upper] && g.inReadsTableFunction(i, g.inFunctionSpelling(i)):
 			// x [GLOBAL] [NOT] IN <table function>(...) reads outside the
 			// database like FROM url(...).
 			return "TABLE FUNCTION"
@@ -232,6 +238,35 @@ func isTableFunctionCall(tk, next chsql.Token) bool {
 		return tableFunctionNames[strings.ToLower(name)] || strings.Contains(name, "\\")
 	}
 	return false
+}
+
+func isDot(tk chsql.Token) bool { return tk.Kind == chsql.Punct && tk.Text == "." }
+
+// exprStarters are keywords after which an expression starts, so an IN that
+// follows one is the function spelling in(x, set).
+var exprStarters = map[string]bool{
+	"SELECT": true, "WHERE": true, "PREWHERE": true, "HAVING": true, "QUALIFY": true, "AND": true,
+	"OR": true, "ON": true, "WHEN": true, "THEN": true, "ELSE": true, "CASE": true, "BY": true,
+	"DISTINCT": true, "WITH": true,
+}
+
+// inFunctionSpelling reports whether the IN-family word at i is a function
+// call rather than the operator. notIn, globalIn and the other joined names
+// exist only as functions. A plain IN is the function when no operand ends
+// right before it: after an opener, a comma, an operator or an
+// expression-starting keyword. NOT and GLOBAL before IN mean the operator.
+func (g *guard) inFunctionSpelling(i int) bool {
+	if g.w[i].Upper != "IN" {
+		return true
+	}
+	prev := g.at(i - 1)
+	switch prev.Kind {
+	case chsql.Punct:
+		return !isCloser(prev)
+	case chsql.Word:
+		return exprStarters[prev.Upper]
+	}
+	return i == 0
 }
 
 func isName(tk chsql.Token) bool {
@@ -324,11 +359,13 @@ func (g *guard) wrappedTableFunction(i int) int {
 // inReadsTableFunction reports whether the IN operator or IN function at i
 // takes a table function as its set: the operand after the operator, or the
 // second of exactly two arguments of the function form.
-func (g *guard) inReadsTableFunction(i int) bool {
-	if g.wrappedTableFunction(i+1) >= 0 {
-		return true
-	}
-	if !isOpener(g.at(i + 1)) {
+func (g *guard) inReadsTableFunction(i int, function bool) bool {
+	// The operator spelling x IN f(...) or x IN (a, f(...)) does not run f as
+	// a table function on 26.3 (it reports UNKNOWN_FUNCTION), and a scalar
+	// call there, such as CAST or lower, is a normal value. The name rule in
+	// scan refuses every table function name and the scalar file() there.
+	// Only the function spelling in(x, f()) gets the structural rule.
+	if !function || !isOpener(g.at(i+1)) {
 		return false
 	}
 	c := g.comma[i+1]
