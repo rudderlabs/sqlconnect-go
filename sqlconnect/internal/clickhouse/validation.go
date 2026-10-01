@@ -518,19 +518,18 @@ func (c probeCleanup) run(parent context.Context) error {
 	return nil
 }
 
-// step runs fn on the connection from acquire. When that fails and a
-// fallback is set, it runs fn once more on a fresh connection, so a broken
-// validation connection never blocks the DROP. The error check cannot tell a
-// broken connection apart, because bounded errors drop the cause, so any
-// failure retries once. Every step is safe to repeat: a repeated plain DROP
-// at worst reports the cleanup as failed.
+// step runs fn on the connection from acquire. When that fails without a
+// server answer (a broken connection, a network error) and a fallback is set,
+// it runs fn once more on a fresh connection, so a broken validation
+// connection never blocks the DROP. An error the server answered, such as a
+// denied DROP, stays fatal and runs once.
 func (c probeCleanup) step(ctx context.Context, fn func(ex sqlconnect.QueryExecutor) error) error {
 	ex, done, err := c.acquire(ctx)
 	if err == nil {
 		err = fn(ex)
 		done()
 	}
-	if err == nil || c.fallback == nil {
+	if err == nil || c.fallback == nil || classify(err).ServerCode != 0 {
 		return err
 	}
 	ex, done, err = c.fallback(ctx)

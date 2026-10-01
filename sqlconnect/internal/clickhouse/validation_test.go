@@ -273,6 +273,18 @@ func TestProbeCleanup_ReusesValidationConnection(t *testing.T) {
 		}.run(context.Background()), broken.Error())
 		require.True(t, strings.HasPrefix(good.lastExec, "DROP TABLE `scratch_db`.`_rudder_probe_"), good.lastExec)
 	}
+
+	// A DROP the server denies runs once and stays fatal.
+	denied := scripted(t, failWith(&cherr.Error{Code: cherr.CodePermission, ServerCode: 497}))
+	err := probeCleanup{
+		db: unitDB(t), ref: ref, created: true, acquire: fixed(denied),
+		fallback: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
+			t.Error("a denied DROP must not take the fallback")
+			return nil, nil, errors.New("unexpected")
+		},
+	}.run(context.Background())
+	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
+	require.Equal(t, 1, denied.calls, "the denied DROP ran once")
 }
 
 func countOf(list []string, s string) int {
