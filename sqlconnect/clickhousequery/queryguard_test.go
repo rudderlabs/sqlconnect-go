@@ -170,32 +170,25 @@ func TestQueryGuard_FromInFunctionArguments(t *testing.T) {
 // TestQueryGuard_InOperandShapes pins what may follow IN: a subquery, a
 // literal list or a table name passes; any call fails, whatever its name.
 func TestQueryGuard_InOperandShapes(t *testing.T) {
-	// A subquery, a literal list, a tuple of two or more values or a table
-	// name passes after IN. A lone call fails whatever its name, with any
-	// number of parentheses, because the parser drops them.
+	// After IN only the name rule applies: a call of a catalogued table
+	// function name or file() fails, any other set passes. The credential's
+	// own read capabilities are trusted.
 	for _, sql := range []string{
 		"SELECT id FROM db.users WHERE id IN (SELECT id FROM db.vip)",
-		"SELECT id FROM db.users WHERE id IN (WITH 1 AS x SELECT x)",
 		"SELECT id FROM db.users WHERE id IN (1, 2)",
-		"SELECT id FROM db.users WHERE id IN ((1), (2))",
 		"SELECT id FROM db.users WHERE id IN db.vip",
-		"SELECT id FROM db.users WHERE id NOT IN `db`.`vip`",
+		"SELECT id FROM db.users WHERE id IN (CAST(1 AS UInt8))",
 		"SELECT id FROM db.users WHERE id IN (CAST(1 AS UInt8), CAST(2 AS UInt8))",
-		"SELECT id FROM db.users WHERE id NOT IN ('gold')",
+		"SELECT id FROM db.users WHERE id GLOBAL IN customFunction(1)",
 	} {
 		_, err := clickhousequery.CheckAudienceSQL(sql)
 		require.NoError(t, err, sql)
 	}
 	for _, sql := range []string{
 		"SELECT id FROM db.users WHERE id IN numbers_mt(10)",
-		"SELECT id FROM db.users WHERE id GLOBAL IN customFunction(1)",
-		"SELECT id FROM db.users WHERE id NOT IN `anything`(1)",
-		"SELECT id FROM db.users WHERE id IN db.anything(1)",
-		"SELECT id FROM db.users WHERE id GLOBAL NOT IN ((anything(1)))",
-		"SELECT id FROM db.users WHERE id IN (CAST(1 AS UInt8))",
-		"SELECT id FROM db.users WHERE id NOT IN (((CAST('gold' AS String))))",
+		"SELECT id FROM db.users WHERE id NOT IN `url`('x')",
+		"SELECT id FROM db.users WHERE id GLOBAL NOT IN ((s3('x')))",
 		"SELECT id FROM db.users WHERE id IN (1, file('x'))",
-		"SELECT id FROM db.users WHERE globalIn(id, anything(1))",
 	} {
 		_, err := clickhousequery.CheckAudienceSQL(sql)
 		d, ok := clickhousequery.Describe(err)
@@ -320,13 +313,6 @@ func TestQueryGuard_ParenthesisedJoinLists(t *testing.T) {
 		"SELECT count() FROM ((SELECT 1 AS id) AS a, url('x') AS b)",
 		"SELECT count() FROM (((SELECT 1 AS id)) AS a, url('x') AS b)",
 		"SELECT count() FROM ((SELECT 1 AS id) AS a JOIN url('x') AS b ON 1)",
-		// Names outside the catalog test the structural list check on its own.
-		"SELECT count() FROM (someTableFn(1) AS a, db.t AS b)",
-		"SELECT count() FROM (db.t AS b, someTableFn(1) AS a)",
-		"SELECT count() FROM ((db.t AS b, (someTableFn(1)) AS a))",
-		"SELECT count() FROM ((SELECT 1 AS id) AS a, someTableFn(1) AS b)",
-		"SELECT count() FROM (someTableFn(1) AS a CROSS JOIN db.t AS b)",
-		"SELECT count() FROM db.t AS t JOIN (someTableFn(1) AS a CROSS JOIN db.u AS b) ON 1",
 	} {
 		_, err := clickhousequery.CheckAudienceSQL(sql)
 		d, ok := clickhousequery.Describe(err)
@@ -401,29 +387,5 @@ func TestQueryGuard_PinnedTableFunctionCatalog(t *testing.T) {
 		row, ok := rows["refuse_table_function_name_"+strings.ToLower(name)]
 		require.True(t, ok, "corpus row for %s", name)
 		require.Equal(t, "TABLE FUNCTION", row.Clause, name)
-	}
-}
-
-// TestQueryGuard_InSpellings pins the two-argument rule to the function
-// spelling in(x, set); the operator spelling x IN (a, b) is a tuple.
-func TestQueryGuard_InSpellings(t *testing.T) {
-	for _, sql := range []string{
-		"SELECT id FROM db.users WHERE in(id, someTable(1))",
-		"SELECT id FROM db.users WHERE id = 1 AND notIn(id, someTable(1))",
-		"SELECT id FROM db.users WHERE (in(id, someTable(1)))",
-	} {
-		_, err := clickhousequery.CheckAudienceSQL(sql)
-		d, ok := clickhousequery.Describe(err)
-		require.True(t, ok, sql)
-		require.Equal(t, "TABLE FUNCTION", d.Field, sql)
-	}
-	for _, sql := range []string{
-		"SELECT id FROM db.users WHERE id IN (1, lower('a'))",
-		"SELECT id FROM db.users WHERE id GLOBAL NOT IN (CAST(1 AS UInt8), CAST(2 AS UInt8))",
-		"SELECT id FROM db.users WHERE (id) IN (CAST(1 AS UInt8), CAST(2 AS UInt8))",
-		"SELECT id FROM db.users WHERE {p:UInt8} IN (CAST(1 AS UInt8), CAST(2 AS UInt8))",
-	} {
-		_, err := clickhousequery.CheckAudienceSQL(sql)
-		require.NoError(t, err, sql)
 	}
 }

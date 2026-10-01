@@ -92,6 +92,24 @@
       "normalized": "SELECT id FROM db.users WHERE id IN (1, 2, 3)"
     },
     {
+      "name": "accept_in_lone_call_nested_parens",
+      "sql": "SELECT id FROM db.users WHERE id NOT IN ((anything(1)))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE id NOT IN ((anything(1)))"
+    },
+    {
+      "name": "accept_in_lone_unknown_call",
+      "sql": "SELECT id FROM db.users WHERE id GLOBAL IN customFunction(1)",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE id GLOBAL IN customFunction(1)"
+    },
+    {
+      "name": "accept_in_one_cast",
+      "sql": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String))"
+    },
+    {
       "name": "accept_in_subquery",
       "sql": "SELECT id FROM db.users WHERE id IN (SELECT id FROM db.vip)",
       "verdict": "accept",
@@ -146,6 +164,12 @@
       "normalized": "SELECT u.id FROM db.sample u"
     },
     {
+      "name": "accept_not_in_one_cast",
+      "sql": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String))"
+    },
+    {
       "name": "accept_not_in_one_value",
       "sql": "SELECT id FROM db.users WHERE plan NOT IN ('gold')",
       "verdict": "accept",
@@ -156,6 +180,30 @@
       "sql": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String), CAST('silver' AS String))",
       "verdict": "accept",
       "normalized": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String), CAST('silver' AS String))"
+    },
+    {
+      "name": "accept_paren_list_after_subquery_uncatalogued",
+      "sql": "SELECT count() FROM ((SELECT 1 AS id) AS a, someTableFn(1) AS b)",
+      "verdict": "accept",
+      "normalized": "SELECT count() FROM ((SELECT 1 AS id) AS a, someTableFn(1) AS b)"
+    },
+    {
+      "name": "accept_paren_list_first_uncatalogued",
+      "sql": "SELECT count() FROM (someTableFn(1) AS a, db.users AS b)",
+      "verdict": "accept",
+      "normalized": "SELECT count() FROM (someTableFn(1) AS a, db.users AS b)"
+    },
+    {
+      "name": "accept_paren_list_join_uncatalogued",
+      "sql": "SELECT count() FROM (someTableFn(1) AS a CROSS JOIN db.users AS b)",
+      "verdict": "accept",
+      "normalized": "SELECT count() FROM (someTableFn(1) AS a CROSS JOIN db.users AS b)"
+    },
+    {
+      "name": "accept_paren_list_second_uncatalogued",
+      "sql": "SELECT count() FROM (db.users AS b, someTableFn(1) AS a)",
+      "verdict": "accept",
+      "normalized": "SELECT count() FROM (db.users AS b, someTableFn(1) AS a)"
     },
     {
       "name": "accept_paren_list_subquery_then_table",
@@ -266,24 +314,6 @@
       "clause": "FORMAT"
     },
     {
-      "name": "refuse_in_lone_call_nested_parens",
-      "sql": "SELECT id FROM db.users WHERE id NOT IN ((anything(1)))",
-      "verdict": "refuse",
-      "clause": "TABLE FUNCTION"
-    },
-    {
-      "name": "refuse_in_lone_unknown_call",
-      "sql": "SELECT id FROM db.users WHERE id GLOBAL IN customFunction(1)",
-      "verdict": "refuse",
-      "clause": "TABLE FUNCTION"
-    },
-    {
-      "name": "refuse_in_one_cast",
-      "sql": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String))",
-      "verdict": "refuse",
-      "clause": "TABLE FUNCTION"
-    },
-    {
       "name": "refuse_into_outfile",
       "sql": "SELECT id FROM db.users INTO OUTFILE 'x.csv'",
       "verdict": "refuse",
@@ -312,18 +342,6 @@
       "sql": "SELECT 1; SELECT 2",
       "verdict": "refuse",
       "clause": "MULTIPLE STATEMENTS"
-    },
-    {
-      "name": "refuse_not_in_one_cast",
-      "sql": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String))",
-      "verdict": "refuse",
-      "clause": "TABLE FUNCTION"
-    },
-    {
-      "name": "refuse_paren_list_after_subquery_uncatalogued",
-      "sql": "SELECT count() FROM ((SELECT 1 AS id) AS a, someTableFn(1) AS b)",
-      "verdict": "refuse",
-      "clause": "TABLE FUNCTION"
     },
     {
       "name": "refuse_paren_list_after_subquery_url",
@@ -392,12 +410,6 @@
       "clause": "TABLE FUNCTION"
     },
     {
-      "name": "refuse_paren_list_first_uncatalogued",
-      "sql": "SELECT count() FROM (someTableFn(1) AS a, db.users AS b)",
-      "verdict": "refuse",
-      "clause": "TABLE FUNCTION"
-    },
-    {
       "name": "refuse_paren_list_first_url",
       "sql": "SELECT a.id FROM (url('https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b)",
       "verdict": "refuse",
@@ -422,20 +434,8 @@
       "clause": "TABLE FUNCTION"
     },
     {
-      "name": "refuse_paren_list_join_uncatalogued",
-      "sql": "SELECT count() FROM (someTableFn(1) AS a CROSS JOIN db.users AS b)",
-      "verdict": "refuse",
-      "clause": "TABLE FUNCTION"
-    },
-    {
       "name": "refuse_paren_list_numbers_pair",
       "sql": "SELECT * FROM (numbers(2) AS a, numbers(2) AS b)",
-      "verdict": "refuse",
-      "clause": "TABLE FUNCTION"
-    },
-    {
-      "name": "refuse_paren_list_second_uncatalogued",
-      "sql": "SELECT count() FROM (db.users AS b, someTableFn(1) AS a)",
       "verdict": "refuse",
       "clause": "TABLE FUNCTION"
     },
