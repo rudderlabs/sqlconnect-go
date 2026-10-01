@@ -106,10 +106,13 @@ func (g *guard) scan() string {
 	// kept as the scan goes, so a wide list costs linear time.
 	listOK := false
 	for i, tk := range w {
-		if tk.Kind == chsql.Word && isDot(g.at(i-1)) && !isOpener(g.at(i+1)) {
-			// A word after a dot names a column or table, as in u.format or
-			// db.sample: it is never a clause keyword. A call after a dot
-			// still goes through the name rule below.
+		if tk.Kind == chsql.Word && !isOpener(g.at(i+1)) &&
+			(isDot(g.at(i-1)) || isDot(g.at(i+1)) && isNameToken(g.at(i+2))) {
+			// A word next to a dot names a database, table or column, as in
+			// u.format, db.sample or sample.users: it is never a clause
+			// keyword. Before a dot this needs a name after it, so
+			// SAMPLE .5 (a dot and a number) stays the SAMPLE clause. A call
+			// after a dot still goes through the name rule.
 			continue
 		}
 		if tk.Kind == chsql.Word && tk.Depth == 0 {
@@ -201,6 +204,8 @@ func isTableFunctionCall(tk, next chsql.Token) bool {
 	}
 	return false
 }
+
+func isNameToken(tk chsql.Token) bool { return tk.Kind == chsql.Word || tk.Kind == chsql.QuotedIdent }
 
 func isDot(tk chsql.Token) bool { return tk.Kind == chsql.Punct && tk.Text == "." }
 

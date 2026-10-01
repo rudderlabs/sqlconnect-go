@@ -158,6 +158,30 @@
       "normalized": "SELECT t.settings FROM db.t AS t"
     },
     {
+      "name": "accept_keyword_database_by",
+      "sql": "SELECT u.id FROM by.users u",
+      "verdict": "accept",
+      "normalized": "SELECT u.id FROM by.users u"
+    },
+    {
+      "name": "accept_keyword_database_final",
+      "sql": "SELECT t.id FROM final.t AS t",
+      "verdict": "accept",
+      "normalized": "SELECT t.id FROM final.t AS t"
+    },
+    {
+      "name": "accept_keyword_database_sample",
+      "sql": "SELECT u.id FROM sample.users u",
+      "verdict": "accept",
+      "normalized": "SELECT u.id FROM sample.users u"
+    },
+    {
+      "name": "accept_keyword_database_sample_mixed_case",
+      "sql": "SELECT u.id FROM Sample.users u",
+      "verdict": "accept",
+      "normalized": "SELECT u.id FROM Sample.users u"
+    },
+    {
       "name": "accept_keyword_table_sample",
       "sql": "SELECT u.id FROM db.sample u",
       "verdict": "accept",

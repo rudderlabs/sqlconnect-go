@@ -394,3 +394,31 @@ func TestQueryGuard_PinnedTableFunctionCatalog(t *testing.T) {
 		require.Equal(t, "TABLE FUNCTION", row.Clause, name)
 	}
 }
+
+// TestQueryGuard_KeywordNamesNextToADot pins database, table and column names
+// that are clause keywords, while the clauses themselves stay refused.
+func TestQueryGuard_KeywordNamesNextToADot(t *testing.T) {
+	for _, sql := range []string{
+		"SELECT u.id FROM sample.users u",
+		"SELECT u.id FROM Sample.users u",
+		"SELECT u.id FROM by.users u",
+		"SELECT t.id FROM final.t AS t",
+		"SELECT t.id FROM `settings`.t AS t",
+		"SELECT u.format FROM db.users AS u",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		require.NoError(t, err, sql)
+	}
+	for sql, clause := range map[string]string{
+		"SELECT id FROM db.users SAMPLE .5":     "SAMPLE",
+		"SELECT id FROM db.users SAMPLE 0.5":    "SAMPLE",
+		"SELECT id FROM db.users LIMIT 1 BY .5": "LIMIT BY",
+		"SELECT id FROM db.users FINAL":         "FINAL",
+		"SELECT id FROM db.users AS u FINAL":    "FINAL",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(sql)
+		d, ok := clickhousequery.Describe(err)
+		require.True(t, ok, sql)
+		require.Equal(t, clause, d.Field, sql)
+	}
+}
