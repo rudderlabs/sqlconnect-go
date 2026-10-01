@@ -7,14 +7,17 @@ package clickhouse_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-go-kit/testhelper/rand"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/clickhouse"
 )
 
@@ -40,19 +43,29 @@ func TestSQ24_CloudSmoke(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("cloud version=%s", res.ServerVersion)
 	scratch := scratchOf(t)
-	a := sqlconnect.NewRelationRef("smoke_a_"+strings.ToLower(rand.String(6)), sqlconnect.WithSchema(scratch))
-	b := sqlconnect.NewRelationRef(a.Name+"_b", sqlconnect.WithSchema(scratch))
+	a := scratchTable(t, db, scratch, "smoke_a_")
+	b := scratchTable(t, db, scratch, "smoke_b_")
 	require.NoError(t, db.CreateTableFromQuery(ctx, a, "SELECT toUInt64(number) AS id, toJSONString(map('k', number)) AS j FROM numbers(3)"))
 	require.Regexp(t, `SharedMergeTree(.|\n)*ORDER BY id`, showCreate(t, db, a))
+	rows := jsonRows(t, db, a)
+	require.Len(t, rows, 3, "the JSON mapper reads the published rows")
+	for i, r := range rows {
+		var m map[string]any
+		require.NoError(t, json.Unmarshal([]byte(r), &m), r)
+		require.EqualValues(t, fmt.Sprint(i), fmt.Sprint(m["id"]), r)
+		require.Contains(t, m["j"], `"k"`, r)
+	}
 	require.NoError(t, db.RenameTable(ctx, a, b))
+	require.Equal(t, 3, countRows(t, db, b), "rename keeps the rows")
 	require.NoError(t, db.CreateTableFromQuery(ctx, a, "SELECT toUInt64(9) AS id, '' AS j"))
 	_, err = db.ExecContext(ctx, "EXCHANGE TABLES "+db.QuoteTable(a)+" AND "+db.QuoteTable(b))
 	require.NoError(t, err)
+	require.Equal(t, 3, countRows(t, db, a), "exchange publishes the three-row table under the first name")
+	require.Equal(t, 1, countRows(t, db, b))
 	_, err = db.ExecContext(ctx, "EXCHANGE TABLES "+db.QuoteTable(a)+" AND "+db.QuoteIdentifier(scratch)+".`missing_x`")
 	require.EqualValues(t, 60, db.ClassifyError(err).ServerCode)
 	require.NoError(t, db.TruncateTable(ctx, a))
-	require.NoError(t, db.DropTable(ctx, a))
-	require.NoError(t, db.DropTable(ctx, b))
+	require.Zero(t, countRows(t, db, a), "truncate empties the table")
 }
 
 func TestSQ5_Native9440(t *testing.T) {
@@ -67,19 +80,116 @@ func TestCP26_CloudReplicatedDefault(t *testing.T) {
 	var engine string
 	require.NoError(t, db.QueryRowContext(ctx, "SELECT value FROM system.settings WHERE name = 'default_table_engine'").Scan(&engine))
 	t.Logf("cloud default_table_engine=%s", engine)
+	require.Contains(t, engine, "MergeTree", "Cloud defaults to a replicated MergeTree engine")
 	scratch := scratchOf(t)
 	conn, err := db.Conn(ctx)
 	require.NoError(t, err)
 	defer func() { _ = conn.Close() }()
+
+	plain := scratchTable(t, db, scratch, "cp26_default_")
+	_, err = conn.ExecContext(ctx, "CREATE TABLE "+db.QuoteTable(plain)+" (a UInt8) ORDER BY a")
+	require.NoError(t, err, "an engine-free CREATE uses the server default")
+	require.Regexp(t, `(Shared|Replicated)MergeTree`, showCreate(t, db, plain))
+
 	hostile := settingsExec{conn: conn, settings: map[string]any{"default_table_engine": "Log"}}
-	free := sqlconnect.NewRelationRef("cp26_free_"+strings.ToLower(rand.String(6)), sqlconnect.WithSchema(scratch))
+	free := scratchTable(t, db, scratch, "cp26_free_")
 	_, err = hostile.ExecContext(ctx, "CREATE TABLE "+db.QuoteTable(free)+" AS SELECT 1 AS a")
 	require.EqualValues(t, 36, db.ClassifyError(err).ServerCode, "negative control: the engine-free CTAS used the hostile default")
-	ours := sqlconnect.NewRelationRef("cp26_"+strings.ToLower(rand.String(6)), sqlconnect.WithSchema(scratch))
-	_, err = db.CreateTableForQueryWithOptions(ctx, hostile, ours, "SELECT toUInt64(1) AS id", sqlconnect.MaterializationOptions{SortingKey: []string{"id"}})
-	require.NoError(t, err, "the explicit ENGINE ignores the hostile default")
-	require.Regexp(t, `SharedMergeTree(.|\n)*ORDER BY id`, showCreate(t, db, ours))
-	require.NoError(t, db.DropTable(ctx, ours))
+
+	for name, ex := range map[string]sqlconnect.QueryExecutor{"server default": settingsExec{conn: conn, settings: map[string]any{}}, "hostile default": hostile} {
+		ours := scratchTable(t, db, scratch, "cp26_ours_")
+		_, err = db.CreateTableForQueryWithOptions(ctx, ex, ours, "SELECT toUInt64(1) AS id", sqlconnect.MaterializationOptions{SortingKey: []string{"id"}})
+		require.NoError(t, err, "%s: the explicit ENGINE decides the engine", name)
+		require.Regexp(t, `SharedMergeTree(.|\n)*ORDER BY id`, showCreate(t, db, ours), name)
+	}
+}
+
+// TestSQ28_CloudCancellation runs the kill and outcome lookups on Cloud, where
+// the answering replica can differ between requests.
+func TestSQ28_CloudCancellation(t *testing.T) {
+	db, ctx := cloudDB(t, 0), context.Background()
+	scratch := scratchOf(t)
+	sink := scratchTable(t, db, scratch, "cancel_sink_")
+	_, err := db.ExecContext(ctx, "CREATE TABLE "+db.QuoteTable(sink)+" (n UInt64) ENGINE = MergeTree ORDER BY n")
+	require.NoError(t, err)
+
+	t.Run("kill a running insert", func(t *testing.T) {
+		id := clickhousequery.NewQueryID()
+		done := make(chan error, 1)
+		go func() {
+			_, err := db.ExecContext(stmtCtx(ctx, map[string]any{"max_block_size": 1}, id),
+				"INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(600) WHERE sleepEachRow(0.1) = 0")
+			done <- err
+		}()
+		require.Eventually(t, func() bool {
+			o, err := db.QueryOutcome(ctx, id, "Insert")
+			return err == nil && o == sqlconnect.QueryRunning
+		}, 2*time.Minute, time.Second)
+		var res sqlconnect.KillResult
+		require.Eventually(t, func() bool {
+			res, err = db.KillQuery(ctx, id)
+			return err == nil && len(res.Rows) == 1 && res.Rows[0].KillStatus == "finished"
+		}, 2*time.Minute, time.Second, "the kill reaches the replica that runs the insert")
+		werr := <-done
+		require.Error(t, werr)
+		require.EqualValues(t, 394, db.ClassifyError(werr).ServerCode, "the killed insert fails mid-stream with code 394")
+		require.Eventually(t, func() bool {
+			o, err := db.QueryOutcome(ctx, id, "Insert")
+			return err == nil && o == sqlconnect.QueryFailed
+		}, 2*time.Minute, 2*time.Second)
+	})
+
+	t.Run("finished and timed out", func(t *testing.T) {
+		id := clickhousequery.NewQueryID()
+		_, err := db.ExecContext(stmtCtx(ctx, map[string]any{}, id), "INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(10)")
+		require.NoError(t, err)
+		require.Eventually(t, func() bool {
+			o, err := db.QueryOutcome(ctx, id, "Insert")
+			return err == nil && o == sqlconnect.QueryFinished
+		}, 2*time.Minute, 2*time.Second)
+
+		rows, err := db.QueryContext(stmtCtx(ctx, map[string]any{"max_execution_time": 1, "max_block_size": 1}, clickhousequery.NewQueryID()),
+			"SELECT number FROM numbers(100) WHERE sleepEachRow(0.1) = 0")
+		if err == nil {
+			for rows.Next() {
+				_ = rows.Scan(new(uint64))
+			}
+			err = rows.Err()
+			_ = rows.Close()
+		}
+		require.Error(t, err)
+		require.EqualValues(t, 159, db.ClassifyError(err).ServerCode, "a statement over its time limit fails with code 159")
+		require.Equal(t, "CH_TIMEOUT", db.ClassifyError(err).Code)
+	})
+}
+
+// scratchTable returns a fresh table name in the scratch database and drops
+// that table at test end, so a failed assertion leaves nothing on the service.
+func scratchTable(t *testing.T, db *clickhouse.DB, scratch, prefix string) sqlconnect.RelationRef {
+	t.Helper()
+	ref := sqlconnect.NewRelationRef(prefix+strings.ToLower(rand.String(8)), sqlconnect.WithSchema(scratch))
+	t.Cleanup(func() { _ = db.DropTable(context.Background(), ref) })
+	return ref
+}
+
+func countRows(t *testing.T, db *clickhouse.DB, ref sqlconnect.RelationRef) int {
+	t.Helper()
+	n, err := db.CountTableRows(context.Background(), ref)
+	require.NoError(t, err)
+	return n
+}
+
+// jsonRows reads every row of ref through the driver's JSON mapper, ordered by id.
+func jsonRows(t *testing.T, db *clickhouse.DB, ref sqlconnect.RelationRef) []string {
+	t.Helper()
+	ch, leave := sqlconnect.QueryJSONAsync(context.Background(), db, "SELECT * FROM "+db.QuoteTable(ref)+" ORDER BY id")
+	defer leave()
+	var out []string
+	for r := range ch {
+		require.NoError(t, r.Err)
+		out = append(out, string(r.Value))
+	}
+	return out
 }
 
 // withPort returns the account config with its port replaced.
