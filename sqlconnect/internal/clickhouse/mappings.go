@@ -24,16 +24,16 @@ import (
 func (db *DB) JSONRowMapper() sqlconnect.RowMapper[map[string]any] {
 	return func(cols []*sql.ColumnType, row sqlconnect.RowScan) (map[string]any, error) {
 		types := make([]chType, len(cols))
-		seen := make(map[string]bool, len(cols))
+		seen := make(map[string]int, len(cols))
 		for i, c := range cols {
-			name := c.Name()
-			if seen[name] {
-				return nil, cherr.New(cherr.CodeDuplicateColumn, "", "the result has two columns named "+quoteName(name))
+			if first, ok := seen[c.Name()]; ok {
+				return nil, cherr.New(cherr.CodeDuplicateColumn, "",
+					"columns "+position(first)+" and "+position(i)+" of the result have the same name; give each column a distinct alias")
 			}
-			seen[name] = true
+			seen[c.Name()] = i
 			t, err := parseType(c.DatabaseTypeName())
 			if err != nil || label(t) == "unsupported" {
-				return nil, cherr.New(cherr.CodeTypeUnsupported, "", "column "+quoteName(name)+": the column type is not supported; project this column with an explicit cast")
+				return nil, cherr.New(cherr.CodeTypeUnsupported, "", "column "+position(i)+": the column type is not supported; project this column with an explicit cast")
 			}
 			types[i] = t
 		}
@@ -48,7 +48,7 @@ func (db *DB) JSONRowMapper() sqlconnect.RowMapper[map[string]any] {
 		for i, c := range cols {
 			v, err := jsonValue(types[i], values[i].(*sqlconnect.NilAny).Value)
 			if err != nil {
-				return nil, columnError(c.Name(), err)
+				return nil, columnError(i, err)
 			}
 			out[c.Name()] = v
 		}
@@ -56,22 +56,17 @@ func (db *DB) JSONRowMapper() sqlconnect.RowMapper[map[string]any] {
 	}
 }
 
-// quoteName bounds a column name before it reaches an error text.
-func quoteName(name string) string {
-	const maxLen = 128
-	if len(name) > maxLen {
-		name = name[:maxLen] + "..."
-	}
-	return strconv.Quote(name)
-}
+// position names a result column by its 1-based position. Errors never carry
+// the column name: an unaliased expression can hold a customer literal.
+func position(i int) string { return strconv.Itoa(i + 1) }
 
-func columnError(name string, err error) error {
+func columnError(i int, err error) error {
 	code, detail := cherr.CodeValueEncoding, "the value cannot be exported"
 	var ce *cherr.Error
 	if errors.As(err, &ce) {
 		code, detail = ce.Code, ce.Detail
 	}
-	return wrap(code, "", "column "+quoteName(name)+": "+detail, err)
+	return wrap(code, "", "column "+position(i)+": "+detail, err)
 }
 
 func errEncoding(detail string) error { return cherr.New(cherr.CodeValueEncoding, "", detail) }
@@ -430,6 +425,14 @@ func jsonSafe(v any) any {
 	switch x := v.(type) {
 	case nil:
 		return nil
+	case interface {
+		Nil() bool
+		Any() any
+	}: // chcol.Dynamic and chcol.Variant
+		if x.Nil() {
+			return nil
+		}
+		return jsonSafe(x.Any())
 	case big.Int:
 		return x.Text(10)
 	case *big.Int:

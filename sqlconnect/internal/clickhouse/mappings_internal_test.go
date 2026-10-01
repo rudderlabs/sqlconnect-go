@@ -68,18 +68,19 @@ func TestJSONValue_Refusals(t *testing.T) {
 }
 
 func TestColumnError_KeepsCode(t *testing.T) {
-	err := columnError("c", cherr.New(cherr.CodeTypeUnsupported, "", "x"))
+	err := columnError(1, cherr.New(cherr.CodeTypeUnsupported, "", "x"))
 	var ce *cherr.Error
 	require.True(t, errors.As(err, &ce))
 	require.Equal(t, cherr.CodeTypeUnsupported, ce.Code)
-	require.Equal(t, `CH_TYPE_UNSUPPORTED: column "c": x`, err.Error())
+	require.Equal(t, "CH_TYPE_UNSUPPORTED: column 2: x", err.Error())
 }
 
 func TestJSONValue_ForkJSONObject(t *testing.T) {
 	o := chcol.NewJSON()
 	o.SetValueAtPath("a.b", int64(1))
 	o.SetValueAtPath("w", *big.NewInt(5))
-	want := map[string]any{"a": map[string]any{"b": json.Number("1")}, "w": "5"}
+	o.SetValueAtPath("dyn", chcol.NewDynamic(*big.NewInt(6))) // a dynamic UInt256 path
+	want := map[string]any{"a": map[string]any{"b": json.Number("1")}, "w": "5", "dyn": "6"}
 	got, err := jsonValue(mustType(t, "JSON"), o) // a top-level column arrives as *chcol.JSON
 	require.NoError(t, err)
 	require.Equal(t, want, got)
