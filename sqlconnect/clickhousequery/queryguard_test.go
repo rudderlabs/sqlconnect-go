@@ -167,12 +167,11 @@ func TestQueryGuard_FromInFunctionArguments(t *testing.T) {
 	}
 }
 
-// TestQueryGuard_InOperandShapes pins what may follow IN: a subquery, a
-// literal list or a table name passes; any call fails, whatever its name.
+// TestQueryGuard_InOperandShapes pins what may follow IN, in the operator
+// and the function spelling: only the name rule applies, so a call of a
+// catalogued table function name or file() fails and any other set passes.
+// The credential's own read capabilities are trusted.
 func TestQueryGuard_InOperandShapes(t *testing.T) {
-	// After IN only the name rule applies: a call of a catalogued table
-	// function name or file() fails, any other set passes. The credential's
-	// own read capabilities are trusted.
 	for _, sql := range []string{
 		"SELECT id FROM db.users WHERE id IN (SELECT id FROM db.vip)",
 		"SELECT id FROM db.users WHERE id IN (1, 2)",
@@ -180,6 +179,10 @@ func TestQueryGuard_InOperandShapes(t *testing.T) {
 		"SELECT id FROM db.users WHERE id IN (CAST(1 AS UInt8))",
 		"SELECT id FROM db.users WHERE id IN (CAST(1 AS UInt8), CAST(2 AS UInt8))",
 		"SELECT id FROM db.users WHERE id GLOBAL IN customFunction(1)",
+		"SELECT id FROM db.users WHERE in(id, someTable(1))",
+		"SELECT id FROM db.users WHERE id = 1 AND notIn(id, someTable(1))",
+		"SELECT id FROM db.users WHERE (in(id, someTable(1)))",
+		"SELECT id FROM db.users WHERE globalIn(id, (anything(1)))",
 	} {
 		_, err := clickhousequery.CheckAudienceSQL(sql)
 		require.NoError(t, err, sql)
@@ -189,6 +192,8 @@ func TestQueryGuard_InOperandShapes(t *testing.T) {
 		"SELECT id FROM db.users WHERE id NOT IN `url`('x')",
 		"SELECT id FROM db.users WHERE id GLOBAL NOT IN ((s3('x')))",
 		"SELECT id FROM db.users WHERE id IN (1, file('x'))",
+		"SELECT id FROM db.users WHERE in(id, url('x'))",
+		"SELECT id FROM db.users WHERE notIn(id, (remote('h', db.t)))",
 	} {
 		_, err := clickhousequery.CheckAudienceSQL(sql)
 		d, ok := clickhousequery.Describe(err)
