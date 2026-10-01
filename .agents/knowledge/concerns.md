@@ -35,3 +35,14 @@
 - CI matrix comments out Trino package tests while README still presents Trino as a supported warehouse, creating support-coverage ambiguity (`.github/workflows/test.yaml`, `README.md`).
 - Cleanup binary also comments out Trino cleanup path, reinforcing potential maintenance skew for Trino environments (`sqlconnect/cmd/cleanup/cleanup.go`).
 - Release workflow uses `package-name: rudder-server`, which appears mismatched for `sqlconnect-go` and may cause release metadata confusion if unintentional (`.github/workflows/release-please.yaml`).
+
+## ACT2-766 — ClickHouse driver residual risks
+
+<!-- session: 2026-10-01 -->
+
+- `clickhousequery.CheckAudienceSQL` refuses some valid SQL: a bare keyword alias `AS final`, `format(...)`, `position(a IN f())` and `EXTRACT`/`trim(... FROM f())`. The cause is the name rule, which refuses `format` and other table function names in any position. Lookout must avoid emitting these forms.
+- The ch-go String decoder (`col_str.go` in the fork's dependency) allocates whatever a length prefix claims, up to 256 MiB per value. Only `driverReadSettings` bounds results through `max_result_bytes`. A caller that passes its own settings map for a model read must set its own result bound.
+- The fork's `discardAndClose` drains an endless 200 response body on Exec until the context deadline, and a deadline during the drain returns `err == nil`. `internal/clickhouse/transport.go::drainClose` already caps its own drain at 64 KiB. The fork does not.
+- `internal/clickhouse/validation.go::readRoleClosure` (validation stage 5) reads the role closure without a size cap.
+- The ClickHouse Cloud arm (`internal/clickhouse/cloud_test.go`, build tag `clickhouse_cloud`, `make test-clickhouse-cloud`, needs `CLICKHOUSE_CLOUD_CONFIG`) does not run in CI. A two-replica proof is also still open. Both are before-GA steps.
+- A typed decimal path inside a JSON column loses trailing zeros in `internal/clickhouse/mappings.go`. No integration case covers a generic `Decimal(P,S)` column yet.
