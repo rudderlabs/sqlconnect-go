@@ -64,13 +64,20 @@ func TestSQ13_SQ29_StatementSettings(t *testing.T) {
 		require.Less(t, time.Since(start), 2500*time.Millisecond, "the deadline ends the request before the statement does")
 		require.Contains(t, []string{"CH_TIMEOUT", "CH_CANCELLED"}, db.ClassifyError(err).Code, "%v", err)
 	}
-	ids := make([]string, 20) // SQ13: concurrent maps do not leak
+	ids := make([]string, 20) // concurrent maps do not leak
 	var wg sync.WaitGroup
+	errs := make([]error, len(ids)) // require must not run off the test goroutine
 	for i := range ids {
 		// max_threads starts at 101: query_log omits a value equal to the auto default.
-		wg.Go(func() { ids[i] = run(db, ctx, map[string]any{"max_threads": i + 101}) })
+		wg.Go(func() {
+			ids[i] = clickhousequery.NewQueryID()
+			_, errs[i] = db.ExecContext(stmtCtx(ctx, map[string]any{"max_threads": i + 101}, ids[i]), "SELECT 1")
+		})
 	}
 	wg.Wait()
+	for _, err := range errs {
+		require.NoError(t, err)
+	}
 	child := run(db, stmtCtx(ctx, map[string]any{"max_threads": 3}, clickhousequery.NewQueryID()), map[string]any{})
 	db.SetMaxIdleConns(0) // the next statement opens a new connection
 	oid := run(db, ctx, map[string]any{"max_threads": 7})
@@ -130,7 +137,7 @@ func TestSQ31_SQ11_InheritedAdminCarriesScratchMap(t *testing.T) {
 			return err
 		},
 		func() error { return db.CreateTestTable(ctx, tbl) },
-		func() error { return db.CreateTestTable(ctx, tbl) }, // SQ11: idempotent, engine checked below
+		func() error { return db.CreateTestTable(ctx, tbl) }, // idempotent, engine checked below
 		func() error {
 			if show := srv.AdminQuery(t, "SHOW CREATE TABLE "+schema.Name+".t")[0][0]; !strings.Contains(show, "ENGINE = MergeTree") || !strings.Contains(show, "ORDER BY c1") {
 				return fmt.Errorf("CreateTestTable engine: %s", show)
@@ -252,5 +259,5 @@ func TestCP22_GoBindsTabString(t *testing.T) {
 	err := db.QueryRowContext(ctx, q+"{p:String}", ch.Named("p", "a\tb")).Scan(&n) // param_p goes unescaped
 	require.EqualValues(t, 457, db.ClassifyError(err).ServerCode, "a raw tab ends the value early")
 	require.NoError(t, db.QueryRowContext(ctx, q+"{p:String}", ch.Named("p", `a\tb`)).Scan(&n))
-	require.EqualValues(t, 1, n, "the escaped form matches; callers of the named path escape (seam S19)")
+	require.EqualValues(t, 1, n, "the escaped form matches; callers of the named path must escape")
 }

@@ -53,7 +53,10 @@ func TestSQ14_ReadonlyAndConstraints(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
 	_, err := openAs(t, srv, srv.CreateUserWithProfile(t, map[string]string{"readonly": "1"})).ValidateContext(context.Background())
 	d, _ := clickhousequery.Describe(err)
-	require.Equal(t, clickhousequery.Details{Code: "CH_PERMISSION", Category: "permission", Field: "max_execution_time", ServerCode: 164}, d)
+	require.Equal(t, clickhousequery.Details{
+		Code: "CH_PERMISSION", Category: "permission", Field: "max_execution_time",
+		Detail: "the user lacks a required privilege or setting", ServerCode: 164,
+	}, d)
 	requireStage(t, err, 1, "settings") // the hello SELECT fails inside stage 1
 	_, err = openAs(t, srv, srv.CreateUserWithConstraint(t, "select_sequential_consistency", "0")).ValidateContext(context.Background())
 	d, _ = clickhousequery.Describe(err)
@@ -141,10 +144,16 @@ func TestSQ25_Probe(t *testing.T) {
 	srv.AdminExec(t, "CREATE TABLE scratch_db.test_table (k UInt8) ENGINE = MergeTree ORDER BY k")
 	db := openScoped(t, srv, "rudder_retl", "pw_Retl_123")
 	var wg sync.WaitGroup
+	// require must not run off the test goroutine.
+	errs := make(chan error, 10)
 	for range 10 { // more calls than pool slots: no call waits on a slot another call holds
-		wg.Go(func() { _, err := db.ValidateContext(context.Background()); require.NoError(t, err) })
+		wg.Go(func() { _, err := db.ValidateContext(context.Background()); errs <- err })
 	}
 	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
+	}
 	require.Equal(t, "1", srv.AdminQuery(t, "SELECT count() FROM system.tables WHERE database='scratch_db' AND name='test_table'")[0][0], "a customer test_table survives")
 	require.Equal(t, "0", probeCount(t, srv))
 	srv.FlushLogs(t)
@@ -210,7 +219,7 @@ func TestSQ25_SQ30_ValidationHelloFaults(t *testing.T) {
 		requireCode(t, err, "CH_AUTHENTICATION")
 		require.Contains(t, err.Error(), "the server refused the credentials")
 	}
-	require.NotContains(t, logs.String(), "sentinel-pw-7f3a", "SQ25: the validation response carries no server text")
+	require.NotContains(t, logs.String(), "sentinel-pw-7f3a", "the validation response carries no server text")
 	var second atomic.Int32
 	other := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { second.Add(1) }))
 	defer other.Close()
@@ -219,7 +228,7 @@ func TestSQ25_SQ30_ValidationHelloFaults(t *testing.T) {
 	_, err := openVia(t, srv, p, true).ValidateContext(context.Background())
 	requireCode(t, err, "CH_REDIRECT_REFUSED")
 	requireStage(t, err, 0, "network")
-	require.Zero(t, second.Load(), "SQ30: the second host receives zero requests")
+	require.Zero(t, second.Load(), "the second host receives zero requests")
 }
 
 func TestValidation_PingDelegates(t *testing.T) {

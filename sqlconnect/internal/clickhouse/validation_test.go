@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -91,6 +92,107 @@ func TestProbeCleanup_Codes(t *testing.T) {
 	require.Equal(t, 1, acquired)
 	require.True(t, strings.HasPrefix(replacement.lastExec, "DROP TABLE `scratch_db`.`_rudder_probe_"), replacement.lastExec)
 	require.Contains(t, unknownLastExec(t), "DROP TABLE IF EXISTS", "an unknown CREATE outcome drops only if the table exists")
+}
+
+// lateCreate is a server where the probe CREATE is still in flight when the
+// cleanup starts. The CREATE runs for running polls of system.processes and
+// then lands, which creates the table. It records every statement in order.
+type lateCreate struct {
+	mu      sync.Mutex
+	running int // polls left that still see the CREATE in system.processes
+	logRow  string
+	exists  bool
+	log     []string
+}
+
+func (l *lateCreate) exec(t *testing.T) *sql.DB {
+	return answerDB(t, func(q string, args []any) ([]string, [][]driver.Value, error) {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		l.log = append(l.log, q)
+		switch q {
+		case processesSQL:
+			require.Equal(t, []any{"retl-create"}, args)
+			if l.running > 0 {
+				l.running--
+				if l.running == 0 {
+					l.exists = true // the delayed CREATE lands
+				}
+				return []string{"count()"}, [][]driver.Value{{int64(1)}}, nil
+			}
+			return []string{"count()"}, [][]driver.Value{{int64(0)}}, nil
+		case queryLogSQL:
+			require.Equal(t, []any{"retl-create", "Create"}, args)
+			if l.logRow == "" {
+				return []string{"type"}, nil, nil
+			}
+			return []string{"type"}, [][]driver.Value{{l.logRow}}, nil
+		case visibilitySQL:
+			if l.exists {
+				return []string{"v"}, [][]driver.Value{{"0000-uuid"}}, nil
+			}
+			return []string{"v"}, nil, nil
+		}
+		return nil, nil, fmt.Errorf("unexpected query %q", q)
+	}, func(q string) error {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		l.log = append(l.log, q)
+		if strings.HasPrefix(q, "DROP TABLE IF EXISTS ") {
+			l.exists = false
+		}
+		return nil
+	})
+}
+
+func TestProbeCleanup_WaitsForUnknownCreate(t *testing.T) {
+	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("scratch_db"))
+	db := unitDB(t)
+	orig := sleep
+	sleep = func(context.Context, time.Duration) error { return nil }
+	t.Cleanup(func() { sleep = orig })
+	cleanup := func(l *lateCreate) probeCleanup {
+		return probeCleanup{
+			db: db, ref: ref, createID: "retl-create", exec: l.exec(t),
+			policy: sqlconnect.VisibilityPolicy{InitialBackoff: time.Millisecond, Deadline: 50 * time.Millisecond},
+		}
+	}
+
+	l := &lateCreate{running: 3, logRow: "QueryFinish"}
+	require.NoError(t, cleanup(l).run(context.Background()))
+	require.False(t, l.exists, "a CREATE that lands during the cleanup is dropped")
+	drop := slices.IndexFunc(l.log, func(q string) bool { return strings.HasPrefix(q, "DROP TABLE IF EXISTS ") })
+	finished := slices.Index(l.log, queryLogSQL)
+	require.True(t, finished >= 0 && drop > finished, "the DROP runs after the CREATE is known to be over: %q", l.log)
+
+	// Never seen anywhere: the CREATE never arrived or query_log is off. The
+	// wait is bounded, and the DROP still runs.
+	l = &lateCreate{}
+	require.NoError(t, cleanup(l).run(context.Background()))
+	require.Equal(t, probeSettlePolls, countOf(l.log, queryLogSQL), "a bounded number of outcome reads")
+	require.Contains(t, l.log, "DROP TABLE IF EXISTS `scratch_db`.`_rudder_probe_0123456789abcdef` SYNC")
+
+	// Still running after every poll: the DROP runs, and the cleanup fails,
+	// because the CREATE can still land.
+	l = &lateCreate{running: probeSettlePolls + 5}
+	err := cleanup(l).run(context.Background())
+	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
+	requireStage(t, err, 4, "scratch_cleanup")
+	require.Contains(t, l.log, "DROP TABLE IF EXISTS `scratch_db`.`_rudder_probe_0123456789abcdef` SYNC")
+
+	// The outcome read is refused: drop at once, as before.
+	refused := probeCleanup{db: db, ref: ref, createID: "retl-create", exec: scripted(t, failWith(&ch.Exception{Code: 497}), execOK, noRow)}
+	require.NoError(t, refused.run(context.Background()))
+}
+
+func countOf(list []string, s string) int {
+	n := 0
+	for _, v := range list {
+		if v == s {
+			n++
+		}
+	}
+	return n
 }
 
 func TestValidation_VersionAndStages(t *testing.T) {

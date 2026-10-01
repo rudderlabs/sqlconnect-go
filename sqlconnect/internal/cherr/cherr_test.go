@@ -12,7 +12,7 @@ import (
 )
 
 func TestCherr_RegistryCategories(t *testing.T) {
-	require.Len(t, cherr.Codes(), 38, "every LLD registry code, listed once in cherr.go")
+	require.Len(t, cherr.Codes(), 38, "every registry code, listed once in cherr.go")
 	for code, category := range map[string]string{
 		"CH_TLS": "connection configuration", "CH_RATE_LIMITED": "transient",
 		"CH_OBJECT_NOT_FOUND": "not_found", "CH_SCRATCH_CLEANUP_FAILED": "cleanup", "CH_SCHEMA_MISMATCH": "integrity",

@@ -79,7 +79,7 @@ func TestQueryGuard_LexerStates(t *testing.T) {
 		"SELECT $$ FINAL $$ AS x FROM db.t":          "",
 		"SELECT id // SAMPLE\nFROM db.t":             "",
 		"SELECT `a``FINAL` FROM db.t":                "",
-		"SELECT id FROM db.t; -- tail":               "MULTIPLE STATEMENTS", // D42
+		"SELECT id FROM db.t; -- tail":               "MULTIPLE STATEMENTS", // a comment after the semicolon is still a second statement
 		"SELECT id FROM db.t WHERE x IN (1, 2), 3":   "SYNTAX",              // depth-0 comma outside a FROM list
 		"INSERT INTO db.t SELECT 1":                  "NOT SELECT",
 		"SELECT 'open":                               "SYNTAX",

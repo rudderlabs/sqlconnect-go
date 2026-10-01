@@ -1,5 +1,5 @@
 {
-  "$comment": "Shared ClickHouse account field cases, catalog LLD section 3.8. rudder-integrations-config owns this file. sqlconnect-go, rudder-sources and rudder-config-backend keep byte-identical copies. Inputs use JSON escapes.",
+  "$comment": "Shared ClickHouse account field cases, catalog LLD section 3.8. rudder-integrations-config owns this file. sqlconnect-go, rudder-config-backend, rudder-control-plane and rudder-lookout keep byte-identical copies. Inputs use JSON escapes.",
   "cases": [
     {
       "id": "H01",

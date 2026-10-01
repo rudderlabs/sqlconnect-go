@@ -75,15 +75,22 @@ func (db *DB) KillQuery(ctx context.Context, queryID string) (sqlconnect.KillRes
 
 // QueryOutcome implements sqlconnect.QueryCanceller.
 func (db *DB) QueryOutcome(ctx context.Context, queryID string, kind sqlconnect.QueryKind) (sqlconnect.QueryOutcome, error) {
+	return queryOutcome(func(q string, args ...any) *sql.Row {
+		return db.QueryRowContext(db.controlCtx(ctx), q, args...)
+	}, queryID, kind)
+}
+
+// queryOutcome reads system.processes, then system.query_log, through row.
+func queryOutcome(row func(q string, args ...any) *sql.Row, queryID string, kind sqlconnect.QueryKind) (sqlconnect.QueryOutcome, error) {
 	var running uint64
-	if err := db.QueryRowContext(db.controlCtx(ctx), processesSQL, queryID).Scan(&running); err != nil {
+	if err := row(processesSQL, queryID).Scan(&running); err != nil {
 		return "", bound("query outcome", "", err)
 	}
 	if running > 0 {
 		return sqlconnect.QueryRunning, nil
 	}
 	var typ string
-	err := db.QueryRowContext(db.controlCtx(ctx), queryLogSQL, queryID, string(kind)).Scan(&typ)
+	err := row(queryLogSQL, queryID, string(kind)).Scan(&typ)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		return sqlconnect.QueryNotFound, nil

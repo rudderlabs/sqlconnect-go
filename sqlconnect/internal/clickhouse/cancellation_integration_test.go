@@ -107,7 +107,7 @@ func TestSQ28_OwnUserOnlyAndGrants(t *testing.T) {
 	_, err = db.QueryOutcome(ctx, clickhousequery.NewQueryID(), "Insert")
 	require.EqualValues(t, 497, db.ClassifyError(err).ServerCode)
 
-	admin := openAdmin(t, srv) // query_kind evidence for rudder-sources (seam S17)
+	admin := openAdmin(t, srv) // rudder-sources passes query_kind to QueryOutcome, so each statement kind is pinned here
 	kinds := []struct{ name, sql, id string }{
 		{"INSERT SELECT", "INSERT INTO scratch_db.sink SELECT 1", ""},
 		{"CREATE", "CREATE TABLE scratch_db.k (a UInt8) ENGINE = MergeTree ORDER BY a", ""},

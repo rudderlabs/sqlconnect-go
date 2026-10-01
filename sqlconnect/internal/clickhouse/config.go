@@ -50,7 +50,7 @@ var (
 	// The last label must start with a letter, so non-canonical IPv4 forms
 	// such as 1.2.3 or 0x7f000001 match neither branch.
 	hostPattern = regexp.MustCompile(`^(((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])|([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*[A-Za-z]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)$`)
-	// The catalog LLD password pattern, character for character. It lists
+	// The rudder-integrations-config account password pattern, character for character. It lists
 	// every character, because RE2 and JavaScript disagree on \s and \p{...}.
 	passwordPattern = regexp.MustCompile("^[^\\x00-\\x20\\x7F-\\xA0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]([^\\x00-\\x1F\\x7F-\\x9F]*[^\\x00-\\x20\\x7F-\\xA0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff])?$")
 )

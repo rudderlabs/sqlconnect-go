@@ -22,7 +22,7 @@ func TestSQ15_SQ16_Integers(t *testing.T) {
 		toUInt256('115792089237316195423570985008687907853269984665640564039457584007913129639935') u256,
 		CAST(NULL AS Nullable(Int128)) n128, toNullable(toInt128(5)) v128`)
 	for k, want := range map[string]any{
-		"i8n": "-128", "i8x": "127", "i16n": "-32768", "i16x": "32767", // SQ15: exact tokens
+		"i8n": "-128", "i8x": "127", "i16n": "-32768", "i16x": "32767", // exact tokens
 		"i32n": "-2147483648", "i32x": "2147483647", "i64n": "-9223372036854775808", "i64x": "9223372036854775807",
 		"u8n": "0", "u8": "255", "u16n": "0", "u16": "65535", "u32n": "0", "u32": "4294967295",
 		"p53m1": "9007199254740991", "p53": "9007199254740992", "p53p1": "9007199254740993",
@@ -30,7 +30,7 @@ func TestSQ15_SQ16_Integers(t *testing.T) {
 		require.Equal(t, json.Number(want.(string)), m[k], k)
 	}
 	require.Equal(t, []any{
-		"18446744073709551615", "340282366920938463463374607431768211455", "-170141183460469231731687303715884105728", // SQ16: digit strings
+		"18446744073709551615", "340282366920938463463374607431768211455", "-170141183460469231731687303715884105728", // digit strings
 		"-57896044618658097711785492504343953926634992332820282019728792003956564819968",
 		"115792089237316195423570985008687907853269984665640564039457584007913129639935", nil, "5",
 	},
@@ -123,7 +123,7 @@ func TestSQ21_Refusals(t *testing.T) {
 	require.Equal(t, "unsupported", cols[0].Type, "the column stays visible")
 	_, err := queryJSONErr(db, "SELECT * FROM "+db.QuoteTable(tbl))
 	require.Contains(t, []string{"CH_TYPE_UNSUPPORTED", "CH_UNKNOWN"}, db.ClassifyError(err).Code, "a named error, never a panic")
-	for _, decl := range []string{"Dynamic", "Variant(String, UInt8)"} { // needs Task 16, which the DAG orders first
+	for _, decl := range []string{"Dynamic", "Variant(String, UInt8)"} { // a newer type maps to unsupported, never to an error
 		cols, err := db.ListColumnsForSqlQuery(context.Background(), "SELECT CAST(NULL AS "+decl+") AS x")
 		require.Equal(t, []any{nil, "unsupported"}, []any{err, cols[0].Type}, decl)
 	}

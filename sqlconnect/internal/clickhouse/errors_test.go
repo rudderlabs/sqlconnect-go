@@ -107,6 +107,19 @@ func TestSQ3_BoundedMessages(t *testing.T) {
 	require.Same(t, own, bound("validate", "", own))
 	require.Same(t, own, bound("validate", "", fmt.Errorf("dial: %w", own)))
 	require.NoError(t, bound("x", "", nil))
+	// A context error beside an adapter error wins, as in classify. An adapter
+	// error that already carries the context error keeps its own code.
+	perm := cherr.New(cherr.CodePermission, "", "x")
+	for ctxErr, want := range map[error]string{context.Canceled: cherr.CodeCancelled, context.DeadlineExceeded: cherr.CodeTimeout} {
+		joined := errors.Join(ctxErr, perm)
+		require.Equal(t, classify(joined).Code, want)
+		var got *cherr.Error
+		require.ErrorAs(t, bound("x", "", joined), &got)
+		require.Equal(t, want, got.Code)
+		require.ErrorIs(t, got, ctxErr)
+		carried := cherr.Wrap(cherr.CodeScratchCleanupFailed, "", "x", ctxErr)
+		require.Same(t, carried, bound("x", "", carried))
+	}
 	require.ErrorIs(t, bound("x", "", fmt.Errorf("q: %w", context.Canceled)), context.Canceled)
 	require.ErrorIs(t, bound("x", "", fmt.Errorf("q: %w", sqlconnect.ErrNotSupported)), sqlconnect.ErrNotSupported)
 	requireChainClean(t, bound("dial", "", &net.OpError{Op: "dial", Err: errors.New("dial tcp sentinel-pw-123@10.0.0.1")}), "sentinel-pw-123")

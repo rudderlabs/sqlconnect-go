@@ -13,7 +13,7 @@ import (
 	integrationtest "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/integration_test"
 )
 
-// TestClickHouseDB runs the shared database suite over HTTPS and plain HTTP (D43).
+// TestClickHouseDB runs the shared database suite over HTTPS and plain HTTP.
 func TestClickHouseDB(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
 	srv.AdminExec(t, "CREATE DATABASE IF NOT EXISTS tsqlcon_scratch") // Ping runs validation

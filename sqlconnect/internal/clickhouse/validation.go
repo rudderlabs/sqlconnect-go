@@ -38,6 +38,11 @@ const (
 	// probeCleanupTimeout bounds the probe cleanup, which runs on a context
 	// detached from the caller.
 	probeCleanupTimeout = 60 * time.Second
+	// probeSettlePolls and probeSettleInterval bound the wait for a probe
+	// CREATE with an unknown outcome. The window outlasts the default
+	// query_log flush interval of 7.5 s, so a finished CREATE shows up in it.
+	probeSettlePolls    = 15
+	probeSettleInterval = time.Second
 	hostNameSQL         = "SELECT hostName()"
 	engineSQL           = "SELECT engine FROM system.databases WHERE name = ?"
 )
@@ -463,11 +468,14 @@ type probeCleanup struct {
 	db      *DB
 	ref     sqlconnect.RelationRef
 	created bool // true after an acknowledged CREATE; false for an unknown outcome
-	exec    sqlconnect.QueryExecutor
-	broken  bool // the original connection returned driver.ErrBadConn or sql.ErrConnDone
-	release func()
-	acquire func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
-	policy  sqlconnect.VisibilityPolicy
+	// createID is the query id of a CREATE with an unknown outcome. That
+	// CREATE can still be in transit, so the DROP waits until it is over.
+	createID string
+	exec     sqlconnect.QueryExecutor
+	broken   bool // the original connection returned driver.ErrBadConn or sql.ErrConnDone
+	release  func()
+	acquire  func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
+	policy   sqlconnect.VisibilityPolicy
 }
 
 // run drops the probe on a context detached from the caller, so a caller
@@ -506,6 +514,7 @@ func (c probeCleanup) run(parent context.Context) error {
 			return failed(err)
 		}
 	}
+	stillRunning := c.createID != "" && !c.createSettled(ctx, ex)
 	_, err := ex.ExecContext(ctx, stmt)
 	if errors.Is(err, sql.ErrConnDone) && !c.broken {
 		// An earlier read lost the connection, and its bounded error no longer
@@ -522,7 +531,33 @@ func (c probeCleanup) run(parent context.Context) error {
 	if err := c.db.AwaitTableAbsent(ctx, ex, c.ref, c.policy); err != nil {
 		return failed(err)
 	}
+	if stillRunning {
+		return failed(cherr.New(cherr.CodeOutcomeUnknown, "", "the probe CREATE was still running after the cleanup wait"))
+	}
 	return nil
+}
+
+// createSettled waits until the unknown-outcome CREATE has finished or
+// failed, so it cannot create the table after the DROP. It polls at most
+// probeSettlePolls times. A CREATE that is never seen either never arrived
+// or ran with query_log off; a failed outcome read gives up at once. Both
+// return true, and the DROP runs. It returns false only when the CREATE was
+// still running at the last poll.
+func (c probeCleanup) createSettled(ctx context.Context, ex sqlconnect.QueryExecutor) bool {
+	row := func(q string, args ...any) *sql.Row { return ex.QueryRowContext(ctx, q, args...) }
+	for i := range probeSettlePolls {
+		o, err := queryOutcome(row, c.createID, "Create")
+		switch {
+		case err != nil, o == sqlconnect.QueryFinished, o == sqlconnect.QueryFailed:
+			return true
+		case i == probeSettlePolls-1:
+			return o != sqlconnect.QueryRunning
+		}
+		if sleep(ctx, probeSettleInterval) != nil {
+			return o != sqlconnect.QueryRunning
+		}
+	}
+	return true
 }
 
 // probe creates, fills, reads and drops one table with a random name. The
@@ -558,10 +593,13 @@ func (db *DB) probe(ctx context.Context, conn *sql.Conn, ex driverExec) (err err
 		}
 		return stageErr(4, "scratch_write", e)
 	}
-	if _, cerr := ex.ExecContext(ctx, "CREATE TABLE "+t+" (probe UInt8)\nENGINE = MergeTree\nORDER BY tuple()"); cerr != nil {
-		// An unknown outcome may have created the table: reconcile with
-		// DROP TABLE IF EXISTS. A refused CREATE needs no cleanup.
+	createID := clickhousequery.NewQueryID()
+	if _, cerr := ex.execAs(ctx, createID, "CREATE TABLE "+t+" (probe UInt8)\nENGINE = MergeTree\nORDER BY tuple()"); cerr != nil {
+		// An unknown outcome may have created the table, or may still create
+		// it: wait for the CREATE, then reconcile with DROP TABLE IF EXISTS.
+		// A refused CREATE needs no cleanup.
 		registered = unknownOutcome(cerr)
+		cleanup.createID = createID
 		return fail(cerr)
 	}
 	registered, cleanup.created = true, true

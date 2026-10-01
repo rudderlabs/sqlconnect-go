@@ -19,8 +19,8 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 )
 
-// serverCodes maps a ClickHouse server code to its registry code, from the
-// driver LLD "Error classification" table. A code outside it is CH_UNKNOWN.
+// serverCodes maps a ClickHouse server code to its registry code. A code
+// outside it is CH_UNKNOWN.
 var serverCodes = map[int32]string{}
 
 func init() {
@@ -89,8 +89,9 @@ func info(code string, server int32) sqlconnect.ErrorInfo {
 	return sqlconnect.ErrorInfo{Category: cherr.Category(code), Code: code, ServerCode: server}
 }
 
-// classify applies the order of the driver LLD "Error classification" section.
-// It matches types only, never message text.
+// classify checks the context errors first, then adapter errors, server
+// exceptions, HTTP status, TLS and transport errors. It matches types only,
+// never message text, because a server controls its text.
 func classify(err error) sqlconnect.ErrorInfo {
 	if err == nil {
 		return sqlconnect.ErrorInfo{}
@@ -150,19 +151,30 @@ func isTLSError(err error) bool {
 
 // bound turns err into an adapter error with the fixed message of its code,
 // the server code and a redacted cause. An adapter error in the chain returns
-// unchanged.
+// unchanged, unless a context error sits beside it and not under it: classify
+// puts the context errors first, and bound must agree with it.
 func bound(op, field string, err error) error {
 	if err == nil {
 		return nil
 	}
 	var own *cherr.Error
-	if errors.As(err, &own) {
+	if errors.As(err, &own) && !contextBeside(err, own) {
 		return own
 	}
 	i := classify(err)
 	e := wrap(i.Code, field, op+": "+fixedMessages[i.Code], err)
 	e.ServerCode = i.ServerCode
 	return e
+}
+
+// contextBeside reports whether err carries a context error that own does not.
+func contextBeside(err error, own *cherr.Error) bool {
+	for _, c := range []error{context.Canceled, context.DeadlineExceeded} {
+		if errors.Is(err, c) && !errors.Is(own, c) {
+			return true
+		}
+	}
+	return false
 }
 
 // wrap is the only way driver code attaches a cause to an adapter error.

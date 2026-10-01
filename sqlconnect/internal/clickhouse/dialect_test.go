@@ -314,6 +314,24 @@ func TestWalkIdentifiers_NamedByteSlices(t *testing.T) {
 	require.Equal(t, "(`c` = 'x')", e.String())
 }
 
+// TestWalkIdentifiers_InvalidUTF8 covers values that Goqu would render with
+// U+FFFD in place of each invalid byte, so the server would compare against a
+// different value than the caller passed.
+func TestWalkIdentifiers_InvalidUTF8(t *testing.T) {
+	d, _ := sqlconnect.NewDialect("clickhouse", nil)
+	for name, v := range map[string]any{
+		"bytes": []byte{'a', 0xff}, "array": [2]byte{'a', 0xff}, "string": "a\xff",
+		"nested": []any{"ok", []byte{0xc3}}, "valuer": sql.NullString{String: "a\xfe", Valid: true},
+	} {
+		_, err := d.QueryCondition("c", "eq", v)
+		requireCode(t, err, "CH_QUERY_INVALID")
+		require.Contains(t, err.Error(), "UTF-8", name)
+	}
+	e, err := d.QueryCondition("c", "eq", []byte("caf\u00e9"))
+	require.NoError(t, err, "valid multi-byte UTF-8 stays a value")
+	require.Equal(t, "(`c` = 'caf\u00e9')", e.String())
+}
+
 // TestExpressions_ValuerStringsStayLiterals proves that a string produced by
 // a driver.Valuer renders as an escaped literal, not as raw SQL.
 func TestExpressions_ValuerStringsStayLiterals(t *testing.T) {

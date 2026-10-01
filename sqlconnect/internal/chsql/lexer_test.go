@@ -29,7 +29,7 @@ func TestLexer_States(t *testing.T) {
 	out, err := chsql.TrimTerminalSemicolon("SELECT 1 ;  \n")
 	require.NoError(t, err)
 	require.Equal(t, "SELECT 1", out)
-	for _, bad := range []string{"SELECT 1; -- tail", "SELECT 1; SELECT 2", "SELECT 1;;"} { // D42
+	for _, bad := range []string{"SELECT 1; -- tail", "SELECT 1; SELECT 2", "SELECT 1;;"} { // anything after a semicolon is a second statement
 		_, err = chsql.TrimTerminalSemicolon(bad)
 		require.Error(t, err, bad)
 	}

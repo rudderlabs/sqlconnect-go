@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/rudderlabs/goqu/v10"
 	"github.com/rudderlabs/goqu/v10/exp"
@@ -334,7 +335,9 @@ func walkValue(e any, check func(string) error) error {
 	}
 	rv := reflect.ValueOf(e)
 	switch rv.Kind() {
-	case reflect.Bool, reflect.String,
+	case reflect.String:
+		return checkUTF8(utf8.ValidString(rv.String()))
+	case reflect.Bool,
 		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Float32, reflect.Float64:
 		return nil
@@ -351,7 +354,10 @@ func walkValue(e any, check func(string) error) error {
 		return walkIdentifiers(rv.Elem().Interface(), check)
 	case reflect.Slice, reflect.Array:
 		if rv.Type().Elem() == reflect.TypeFor[byte]() {
-			return nil // []byte and byte arrays; a named element type can carry a Value method
+			// []byte and byte arrays; a named element type can carry a Value method.
+			b := make([]byte, rv.Len())
+			reflect.Copy(reflect.ValueOf(b), rv)
+			return checkUTF8(utf8.Valid(b))
 		}
 		for i := range rv.Len() {
 			if err := walkIdentifiers(rv.Index(i).Interface(), check); err != nil {
@@ -361,6 +367,16 @@ func walkValue(e any, check func(string) error) error {
 		return nil
 	}
 	return cherr.New(cherr.CodeQueryInvalid, "expression", "the driver cannot render a value of kind "+rv.Kind().String())
+}
+
+// checkUTF8 refuses a value that is not valid UTF-8. Goqu writes a string
+// or []byte literal rune by rune, so each invalid byte would reach the server
+// as U+FFFD and the statement would match a different value.
+func checkUTF8(valid bool) error {
+	if valid {
+		return nil
+	}
+	return cherr.New(cherr.CodeQueryInvalid, "expression", "a string or byte value is not valid UTF-8")
 }
 
 // isCastType admits a type name with optional balanced parentheses that hold

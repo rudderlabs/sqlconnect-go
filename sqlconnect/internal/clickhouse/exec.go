@@ -30,6 +30,11 @@ func (e driverExec) ExecContext(ctx context.Context, q string, args ...any) (sql
 	return e.conn.ExecContext(e.stmt(ctx), q, args...)
 }
 
+// execAs runs q under queryID, so a later outcome read can find the statement.
+func (e driverExec) execAs(ctx context.Context, queryID, q string, args ...any) (sql.Result, error) {
+	return e.conn.ExecContext(clickhousequery.WithStatement(ctx, e.settings(), queryID), q, args...)
+}
+
 func (e driverExec) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
 	return e.conn.QueryContext(e.stmt(ctx), q, args...)
 }

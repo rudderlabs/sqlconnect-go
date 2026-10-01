@@ -13,10 +13,13 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
 
-// Policy holds the operator block list and the test-only relaxations.
+// Policy holds the operator block list and two relaxations for test builds
+// only. Production code never sets AllowLoopback or AllowPlainHTTP.
 type Policy struct {
-	Blocked        []netip.Prefix
-	AllowLoopback  bool
+	Blocked []netip.Prefix
+	// AllowLoopback admits loopback answers. Test builds only.
+	AllowLoopback bool
+	// AllowPlainHTTP admits secure=false. Test builds only.
 	AllowPlainHTTP bool
 }
 

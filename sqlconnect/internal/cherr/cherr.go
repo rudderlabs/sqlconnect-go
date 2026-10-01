@@ -59,8 +59,9 @@ const (
 	CodeUnknown        = "CH_UNKNOWN"
 )
 
-// byCategory is the registry of the driver LLD "Error classification" section.
-// Each code appears once.
+// byCategory is the error code registry, grouped by category. Callers in
+// other services match on these codes, so each one is a contract. Each code
+// appears once.
 var byCategory = map[string][]string{
 	"configuration": {
 		CodeConfigInvalid, CodeCAInvalid, CodeWorkspaceNotEnabled, CodeHostNotAllowed, CodeDNSFailed,

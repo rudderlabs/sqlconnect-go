@@ -34,7 +34,7 @@ func TestSQ11_DDLLifecycleExplicitEngine(t *testing.T) {
 }
 
 func TestCP26_HostileDefaultEngine(t *testing.T) {
-	srv, _ := openFloorWithServer(t) // the ReplicatedMergeTree arm needs Keeper; it runs on Cloud (Task 23)
+	srv, _ := openFloorWithServer(t) // the ReplicatedMergeTree arm needs Keeper; it runs in the Cloud test arm
 	user := srv.CreateUserWithProfile(t, map[string]string{"default_table_engine": "Log"})
 	srv.AdminExec(t, "CREATE DATABASE IF NOT EXISTS cp26")
 	srv.AdminExec(t, "GRANT CREATE TABLE, INSERT, SELECT, DROP TABLE ON cp26.* TO "+user.Name)

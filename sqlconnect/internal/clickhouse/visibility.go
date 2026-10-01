@@ -16,8 +16,8 @@ var _ sqlconnect.VisibilityChecker = (*DB)(nil)
 // makes that replica apply every committed change first.
 const visibilitySQL = "SELECT toString(uuid)\nFROM system.tables\nWHERE database = ? AND name = ?\nSETTINGS select_sequential_consistency = 1"
 
-// Visibility defaults (D17). The P1 gates "Multi-replica Cloud" and "Late DDL
-// visibility" set the final values.
+// Visibility defaults. A DDL change can reach other Cloud replicas late, so
+// a miss repeats with backoff until the deadline.
 const (
 	defaultInitialBackoff = 250 * time.Millisecond
 	defaultMaxBackoff     = 5 * time.Second

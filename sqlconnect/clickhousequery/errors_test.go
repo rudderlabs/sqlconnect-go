@@ -17,7 +17,9 @@ func TestDescribe_ExposesAdapterFields(t *testing.T) {
 	e.RetryAfter = 7 * time.Second
 	d, ok := clickhousequery.Describe(fmt.Errorf("op: %w", e))
 	require.True(t, ok)
-	require.Equal(t, clickhousequery.Details{Code: "CH_RATE_LIMITED", Category: "transient", RetryAfter: 7 * time.Second}, d)
+	require.Equal(t, clickhousequery.Details{
+		Code: "CH_RATE_LIMITED", Category: "transient", Detail: "the server asked the client to slow down", RetryAfter: 7 * time.Second,
+	}, d)
 	_, ok = clickhousequery.Describe(errors.New("plain"))
 	require.False(t, ok)
 	require.Regexp(t, `^retl-[0-9a-f-]{36}$`, clickhousequery.NewQueryID())

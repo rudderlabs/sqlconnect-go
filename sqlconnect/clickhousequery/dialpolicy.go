@@ -13,9 +13,12 @@ import (
 type DialPolicy struct {
 	// BlockedPrefixes adds refused ranges to the fixed refused address set.
 	BlockedPrefixes []netip.Prefix
-	// AllowLoopback admits loopback answers. Tests only.
+	// AllowLoopback admits loopback answers. Test builds only: production
+	// code never sets it, because a loopback answer reaches the pod itself.
 	AllowLoopback bool
-	// AllowPlainHTTP lets the parser admit secure=false. Tests only.
+	// AllowPlainHTTP lets the parser admit secure=false. Test builds only:
+	// production code never sets it, because plain HTTP sends the password
+	// in clear text.
 	AllowPlainHTTP bool
 }
 

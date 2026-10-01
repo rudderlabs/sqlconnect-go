@@ -1,6 +1,8 @@
 package clickhouse_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -196,9 +198,16 @@ func fixtureTargets(field string) []string {
 	return []string{field}
 }
 
+// fieldFixtureSHA256 is the digest of test/data/validation/accounts/clickhouse-fields.json
+// at rudder-integrations-config commit 28839cccc9367b18cf11b9b2e44d05d942b46cbc.
+// The copy must stay byte-identical, so a local edit fails here.
+const fieldFixtureSHA256 = "ac11f0b43bd6a904f5b44a667dcf5f53267bb39f9d08c1b62449ed2b6b204dd0"
+
 func TestSQ2_SharedFieldFixtures(t *testing.T) {
 	raw, err := os.ReadFile("testdata/clickhouse-fields.json")
 	require.NoError(t, err)
+	sum := sha256.Sum256(raw)
+	require.Equal(t, fieldFixtureSHA256, hex.EncodeToString(sum[:]), "copy the fixture byte for byte from rudder-integrations-config")
 	var f struct {
 		Cases []fieldCase `json:"cases"`
 	}
