@@ -2,6 +2,7 @@ package clickhouse_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"testing"
@@ -72,6 +73,34 @@ func TestSQ_MaterializationOptions(t *testing.T) {
 	}
 	require.Error(t, db.InsertFromQueryWithOptions(ctx, dml, ref, "SELECT 'x' AS email, CAST(NULL AS Nullable(UInt64)) AS id", o), "a non-nullable key rejects NULL")
 	require.False(t, ddl.closed || dml.closed, "the driver never closes the executor")
+	lax := settingsExec{conn: scopedExec(t, db), settings: map[string]any{"insert_null_as_default": 1}}
+	require.Error(t, db.InsertFromQueryWithOptions(ctx, lax, ref, "SELECT 'x' AS email, CAST(NULL AS Nullable(UInt64)) AS id", o),
+		"a caller map that allows NULL as default still cannot turn the NULL into 0")
+	n, _ = db.CountTableRows(ctx, ref)
+	require.Equal(t, 1, n, "only the first INSERT wrote")
+}
+
+// settingsExec runs every statement on conn under the caller map settings
+// and a fresh query id, as a caller with its own statement map does.
+type settingsExec struct {
+	conn     *sql.Conn
+	settings map[string]any
+}
+
+func (e settingsExec) stmt(ctx context.Context) context.Context {
+	return stmtCtx(ctx, e.settings, clickhousequery.NewQueryID())
+}
+
+func (e settingsExec) ExecContext(ctx context.Context, q string, args ...any) (sql.Result, error) {
+	return e.conn.ExecContext(e.stmt(ctx), q, args...)
+}
+
+func (e settingsExec) QueryContext(ctx context.Context, q string, args ...any) (*sql.Rows, error) {
+	return e.conn.QueryContext(e.stmt(ctx), q, args...)
+}
+
+func (e settingsExec) QueryRowContext(ctx context.Context, q string, args ...any) *sql.Row {
+	return e.conn.QueryRowContext(e.stmt(ctx), q, args...)
 }
 
 func TestSQ12_CreateFailureAndMoveSentinel(t *testing.T) {

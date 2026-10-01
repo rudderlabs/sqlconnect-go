@@ -2,11 +2,13 @@ package clickhouse
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"slices"
 	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chsql"
 )
@@ -106,8 +108,17 @@ func renderCreate(q func(string) string, table string, cols []sqlconnect.ColumnR
 	return s
 }
 
-func executorRequired() error {
-	return cherr.New(cherr.CodeConfigInvalid, "executor", "an executor is required")
+// checkExecutor refuses a missing executor and a pool. database/sql replays a
+// pool statement after driver.ErrBadConn, so a pool executor could apply a
+// CREATE, INSERT or DROP twice. Callers pass a *sql.Conn.
+func checkExecutor(ex sqlconnect.QueryExecutor) error {
+	switch ex.(type) {
+	case nil:
+		return cherr.New(cherr.CodeConfigInvalid, "executor", "an executor is required")
+	case *sql.DB, *base.DB, *DB, poolExec:
+		return cherr.New(cherr.CodeConfigInvalid, "executor", "the executor must be one pinned connection, not the pool")
+	}
+	return nil
 }
 
 // normalizeQuery strips one terminal semicolon. A second statement, text after
@@ -170,8 +181,8 @@ func sameNames(a, b []sqlconnect.ColumnRef) bool {
 // CreateTableForQueryWithOptions creates an empty MergeTree table for query on
 // ex, waits until it is visible and returns its UUID. It runs no INSERT.
 func (db *DB) CreateTableForQueryWithOptions(ctx context.Context, ex sqlconnect.QueryExecutor, ref sqlconnect.RelationRef, query string, o sqlconnect.MaterializationOptions) (string, error) {
-	if ex == nil {
-		return "", executorRequired()
+	if err := checkExecutor(ex); err != nil {
+		return "", err
 	}
 	ref, err := db.resolve(ref)
 	if err != nil {
@@ -195,8 +206,8 @@ func (db *DB) CreateTableForQueryWithOptions(ctx context.Context, ex sqlconnect.
 // created with the same options. With explicit Columns it first checks the
 // query projection through DESCRIBE, so a mismatch writes nothing.
 func (db *DB) InsertFromQueryWithOptions(ctx context.Context, ex sqlconnect.QueryExecutor, ref sqlconnect.RelationRef, query string, o sqlconnect.MaterializationOptions) error {
-	if ex == nil {
-		return executorRequired()
+	if err := checkExecutor(ex); err != nil {
+		return err
 	}
 	ref, err := db.resolve(ref)
 	if err != nil {
@@ -224,7 +235,10 @@ func (db *DB) InsertFromQueryWithOptions(ctx context.Context, ex sqlconnect.Quer
 		list[i] = db.QuoteIdentifier(c.Name)
 	}
 	names := strings.Join(list, ", ")
-	_, err = ex.ExecContext(ctx, "INSERT INTO "+db.QuoteTable(ref)+" ("+names+")\nSELECT "+names+" FROM (\n"+norm+"\n) AS _sqlconnect_source")
+	// The statement-level setting overrides any caller map: ClickHouse
+	// otherwise writes the column default for a NULL into a non-nullable
+	// column.
+	_, err = ex.ExecContext(ctx, "INSERT INTO "+db.QuoteTable(ref)+" ("+names+")\nSETTINGS insert_null_as_default = 0\nSELECT "+names+" FROM (\n"+norm+"\n) AS _sqlconnect_source")
 	return bound("insert from query", "", err)
 }
 
@@ -245,8 +259,8 @@ func (db *DB) CreateTableFromQueryWithOptions(ctx context.Context, ex sqlconnect
 // database, then drops oldRef. A failed copy drops nothing. A failed drop
 // returns an error that joins sqlconnect.ErrDropOldTablePostCopy.
 func (db *DB) MoveTableWithOptions(ctx context.Context, ex sqlconnect.QueryExecutor, oldRef, newRef sqlconnect.RelationRef, o sqlconnect.MaterializationOptions) (string, error) {
-	if ex == nil {
-		return "", executorRequired()
+	if err := checkExecutor(ex); err != nil {
+		return "", err
 	}
 	oldRef, err := db.resolve(oldRef)
 	if err != nil {

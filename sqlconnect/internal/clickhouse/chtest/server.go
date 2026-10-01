@@ -373,10 +373,12 @@ func (s *Server) QueryAs(t *testing.T, u User, sql string) string {
 }
 
 // Show returns SHOW CREATE TABLE for table, run as the admin. table is
-// "db.name" and is sent as written.
+// "db.name"; both parts are quoted.
 func (s *Server) Show(t *testing.T, table string) string {
 	t.Helper()
-	rows := s.AdminQuery(t, "SHOW CREATE TABLE "+table)
+	db, name, ok := strings.Cut(table, ".")
+	require.True(t, ok, "Show wants db.name")
+	rows := s.AdminQuery(t, "SHOW CREATE TABLE "+quoteIdent(db)+"."+quoteIdent(name))
 	require.Len(t, rows, 1, "SHOW CREATE TABLE answer shape")
 	return rows[0][0]
 }

@@ -57,7 +57,11 @@ func TestMaterialization_RefusesBadColumnsBeforeSQL(t *testing.T) {
 	ex := unitScopedExec(t, db)
 	ref := sqlconnect.NewRelationRef("t", sqlconnect.WithSchema("s"))
 	for code, cols := range map[string][]sqlconnect.ColumnRef{
-		"CH_QUERY_INVALID":      {{Name: "a", RawType: "UInt8) ENGINE = Log AS SELECT 1 --"}},
+		"CH_QUERY_INVALID": {
+			{Name: "a", RawType: "UInt8) ENGINE = Log AS SELECT 1 --"},
+			{Name: "b", RawType: "Enum8('a' = 1); DROP TABLE x"},
+			{Name: "c", RawType: "String /* x */"},
+		},
 		"CH_INVALID_IDENTIFIER": {{Name: "a\x00b", RawType: "UInt8"}},
 		"CH_DUPLICATE_COLUMN":   {{Name: "a", RawType: "UInt8"}, {Name: "a", RawType: "String"}},
 	} {
@@ -72,9 +76,17 @@ func TestMaterialization_RefusesBadColumnsBeforeSQL(t *testing.T) {
 		_, err := db.CreateTableForQueryWithOptions(ctx, ex, ref, q, sqlconnect.MaterializationOptions{})
 		requireCode(t, err, "CH_QUERY_INVALID")
 	}
-	_, err := db.CreateTableForQueryWithOptions(ctx, nil, ref, "SELECT 1", sqlconnect.MaterializationOptions{})
-	requireCode(t, err, "CH_CONFIG_INVALID")
-	_, err = db.MoveTableWithOptions(ctx, ex, ref, sqlconnect.NewRelationRef("t2", sqlconnect.WithSchema("other")), sqlconnect.MaterializationOptions{})
+	// A pool executor would let database/sql replay a write after ErrBadConn.
+	for _, pool := range []sqlconnect.QueryExecutor{nil, db, db.DB, db.DB.DB, poolExec{db.DB.DB}} {
+		_, err := db.CreateTableForQueryWithOptions(ctx, pool, ref, "SELECT 1", sqlconnect.MaterializationOptions{})
+		requireCode(t, err, "CH_CONFIG_INVALID")
+		_, err = db.CreateTableFromQueryWithOptions(ctx, pool, ref, "SELECT 1", sqlconnect.MaterializationOptions{})
+		requireCode(t, err, "CH_CONFIG_INVALID")
+		requireCode(t, db.InsertFromQueryWithOptions(ctx, pool, ref, "SELECT 1", sqlconnect.MaterializationOptions{}), "CH_CONFIG_INVALID")
+		_, err = db.MoveTableWithOptions(ctx, pool, ref, ref, sqlconnect.MaterializationOptions{})
+		requireCode(t, err, "CH_CONFIG_INVALID")
+	}
+	_, err := db.MoveTableWithOptions(ctx, ex, ref, sqlconnect.NewRelationRef("t2", sqlconnect.WithSchema("other")), sqlconnect.MaterializationOptions{})
 	requireCode(t, err, "CH_CROSS_DATABASE_MOVE_UNSUPPORTED")
 	require.ErrorIs(t, err, sqlconnect.ErrNotSupported)
 	require.Zero(t, attempts.Writes()+attempts.Reads())
