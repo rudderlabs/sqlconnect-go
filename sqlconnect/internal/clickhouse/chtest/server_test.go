@@ -144,28 +144,28 @@ func TestFixture_ProxyResetModes(t *testing.T) {
 	}
 
 	t.Run("scoped user, injected answers, dropped responses and redacted records", func(t *testing.T) {
-		srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", true)
+		srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", true)
 		require.Equal(t, [][]string{{"1"}}, srv.AdminQuery(t, "SELECT count() FROM system.users WHERE name = 'rudder_retl'"))
 		grants := srv.AdminQuery(t, "SHOW GRANTS FOR rudder_retl")
 		joined := fmt.Sprint(grants)
 		for _, want := range []string{
 			"GRANT SELECT ON customer_db.*",
-			"GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON scratch_db.*",
+			"GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON _rudderstack.*",
 			"GRANT SELECT ON system.processes",
 			"GRANT SELECT ON system.query_log",
-			"GRANT ALTER DELETE ON scratch_db.sync_log",
+			"GRANT ALTER DELETE ON _rudderstack.sync_log",
 		} {
 			require.Contains(t, joined, want)
 		}
 		srv.FlushLogs(t)
 
 		var cfg map[string]any
-		require.NoError(t, json.Unmarshal(srv.Config("rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", true), &cfg))
+		require.NoError(t, json.Unmarshal(srv.Config("rudder_retl", "pw_Retl_123", "customer_db", true), &cfg))
 		require.Equal(t, map[string]any{
 			"host": "localhost", "port": float64(srv.HTTPSPort), "database": "customer_db", "user": "rudder_retl",
-			"password": "pw_Retl_123", "secure": true, "skipVerify": false, "scratchDatabase": "scratch_db",
+			"password": "pw_Retl_123", "secure": true, "skipVerify": false,
 		}, cfg)
-		require.NoError(t, json.Unmarshal(srv.Config("u", "p", "d", "s", false), &cfg))
+		require.NoError(t, json.Unmarshal(srv.Config("u", "p", "d", false), &cfg))
 		require.Equal(t, float64(srv.HTTPPort), cfg["port"])
 		require.Regexp(t, `^sha256:[0-9a-f]{64}$`, srv.ImageDigest(t))
 

@@ -19,7 +19,7 @@ import (
 func validJSON(mut func(m map[string]any)) json.RawMessage {
 	m := map[string]any{
 		"host": "ch.example.com", "database": "analytics", "user": "rudder_retl",
-		"password": "s3cret", "secure": true, "scratchDatabase": "_rudderstack_ws",
+		"password": "s3cret", "secure": true,
 	}
 	if mut != nil {
 		mut(m)
@@ -34,6 +34,18 @@ func requireConfigInvalid(t *testing.T, err error, field string) {
 	require.True(t, ok, "%v", err)
 	require.Equal(t, "CH_CONFIG_INVALID", d.Code)
 	require.Equal(t, field, d.Field, "%v", err)
+}
+
+func TestConfig_RejectsWorkingDatabaseKeys(t *testing.T) {
+	for _, key := range []string{"rudderSchema", "scratchDatabase"} {
+		t.Run(key, func(t *testing.T) {
+			_, err := clickhouse.ParseConfigForTest(validJSON(func(m map[string]any) {
+				m[key] = "custom_rudder"
+			}), false)
+			requireConfigInvalid(t, err, "")
+			require.Contains(t, err.Error(), "unknown field")
+		})
+	}
 }
 
 func TestSQ2_CredentialContract(t *testing.T) {
@@ -53,7 +65,6 @@ func TestSQ2_CredentialContract(t *testing.T) {
 		"blank host":            {func(m map[string]any) { m["host"] = "" }, "host"},
 		"blank database":        {func(m map[string]any) { m["database"] = "" }, "database"},
 		"blank user":            {func(m map[string]any) { m["user"] = "" }, "user"},
-		"blank scratch":         {func(m map[string]any) { m["scratchDatabase"] = "" }, "scratchDatabase"},
 		"port fraction":         {func(m map[string]any) { m["port"] = 0.5 }, "port"},
 		"port zero":             {func(m map[string]any) { m["port"] = 0 }, "port"},
 		"negative port":         {func(m map[string]any) { m["port"] = -1 }, "port"},
@@ -110,7 +121,7 @@ func TestSQ2_MalformedDocuments(t *testing.T) {
 		"trailing value": valid + ` {}`,
 		"trailing brace": valid + `}`,
 		"two documents":  valid + valid,
-		"duplicate key":  `{"host":"ch.example.com","host":"evil.example.com","database":"analytics","user":"u","password":"pw","secure":true,"scratchDatabase":"_s"}`,
+		"duplicate key":  `{"host":"ch.example.com","host":"evil.example.com","database":"analytics","user":"u","password":"pw","secure":true,"rudderSchema":"_s"}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := clickhouse.ParseConfigForTest(json.RawMessage(raw), false)
@@ -163,18 +174,7 @@ func TestSQ6_ExcludedConfiguration(t *testing.T) {
 		_, err := clickhouse.ParseConfigForTest(validJSON(func(m map[string]any) { m[key] = "x" }), false)
 		requireConfigInvalid(t, err, key)
 	}
-	require.Equal(t, 8, reflect.TypeFor[clickhouse.Config]().NumField())
-}
-
-func TestSQ25_ScratchExclusions(t *testing.T) {
-	for _, name := range []string{
-		"default", "DEFAULT", "Default", "system", "SYSTEM", "System",
-		"information_schema", "INFORMATION_SCHEMA", "Information_Schema", "analytics", "ANALYTICS",
-	} {
-		_, err := clickhouse.ParseConfigForTest(validJSON(func(m map[string]any) { m["scratchDatabase"] = name }), false)
-		requireConfigInvalid(t, err, "scratchDatabase")
-		require.Contains(t, err.Error(), "The scratch database must differ from the customer database, default, system and information_schema.")
-	}
+	require.Equal(t, 7, reflect.TypeFor[clickhouse.Config]().NumField())
 }
 
 // fieldCase is one entry of the shared rudder-integrations-config fixture.
@@ -190,29 +190,28 @@ type fieldCase struct {
 }
 
 // fixtureTargets maps a fixture field onto the account keys the case applies to.
-// "name" is the shared pattern of database, user and scratchDatabase.
+// "name" is the shared pattern of database and user.
 func fixtureTargets(field string) []string {
 	if field == "name" {
-		return []string{"database", "user", "scratchDatabase"}
+		return []string{"database", "user"}
 	}
 	return []string{field}
 }
 
-// fieldFixtureSHA256 is the digest of test/data/validation/accounts/clickhouse-fields.json
-// at rudder-integrations-config commit 28839cccc9367b18cf11b9b2e44d05d942b46cbc.
-// The copy must stay byte-identical, so a local edit fails here.
-const fieldFixtureSHA256 = "ac11f0b43bd6a904f5b44a667dcf5f53267bb39f9d08c1b62449ed2b6b204dd0"
+// fieldFixtureSHA256 pins the D33 account field fixture derived from
+// rudder-integrations-config commit 28839cccc9367b18cf11b9b2e44d05d942b46cbc.
+const fieldFixtureSHA256 = "015f05ec242e5b4b700af09a734f5b09968393feedbc7791c8e78384a07fd7d7"
 
 func TestSQ2_SharedFieldFixtures(t *testing.T) {
 	raw, err := os.ReadFile("testdata/clickhouse-fields.json")
 	require.NoError(t, err)
 	sum := sha256.Sum256(raw)
-	require.Equal(t, fieldFixtureSHA256, hex.EncodeToString(sum[:]), "copy the fixture byte for byte from rudder-integrations-config")
+	require.Equal(t, fieldFixtureSHA256, hex.EncodeToString(sum[:]), "the D33 fixture digest must match")
 	var f struct {
 		Cases []fieldCase `json:"cases"`
 	}
 	require.NoError(t, json.Unmarshal(raw, &f))
-	require.Len(t, f.Cases, 75, "the fixture is a byte copy of rudder-integrations-config")
+	require.Len(t, f.Cases, 65, "the D33 fixture covers account form fields")
 
 	perField := map[string]int{}
 	for _, c := range f.Cases {
@@ -221,21 +220,15 @@ func TestSQ2_SharedFieldFixtures(t *testing.T) {
 			t.Run(c.ID+"/"+key, func(t *testing.T) {
 				cfg, err := clickhouse.ParseConfigForTest(validJSON(func(m map[string]any) {
 					m[key] = c.Input
-					switch {
-					case c.Database != "":
+					if c.Database != "" {
 						m["database"] = c.Database
-					case key == "scratchDatabase" && strings.EqualFold(c.Input, "analytics"):
-						// Keeps the name case off the scratch rule, which S20 to S27 cover.
-						m["database"] = "customer_db"
-					case key == "database" && strings.EqualFold(c.Input, "_rudderstack_ws"):
-						m["scratchDatabase"] = "_scratch_other"
 					}
 				}), false)
 				if c.Verdict == "pass" {
 					require.NoError(t, err, "%s: %s=%q", c.ID, key, c.Input)
 					got := map[string]string{
 						"host": cfg.Host, "database": cfg.Database, "user": cfg.User,
-						"password": cfg.Password, "scratchDatabase": cfg.ScratchDatabase,
+						"password": cfg.Password,
 					}[key]
 					require.Equal(t, c.Input, got, "%s: exact bytes, never trimmed or folded", c.ID)
 					return
@@ -247,8 +240,8 @@ func TestSQ2_SharedFieldFixtures(t *testing.T) {
 			perField[c.Field]++
 		}
 	}
-	for _, field := range []string{"host", "name", "scratchDatabase", "password"} {
+	for _, field := range []string{"host", "name", "password"} {
 		require.Positive(t, perField[field], "no case ran for %s", field)
 	}
-	require.Len(t, perField, 4, "unexpected fixture field: %v", perField)
+	require.Len(t, perField, 3, "unexpected fixture field: %v", perField)
 }

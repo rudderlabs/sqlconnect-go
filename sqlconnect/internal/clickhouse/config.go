@@ -8,7 +8,6 @@ import (
 	"io"
 	"regexp"
 	"slices"
-	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chpolicy"
@@ -17,17 +16,15 @@ import (
 // DefaultPort is the HTTPS port used when the account omits port.
 const DefaultPort = 8443
 
-// Config is the ClickHouse account configuration. It has exactly the eight
-// fields of the account definition.
+// Config is the ClickHouse account configuration.
 type Config struct {
-	Host            string `json:"host"`
-	Port            int    `json:"port,omitempty"`
-	Database        string `json:"database"`
-	User            string `json:"user"`
-	Password        string `json:"password"`
-	Secure          *bool  `json:"secure,omitempty"`
-	SkipVerify      bool   `json:"skipVerify,omitempty"`
-	ScratchDatabase string `json:"scratchDatabase"`
+	Host       string `json:"host"`
+	Port       int    `json:"port,omitempty"`
+	Database   string `json:"database"`
+	User       string `json:"user"`
+	Password   string `json:"password"`
+	Secure     *bool  `json:"secure,omitempty"`
+	SkipVerify bool   `json:"skipVerify,omitempty"`
 }
 
 // The texts are shared with the account schema, config-backend and Lookout.
@@ -35,7 +32,6 @@ const (
 	nameErr     = "Use letters, digits and underscores, start with a letter or underscore, at most 128 characters."
 	hostErr     = "Enter a hostname or a dotted-decimal IPv4 address without a scheme, port or path."
 	passwordErr = "The password cannot contain control characters or start or end with whitespace."
-	scratchErr  = "The scratch database must differ from the customer database, default, system and information_schema."
 	portErr     = "Enter a port from 1 to 65535."
 	documentErr = "the account configuration is not valid"
 )
@@ -55,7 +51,7 @@ var (
 	passwordPattern = regexp.MustCompile("^[^\\x00-\\x20\\x7F-\\xA0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]([^\\x00-\\x1F\\x7F-\\x9F]*[^\\x00-\\x20\\x7F-\\xA0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff])?$")
 )
 
-var accountKeys = []string{"host", "port", "database", "user", "password", "secure", "skipVerify", "scratchDatabase"}
+var accountKeys = []string{"host", "port", "database", "user", "password", "secure", "skipVerify"}
 
 // excludedKeys are options that other drivers or older drafts accept. An error
 // names one of them; any other unknown key stays unnamed, because a key can
@@ -96,8 +92,6 @@ func parseConfig(raw json.RawMessage, allowPlainHTTP bool) (Config, error) {
 		return Config{}, invalid("database", nameErr)
 	case !namePattern.MatchString(c.User):
 		return Config{}, invalid("user", nameErr)
-	case !namePattern.MatchString(c.ScratchDatabase):
-		return Config{}, invalid("scratchDatabase", nameErr)
 	case !passwordPattern.MatchString(c.Password):
 		return Config{}, invalid("password", passwordErr)
 	case c.Secure == nil:
@@ -106,10 +100,6 @@ func parseConfig(raw json.RawMessage, allowPlainHTTP bool) (Config, error) {
 		return Config{}, invalid("secure", "secure must be true; RudderStack does not connect over plain HTTP")
 	case c.SkipVerify:
 		return Config{}, invalid("skipVerify", "skipVerify must be false")
-	}
-	switch strings.ToLower(c.ScratchDatabase) {
-	case strings.ToLower(c.Database), "default", "system", "information_schema":
-		return Config{}, invalid("scratchDatabase", scratchErr)
 	}
 	return c, nil
 }

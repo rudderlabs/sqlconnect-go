@@ -27,7 +27,7 @@ func TestSQ4_FloorMatrix(t *testing.T) {
 	for tag, ok := range map[string]bool{"26.3": true, "25.8": false, "24.8": false} {
 		t.Run(tag, func(t *testing.T) {
 			srv := chtest.Start(t, chtest.Options{Tag: tag})
-			srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", false)
+			srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
 			res, err := openScoped(t, srv, "rudder_retl", "pw_Retl_123").ValidateContext(context.Background())
 			if ok {
 				require.NoError(t, err)
@@ -38,14 +38,14 @@ func TestSQ4_FloorMatrix(t *testing.T) {
 			requireStage(t, err, 1, "version")
 			require.Contains(t, err.Error(), tag+".")
 			require.Contains(t, err.Error(), "26.3.0")
-			require.Equal(t, "0", srv.AdminQuery(t, "SELECT count() FROM system.tables WHERE database = 'scratch_db'")[0][0], "no scratch DDL")
+			require.Equal(t, "0", srv.AdminQuery(t, "SELECT count() FROM system.tables WHERE database = '_rudderstack'")[0][0], "no scratch DDL")
 		})
 	}
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
-	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", false)
+	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
 	_, err := openScoped(t, srv, "rudder_retl", "wrong-pw").ValidateContext(context.Background())
 	requireCode(t, err, "CH_AUTHENTICATION")
-	_, err = openScopedOnDatabase(t, srv, "rudder_retl", "pw_Retl_123", "no_such_db", "scratch_db").ValidateContext(context.Background())
+	_, err = openScopedOnDatabase(t, srv, "rudder_retl", "pw_Retl_123", "no_such_db").ValidateContext(context.Background())
 	require.Contains(t, []string{"CH_OBJECT_NOT_FOUND", "CH_PERMISSION"}, clickhouse.CodeOf(err), "a missing database fails, classified")
 }
 
@@ -76,7 +76,7 @@ func TestValidation_Grants(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
 	fresh := func(t *testing.T, pruning bool) (string, *clickhouse.DB) {
 		user := "u_" + strings.ToLower(rand.String(6))
-		srv.CreateScopedUser(t, user, "pw_U_12345", "customer_db", "scratch_db", pruning)
+		srv.CreateScopedUser(t, user, "pw_U_12345", "customer_db", "_rudderstack", pruning)
 		return user, openScoped(t, srv, user, "pw_U_12345")
 	}
 	pruning := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{SyncLogPruning: true})
@@ -87,7 +87,7 @@ func TestValidation_Grants(t *testing.T) {
 	require.Len(t, filterOp(res.Warnings, "inspect_grants"), 1)
 	require.Len(t, filterOp(res.Warnings, "check_alter_delete"), 1, "no options: a missing ALTER DELETE is a warning")
 	for privilege, revoke := range map[string]string{
-		"CREATE TABLE": "REVOKE CREATE TABLE ON scratch_db.* FROM ", "SELECT ON system.processes": "REVOKE SELECT ON system.processes FROM ",
+		"CREATE TABLE": "REVOKE CREATE TABLE ON _rudderstack.* FROM ", "SELECT ON system.processes": "REVOKE SELECT ON system.processes FROM ",
 		"SELECT ON system.query_log": "REVOKE SELECT ON system.query_log FROM ", "ALTER DELETE": "", // pruning on, no sync_log grant
 	} {
 		user, db := fresh(t, false)
@@ -106,7 +106,7 @@ func TestValidation_Grants(t *testing.T) {
 	require.NoError(t, err, "pruning on with the sync_log grant")
 	for _, g := range []string{
 		"CREATE USER retl_user IDENTIFIED WITH sha256_password BY 'pw_Role_123'", "CREATE ROLE retl_permissions", "CREATE ROLE retl_login",
-		"GRANT SELECT ON customer_db.* TO retl_permissions", "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON scratch_db.* TO retl_permissions",
+		"GRANT SELECT ON customer_db.* TO retl_permissions", "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON _rudderstack.* TO retl_permissions",
 		"GRANT SELECT ON system.processes TO retl_permissions", "GRANT SELECT ON system.query_log TO retl_permissions",
 		"GRANT retl_permissions TO retl_login", "GRANT retl_login TO retl_user", "SET DEFAULT ROLE retl_login TO retl_user",
 	} {
@@ -120,28 +120,29 @@ func TestValidation_EngineAndCluster(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
 	srv.AdminExec(t, "CREATE DATABASE s_mem ENGINE = Memory")
 	srv.CreateScopedUser(t, "e_mem", "pw_E_12345", "customer_db", "s_mem", false)
-	_, err := openScopedOnDatabase(t, srv, "e_mem", "pw_E_12345", "customer_db", "s_mem").ValidateContext(context.Background())
+	ctx := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{WorkingDatabase: "s_mem"})
+	_, err := openScopedOnDatabase(t, srv, "e_mem", "pw_E_12345", "customer_db").ValidateContext(ctx)
 	d, _ := clickhousequery.Describe(err)
-	require.Equal(t, [2]string{"CH_CONFIG_INVALID", "scratchDatabase"}, [2]string{d.Code, d.Field})
+	require.Equal(t, [2]string{"CH_CONFIG_INVALID", "workingDatabase"}, [2]string{d.Code, d.Field})
 	require.Contains(t, err.Error(), "Memory")
 	// One container at a time (load limits): the second "host" is a proxy
 	// that answers hostName() with another name.
-	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", false)
+	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
 	other := chtest.NewProxy(t, srv, chtest.ProxyOptions{PlainHTTP: true, RewriteSQL: func(q string) string {
 		return strings.ReplaceAll(q, "SELECT hostName()", "SELECT 'replica-2'")
 	}})
 	_, err = openScopedVia(t, srv, chtest.NewBalancer(t, srv, srv.HTTPPort, other.Port()), "rudder_retl", "pw_Retl_123").ValidateContext(context.Background())
 	requireCode(t, err, "CH_CLUSTER_UNSUPPORTED")
 	requireStage(t, err, 3, "engine")
-	srv.CreateScopedUser(t, "lb_user", "pw_Lb_12345", "customer_db", "scratch_db", false)
+	srv.CreateScopedUser(t, "lb_user", "pw_Lb_12345", "customer_db", "_rudderstack", false)
 	_, err = openScopedVia(t, srv, chtest.NewBalancer(t, srv, srv.HTTPPort), "lb_user", "pw_Lb_12345").ValidateContext(context.Background())
 	require.NoError(t, err, "one host behind the balancer passes")
 }
 
 func TestSQ25_Probe(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
-	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", false)
-	srv.AdminExec(t, "CREATE TABLE scratch_db.test_table (k UInt8) ENGINE = MergeTree ORDER BY k")
+	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
+	srv.AdminExec(t, "CREATE TABLE _rudderstack.test_table (k UInt8) ENGINE = MergeTree ORDER BY k")
 	db := openScoped(t, srv, "rudder_retl", "pw_Retl_123")
 	var wg sync.WaitGroup
 	// require must not run off the test goroutine.
@@ -154,12 +155,12 @@ func TestSQ25_Probe(t *testing.T) {
 	for err := range errs {
 		require.NoError(t, err)
 	}
-	require.Equal(t, "1", srv.AdminQuery(t, "SELECT count() FROM system.tables WHERE database='scratch_db' AND name='test_table'")[0][0], "a customer test_table survives")
+	require.Equal(t, "1", srv.AdminQuery(t, "SELECT count() FROM system.tables WHERE database='_rudderstack' AND name='test_table'")[0][0], "a customer test_table survives")
 	require.Equal(t, "0", probeCount(t, srv))
 	srv.FlushLogs(t)
 	seen := map[string]bool{}
-	for _, c := range srv.QueryLogLike(t, "CREATE TABLE `scratch_db`.`_rudder_probe_%") {
-		require.Regexp(t, "^CREATE TABLE `scratch_db`\\.`_rudder_probe_[0-9a-f]{16}` \\(probe UInt8\\)\\nENGINE = MergeTree", c.Query, "plain CREATE")
+	for _, c := range srv.QueryLogLike(t, "CREATE TABLE `_rudderstack`.`_rudder_probe_%") {
+		require.Regexp(t, "^CREATE TABLE `_rudderstack`\\.`_rudder_probe_[0-9a-f]{16}` \\(probe UInt8\\)\\nENGINE = MergeTree", c.Query, "plain CREATE")
 		seen[c.Query] = true
 	}
 	require.Len(t, seen, 10, "the probe name is unique per call")
@@ -167,9 +168,9 @@ func TestSQ25_Probe(t *testing.T) {
 
 func TestSQ25_ProbeCleanup(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
-	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", false)
+	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
 	isProbe := func(prefix string) func(chtest.Request) bool {
-		return func(r chtest.Request) bool { return strings.HasPrefix(r.SQL, prefix+" `scratch_db`.`_rudder_probe_") }
+		return func(r chtest.Request) bool { return strings.HasPrefix(r.SQL, prefix+" `_rudderstack`.`_rudder_probe_") }
 	}
 	validate := func(p *chtest.Proxy, ctx context.Context) error {
 		_, err := openScopedVia(t, srv, p, "rudder_retl", "pw_Retl_123").ValidateContext(ctx)
@@ -201,7 +202,7 @@ func TestSQ25_ProbeCleanup(t *testing.T) {
 	p.DropResponseOnce(isProbe("CREATE TABLE"))
 	require.Error(t, validate(p, context.Background()))
 	require.Equal(t, "0", probeCount(t, srv), "unknown CREATE outcome: reconciled with DROP TABLE IF EXISTS")
-	srv.AdminExec(t, "REVOKE DROP TABLE ON scratch_db.* FROM rudder_retl")
+	srv.AdminExec(t, "REVOKE DROP TABLE ON _rudderstack.* FROM rudder_retl")
 	_, err = openScoped(t, srv, "rudder_retl", "pw_Retl_123").ValidateContext(context.Background())
 	_, stage := stageOf(err)
 	require.Equal(t, "grant_check", stage, "a missing DROP grant stops before the probe")
@@ -233,7 +234,7 @@ func TestSQ25_SQ30_ValidationHelloFaults(t *testing.T) {
 
 func TestValidation_PingDelegates(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
-	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", false)
+	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
 	db := openScoped(t, srv, "rudder_retl", "pw_Retl_123")
 	require.NoError(t, db.Ping(), "metadata warnings never fail Ping")
 	r1, err := db.ValidateContext(context.Background())
@@ -250,7 +251,7 @@ func TestValidation_PingDelegates(t *testing.T) {
 
 func TestValidation_VisibilityDisconnectAndWarmPool(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
-	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", false)
+	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
 	// The visibility read after the CREATE loses its connection: the cleanup
 	// must drop the probe through a fresh connection.
 	p := chtest.NewProxy(t, srv, chtest.ProxyOptions{})

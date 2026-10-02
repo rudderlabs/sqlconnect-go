@@ -204,7 +204,7 @@ func pinned(t *testing.T, db *clickhouse.DB) *sql.Conn {
 	return conn
 }
 
-// scratchTable returns a fresh table name in the scratch database and drops
+// scratchTable returns a fresh table name in the _rudderstack database and drops
 // that table at test end, so a failed assertion leaves nothing on the service.
 func scratchTable(t *testing.T, db *clickhouse.DB, scratch, prefix string) sqlconnect.RelationRef {
 	t.Helper()
@@ -248,15 +248,12 @@ func withPort(t *testing.T, raw json.RawMessage, port int) json.RawMessage {
 	return out
 }
 
-// scratchOf reads the scratch database from the account config.
+// scratchOf checks the account and returns the default working database.
 func scratchOf(t *testing.T) string {
 	t.Helper()
-	var c struct {
-		ScratchDatabase string `json:"scratchDatabase"`
-	}
-	require.NoError(t, json.Unmarshal([]byte(os.Getenv("CLICKHOUSE_CLOUD_CONFIG")), &c))
-	require.NotEmpty(t, c.ScratchDatabase)
-	return c.ScratchDatabase
+	_, err := clickhouse.ParseConfig(json.RawMessage(os.Getenv("CLICKHOUSE_CLOUD_CONFIG")))
+	require.NoError(t, err)
+	return "_rudderstack"
 }
 
 func showCreate(t *testing.T, db *clickhouse.DB, ref sqlconnect.RelationRef) string {

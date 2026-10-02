@@ -60,8 +60,8 @@ func TestSQ28_LostResponseOutcomes(t *testing.T) {
 	db := openScopedVia(t, srv, p, "rudder_retl", "pw_Retl_123")
 	ctx := context.Background()
 	for sql, want := range map[string]sqlconnect.QueryOutcome{
-		"INSERT INTO scratch_db.sink SELECT number FROM numbers(10)":                      sqlconnect.QueryFinished,
-		"INSERT INTO scratch_db.sink SELECT throwIf(number = 5, 'boom') FROM numbers(10)": sqlconnect.QueryFailed,
+		"INSERT INTO _rudderstack.sink SELECT number FROM numbers(10)":                      sqlconnect.QueryFinished,
+		"INSERT INTO _rudderstack.sink SELECT throwIf(number = 5, 'boom') FROM numbers(10)": sqlconnect.QueryFailed,
 	} {
 		id := clickhousequery.NewQueryID()
 		p.DropResponseOnce(func(r chtest.Request) bool { return r.Query.Get("query_id") == id })
@@ -109,12 +109,12 @@ func TestSQ28_OwnUserOnlyAndGrants(t *testing.T) {
 
 	admin := openAdmin(t, srv) // rudder-sources passes query_kind to QueryOutcome, so each statement kind is pinned here
 	kinds := []struct{ name, sql, id string }{
-		{"INSERT SELECT", "INSERT INTO scratch_db.sink SELECT 1", ""},
-		{"CREATE", "CREATE TABLE scratch_db.k (a UInt8) ENGINE = MergeTree ORDER BY a", ""},
-		{"RENAME", "RENAME TABLE scratch_db.k TO scratch_db.k2", ""},
-		{"EXCHANGE", "EXCHANGE TABLES scratch_db.k2 AND scratch_db.sink", ""},
-		{"ALTER DELETE", "ALTER TABLE scratch_db.k2 DELETE WHERE n = 1 SETTINGS mutations_sync = 1", ""},
-		{"DROP", "DROP TABLE scratch_db.k2 SYNC", ""},
+		{"INSERT SELECT", "INSERT INTO _rudderstack.sink SELECT 1", ""},
+		{"CREATE", "CREATE TABLE _rudderstack.k (a UInt8) ENGINE = MergeTree ORDER BY a", ""},
+		{"RENAME", "RENAME TABLE _rudderstack.k TO _rudderstack.k2", ""},
+		{"EXCHANGE", "EXCHANGE TABLES _rudderstack.k2 AND _rudderstack.sink", ""},
+		{"ALTER DELETE", "ALTER TABLE _rudderstack.k2 DELETE WHERE n = 1 SETTINGS mutations_sync = 1", ""},
+		{"DROP", "DROP TABLE _rudderstack.k2 SYNC", ""},
 	}
 	for i := range kinds {
 		kinds[i].id = clickhousequery.NewQueryID()

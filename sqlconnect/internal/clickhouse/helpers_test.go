@@ -83,7 +83,7 @@ func openVia(t *testing.T, srv *chtest.Server, p *chtest.Proxy, secure bool) *cl
 
 func openViaWithPassword(t *testing.T, srv *chtest.Server, p *chtest.Proxy, secure bool, password string) *clickhouse.DB {
 	t.Helper()
-	cfg := withHostPort(srv.Config(srv.AdminUser, password, "default", "scratch_db", secure), "localhost", p.Port())
+	cfg := withHostPort(srv.Config(srv.AdminUser, password, "default", secure), "localhost", p.Port())
 	db, err := clickhouse.NewDBForTest(cfg, testPolicy, srv.CA)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
@@ -233,14 +233,14 @@ func openFloor(t *testing.T) *clickhouse.DB {
 // openAdmin opens a DB as the fixture admin on the database "default".
 func openAdmin(t *testing.T, srv *chtest.Server) *clickhouse.DB {
 	t.Helper()
-	return openWith(t, srv.Config(srv.AdminUser, srv.AdminPassword, "default", "scratch_db", true), srv)
+	return openWith(t, srv.Config(srv.AdminUser, srv.AdminPassword, "default", true), srv)
 }
 
 // openScoped opens a DB as a user that CreateScopedUser made for customer_db
-// and scratch_db.
+// and _rudderstack.
 func openScoped(t *testing.T, srv *chtest.Server, user, password string) *clickhouse.DB {
 	t.Helper()
-	return openWith(t, srv.Config(user, password, "customer_db", "scratch_db", true), srv)
+	return openWith(t, srv.Config(user, password, "customer_db", true), srv)
 }
 
 func openWith(t *testing.T, cfg json.RawMessage, srv *chtest.Server) *clickhouse.DB {
@@ -463,13 +463,13 @@ func (e idExec) QueryRowContext(ctx context.Context, q string, args ...any) *sql
 // openAs opens a DB as u on the database "default".
 func openAs(t *testing.T, srv *chtest.Server, u chtest.User) *clickhouse.DB {
 	t.Helper()
-	return openWith(t, srv.Config(u.Name, u.Password, "default", "scratch_db", true), srv)
+	return openWith(t, srv.Config(u.Name, u.Password, "default", true), srv)
 }
 
 // openScopedOn opens a DB as user with database as the customer database.
 func openScopedOn(t *testing.T, srv *chtest.Server, user, password, database string) *clickhouse.DB {
 	t.Helper()
-	return openWith(t, srv.Config(user, password, database, "scratch_db", true), srv)
+	return openWith(t, srv.Config(user, password, database, true), srv)
 }
 
 // mkSchema creates a fresh database named prefix_<random> and drops it when
@@ -503,13 +503,13 @@ func rawTypes(cols []sqlconnect.ColumnRef) []string {
 }
 
 // retlFixture starts the pinned 26.3 server with the published-script user
-// rudder_retl, the table scratch_db.sink (n UInt64) and a DB scoped to that
+// rudder_retl, the table _rudderstack.sink (n UInt64) and a DB scoped to that
 // user.
 func retlFixture(t *testing.T) (*chtest.Server, *clickhouse.DB) {
 	t.Helper()
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
-	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", false)
-	srv.AdminExec(t, "CREATE TABLE scratch_db.sink (n UInt64) ENGINE = MergeTree ORDER BY n")
+	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
+	srv.AdminExec(t, "CREATE TABLE _rudderstack.sink (n UInt64) ENGINE = MergeTree ORDER BY n")
 	return srv, openScoped(t, srv, "rudder_retl", "pw_Retl_123")
 }
 
@@ -528,7 +528,7 @@ func startSlow(t *testing.T, db *clickhouse.DB, ctx context.Context, id string) 
 	go func() {
 		defer func() { _ = conn.Close() }()
 		_, err := conn.ExecContext(stmtCtx(ctx, map[string]any{"max_block_size": 1}, id),
-			"INSERT INTO scratch_db.sink SELECT number FROM numbers(600) WHERE sleepEachRow(0.1) = 0")
+			"INSERT INTO _rudderstack.sink SELECT number FROM numbers(600) WHERE sleepEachRow(0.1) = 0")
 		done <- err
 	}()
 	return done
@@ -538,7 +538,7 @@ func startSlow(t *testing.T, db *clickhouse.DB, ctx context.Context, id string) 
 // front p (a chtest.Proxy or a chtest.Balancer) over TLS.
 func openScopedVia(t *testing.T, srv *chtest.Server, p interface{ Port() int }, user, password string) *clickhouse.DB {
 	t.Helper()
-	cfg := withHostPort(srv.Config(user, password, "customer_db", "scratch_db", true), "localhost", p.Port())
+	cfg := withHostPort(srv.Config(user, password, "customer_db", true), "localhost", p.Port())
 	db, err := clickhouse.NewDBForTest(cfg, testPolicy, srv.CA)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
@@ -561,17 +561,16 @@ func requireStage(t *testing.T, err error, n int, tag string) {
 	require.Equal(t, []any{n, tag}, []any{stage, got}, "%v", err)
 }
 
-// probeCount returns the number of validation probe tables in scratch_db.
+// probeCount returns the number of validation probe tables in _rudderstack.
 func probeCount(t *testing.T, srv *chtest.Server) string {
 	t.Helper()
 	return strconv.Itoa(len(srv.ProbeTables(t)))
 }
 
-// openScopedOnDatabase opens a DB as user with the given customer and scratch
-// databases.
-func openScopedOnDatabase(t *testing.T, srv *chtest.Server, user, password, database, scratch string) *clickhouse.DB {
+// openScopedOnDatabase opens a DB as user with the given customer database.
+func openScopedOnDatabase(t *testing.T, srv *chtest.Server, user, password, database string) *clickhouse.DB {
 	t.Helper()
-	return openWith(t, srv.Config(user, password, database, scratch, true), srv)
+	return openWith(t, srv.Config(user, password, database, true), srv)
 }
 
 // filterOp returns the warnings with the operation op.

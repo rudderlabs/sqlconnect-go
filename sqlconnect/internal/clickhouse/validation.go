@@ -55,6 +55,16 @@ var probeLookupTimeout = 5 * time.Second
 
 const probeCleanupReserve = 20 * time.Second
 
+const defaultRudderSchema = "_rudderstack"
+
+func workingDatabase(ctx context.Context) string {
+	opts, _ := sqlconnect.ValidationOptionsFrom(ctx)
+	if opts.WorkingDatabase == "" {
+		return defaultRudderSchema
+	}
+	return opts.WorkingDatabase
+}
+
 // diagnosticSettings are the settings stage 5 reads from system.settings.
 var diagnosticSettings = []string{
 	"async_insert", "cancel_http_readonly_queries_on_client_close", "date_time_input_format",
@@ -93,6 +103,15 @@ func stageErr(stage int, tag string, err error) error {
 // result.
 func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult, error) {
 	var res sqlconnect.ValidationResult
+	working := workingDatabase(ctx)
+	if !namePattern.MatchString(working) {
+		return res, stageErr(3, "engine", invalid("workingDatabase", nameErr))
+	}
+	switch strings.ToLower(working) {
+	case strings.ToLower(db.cfg.Database), "default", "system", "information_schema":
+		return res, stageErr(3, "engine", invalid("workingDatabase",
+			"The _rudderstack database must differ from the customer database, default, system and information_schema."))
+	}
 	select {
 	case db.validateSem <- struct{}{}:
 		defer func() { <-db.validateSem }()
@@ -166,7 +185,7 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 // checkGrants runs one CHECK GRANT per required privilege, so CH_PERMISSION
 // names the failing one, then the diagnostic checks that only warn.
 func (db *DB) checkGrants(ctx context.Context, ex sqlconnect.QueryExecutor) ([]sqlconnect.ValidationWarning, error) {
-	scratch := db.QuoteIdentifier(db.cfg.ScratchDatabase)
+	scratch := db.QuoteIdentifier(workingDatabase(ctx))
 	type grant struct{ privilege, stmt string }
 	var checks []grant
 	for _, p := range []string{"SELECT", "INSERT", "CREATE TABLE", "DROP TABLE"} {
@@ -219,9 +238,9 @@ func checkGrant(ctx context.Context, ex sqlconnect.QueryExecutor, stmt string) (
 // Atomic it compares the host of four connections.
 func (db *DB) checkEngine(ctx context.Context, ex sqlconnect.QueryExecutor) error {
 	var engine string
-	switch err := ex.QueryRowContext(ctx, engineSQL, db.cfg.ScratchDatabase).Scan(&engine); {
+	switch err := ex.QueryRowContext(ctx, engineSQL, workingDatabase(ctx)).Scan(&engine); {
 	case errors.Is(err, sql.ErrNoRows):
-		return stageErr(3, "engine", cherr.New(cherr.CodeConfigInvalid, "scratchDatabase", "the scratch database does not exist"))
+		return stageErr(3, "engine", cherr.New(cherr.CodeConfigInvalid, "workingDatabase", "the _rudderstack database does not exist"))
 	case err != nil:
 		return stageErr(3, "engine", err)
 	}
@@ -234,8 +253,8 @@ func (db *DB) checkEngine(ctx context.Context, ex sqlconnect.QueryExecutor) erro
 		}
 		return nil
 	default:
-		return stageErr(3, "engine", cherr.New(cherr.CodeConfigInvalid, "scratchDatabase",
-			"the scratch database engine "+engineLabel(engine)+" is not Atomic or Shared"))
+		return stageErr(3, "engine", cherr.New(cherr.CodeConfigInvalid, "workingDatabase",
+			"the _rudderstack database engine "+engineLabel(engine)+" is not Atomic or Shared"))
 	}
 }
 
@@ -588,7 +607,7 @@ func (db *DB) cleanupAcquire(own driverExec) func(context.Context) (sqlconnect.Q
 func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 	var b [8]byte
 	_, _ = rand.Read(b[:])
-	ref := sqlconnect.NewRelationRef("_rudder_probe_"+hex.EncodeToString(b[:]), sqlconnect.WithSchema(db.cfg.ScratchDatabase))
+	ref := sqlconnect.NewRelationRef("_rudder_probe_"+hex.EncodeToString(b[:]), sqlconnect.WithSchema(workingDatabase(ctx)))
 	t := db.QuoteTable(ref)
 	cleanup := probeCleanup{
 		db: db, ref: ref,

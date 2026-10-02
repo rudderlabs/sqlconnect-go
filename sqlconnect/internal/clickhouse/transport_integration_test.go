@@ -31,17 +31,19 @@ func server(t *testing.T) *chtest.Server {
 	return chtest.Start(t, chtest.Options{Tag: "26.3"})
 }
 
-func TestSQ25_NewDBRefusesScratchBeforeAnyRequest(t *testing.T) {
+func TestSQ25_ValidationRefusesWorkingDatabaseBeforeAnyRequest(t *testing.T) {
 	srv := server(t)
 	p := chtest.NewProxy(t, srv, chtest.ProxyOptions{})
 	for _, name := range []string{"default", "DEFAULT", "System", "information_schema", "customer_db"} {
-		cfg := withHostPort(srv.Config("rudder_retl", "pw", "customer_db", name, true), "localhost", p.Port())
-		_, err := clickhouse.NewDBForTest(cfg, chpolicy.Policy{AllowLoopback: true}, srv.CA)
+		cfg := withHostPort(srv.Config("rudder_retl", "pw", "customer_db", true), "localhost", p.Port())
+		db, err := clickhouse.NewDBForTest(cfg, chpolicy.Policy{AllowLoopback: true}, srv.CA)
+		require.NoError(t, err)
+		ctx := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{WorkingDatabase: name})
+		_, err = db.ValidateContext(ctx)
 		requireCode(t, err, "CH_CONFIG_INVALID")
-		_, err = sqlconnect.NewDB("clickhouse", cfg) // the public constructor refuses the same way
-		requireCode(t, err, "CH_CONFIG_INVALID")
+		require.NoError(t, db.Close())
 	}
-	require.Empty(t, p.Requests(), "the scratch rule refuses in NewDB before any query")
+	require.Empty(t, p.Requests(), "validation rejects the working database before any query")
 }
 
 func TestSQ26_RebindOverBothTransports(t *testing.T) {
@@ -49,7 +51,7 @@ func TestSQ26_RebindOverBothTransports(t *testing.T) {
 	for _, secure := range []bool{true, false} {
 		p := chtest.NewProxy(t, srv, chtest.ProxyOptions{PlainHTTP: !secure})
 		r := newMutableResolver("rebind.test", "127.0.0.1") // the fixture certificate carries SAN rebind.test
-		cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", "scratch_db", secure), "rebind.test", p.Port())
+		cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", secure), "rebind.test", p.Port())
 		db, err := clickhouse.NewDBForTestWith(cfg, clickhouse.TestEnv{Policy: testPolicy, Roots: srv.CA, Resolver: r})
 		require.NoError(t, err)
 		db.SetMaxIdleConns(0) // every statement opens a new connection
@@ -71,7 +73,7 @@ func TestSQ5_TLSMatrix(t *testing.T) {
 	srv := server(t)
 	p := chtest.NewProxy(t, srv, chtest.ProxyOptions{PlainHTTP: true}) // counts plain-port requests
 	try := func(host string, port int, secure bool, roots *x509.CertPool) error {
-		cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", "scratch_db", secure), host, port)
+		cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", secure), host, port)
 		db, err := clickhouse.NewDBForTest(cfg, testPolicy, roots)
 		require.NoError(t, err)
 		defer func() { _ = db.Close() }()
@@ -92,7 +94,7 @@ func TestSQ26_TLSVerifiesConfiguredHostname(t *testing.T) {
 	front := newSNIFront(t, srv, func(name string) { sni <- name }) // the server certificate carries SAN localhost
 	resolver := staticResolver{"localhost": "127.0.0.1", "outside-san.test": "127.0.0.1"}
 	for _, c := range []struct{ host, wantErr string }{{"localhost", ""}, {"outside-san.test", "CH_TLS"}} {
-		cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", "scratch_db", true), c.host, front.Port())
+		cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", true), c.host, front.Port())
 		db, err := clickhouse.NewDBForTestWith(cfg, clickhouse.TestEnv{Policy: chpolicy.Policy{AllowLoopback: true}, Roots: srv.CA, Resolver: resolver})
 		require.NoError(t, err)
 		_, err = db.ExecContext(context.Background(), "SELECT 1")
@@ -147,7 +149,7 @@ func (f *authFront) port() int {
 func TestSQ5_PlainHTTPBasicHeader(t *testing.T) {
 	srv := server(t)
 	f := newAuthFront(t, srv)
-	cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", "scratch_db", false), "localhost", f.port())
+	cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", false), "localhost", f.port())
 	db, err := clickhouse.NewDBForTest(cfg, testPolicy, nil)
 	require.NoError(t, err)
 	defer func() { _ = db.Close() }()
@@ -163,7 +165,7 @@ func TestSQ5_PlainHTTPBasicHeader(t *testing.T) {
 	before := len(f.schemes)
 	f.mu.Unlock()
 
-	_, err = clickhouse.NewDBForTest(withHostPort(srv.Config("u", "p", "d", "s", false), "localhost", f.port()), chpolicy.Policy{AllowLoopback: true}, nil)
+	_, err = clickhouse.NewDBForTest(withHostPort(srv.Config("u", "p", "d", false), "localhost", f.port()), chpolicy.Policy{AllowLoopback: true}, nil)
 	requireCode(t, err, "CH_CONFIG_INVALID")
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -183,7 +185,7 @@ func TestSQ27_TransportOptions(t *testing.T) {
 	// proxy variables once per process, so the Proxy == nil check below is the
 	// check that does not depend on test order.
 	p := chtest.NewProxy(t, srv, chtest.ProxyOptions{IdleTimeout: 10 * time.Second})
-	cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", "scratch_db", true), "rebind.test", p.Port())
+	cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", true), "rebind.test", p.Port())
 	db, err := clickhouse.NewDBForTestWith(cfg, clickhouse.TestEnv{
 		Policy: chpolicy.Policy{AllowLoopback: true}, Roots: srv.CA, Resolver: staticResolver{"rebind.test": "127.0.0.1"},
 	})
@@ -218,7 +220,7 @@ func TestSQ27_SilentInsertOutlivesShortReadTimeout(t *testing.T) {
 	srv := server(t)
 	srv.AdminExec(t, "CREATE TABLE default.silent (n UInt64) ENGINE = MergeTree ORDER BY n")
 	run := func(readTimeout time.Duration) error {
-		db, err := clickhouse.NewDBForTestWith(srv.Config(srv.AdminUser, srv.AdminPassword, "default", "scratch_db", true),
+		db, err := clickhouse.NewDBForTestWith(srv.Config(srv.AdminUser, srv.AdminPassword, "default", true),
 			clickhouse.TestEnv{Policy: chpolicy.Policy{AllowLoopback: true}, Roots: srv.CA, ReadTimeout: readTimeout})
 		require.NoError(t, err)
 		defer func() { _ = db.Close() }()
@@ -270,8 +272,8 @@ func TestSQ31_RefusedDialNotReplayed(t *testing.T) {
 
 func TestSQ30_RedirectOnHelloAndStatement(t *testing.T) {
 	srv := server(t)
-	srv.AdminExec(t, "CREATE DATABASE IF NOT EXISTS scratch_db")
-	srv.AdminExec(t, "CREATE TABLE scratch_db.r (a UInt8) ENGINE = MergeTree ORDER BY a")
+	srv.AdminExec(t, "CREATE DATABASE IF NOT EXISTS _rudderstack")
+	srv.AdminExec(t, "CREATE TABLE _rudderstack.r (a UInt8) ENGINE = MergeTree ORDER BY a")
 	var second atomic.Int32
 	other := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { second.Add(1) }))
 	defer other.Close()
@@ -291,7 +293,7 @@ func TestSQ30_RedirectOnHelloAndStatement(t *testing.T) {
 				if c.name == "sync statement" {
 					require.NoError(t, err)
 					defer func() { _ = conn.Close() }()
-					_, err = conn.ExecContext(context.Background(), "INSERT INTO scratch_db.r SELECT 1")
+					_, err = conn.ExecContext(context.Background(), "INSERT INTO _rudderstack.r SELECT 1")
 				}
 				requireCode(t, err, "CH_REDIRECT_REFUSED")
 			})

@@ -233,21 +233,20 @@ func (s *Server) ImageDigest(t *testing.T) string {
 
 // Config returns the eight account fields for the driver. HTTPS uses the host
 // "localhost" so the fixture certificate matches.
-func (s *Server) Config(user, password, database, scratch string, secure bool) json.RawMessage {
+func (s *Server) Config(user, password, database string, secure bool) json.RawMessage {
 	port := s.HTTPPort
 	if secure {
 		port = s.HTTPSPort
 	}
 	b, err := json.Marshal(struct {
-		Host            string `json:"host"`
-		Port            int    `json:"port"`
-		Database        string `json:"database"`
-		User            string `json:"user"`
-		Password        string `json:"password"`
-		Secure          bool   `json:"secure"`
-		SkipVerify      bool   `json:"skipVerify"`
-		ScratchDatabase string `json:"scratchDatabase"`
-	}{s.Host, port, database, user, password, secure, false, scratch})
+		Host       string `json:"host"`
+		Port       int    `json:"port"`
+		Database   string `json:"database"`
+		User       string `json:"user"`
+		Password   string `json:"password"`
+		Secure     bool   `json:"secure"`
+		SkipVerify bool   `json:"skipVerify"`
+	}{s.Host, port, database, user, password, secure, false})
 	if err != nil {
 		panic(err)
 	}
@@ -316,9 +315,9 @@ func (s *Server) FlushLogs(t *testing.T) {
 
 // CreateScopedUser provisions a runtime user with the published grant script:
 // grants-and-security section 2.1, plus section 2.2 when pruning is true.
-func (s *Server) CreateScopedUser(t *testing.T, name, password, customerDB, scratchDB string, pruning bool) {
+func (s *Server) CreateScopedUser(t *testing.T, name, password, customerDB, rudderDB string, pruning bool) {
 	t.Helper()
-	user, customer, scratch := quoteIdent(name), quoteIdent(customerDB), quoteIdent(scratchDB)
+	user, customer, scratch := quoteIdent(name), quoteIdent(customerDB), quoteIdent(rudderDB)
 	stmts := []string{
 		fmt.Sprintf("CREATE USER %s IDENTIFIED WITH sha256_password BY %s", user, quoteString(password)),
 		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", scratch),
@@ -693,11 +692,11 @@ func (s *Server) CreateUserWithConstraint(t *testing.T, setting, value string) U
 	return u
 }
 
-// ProbeTables returns the names of the validation probe tables in scratch_db.
+// ProbeTables returns the names of the validation probe tables in _rudderstack.
 func (s *Server) ProbeTables(t *testing.T) []string {
 	t.Helper()
 	var out []string
-	for _, r := range s.AdminQuery(t, "SELECT name FROM system.tables WHERE database = 'scratch_db' AND startsWith(name, '_rudder_probe_')") {
+	for _, r := range s.AdminQuery(t, "SELECT name FROM system.tables WHERE database = '_rudderstack' AND startsWith(name, '_rudder_probe_')") {
 		if len(r) == 1 && r[0] != "" {
 			out = append(out, r[0])
 		}
@@ -705,10 +704,10 @@ func (s *Server) ProbeTables(t *testing.T) []string {
 	return out
 }
 
-// DropProbes drops every validation probe table in scratch_db.
+// DropProbes drops every validation probe table in _rudderstack.
 func (s *Server) DropProbes(t *testing.T) {
 	t.Helper()
 	for _, name := range s.ProbeTables(t) {
-		s.AdminExec(t, "DROP TABLE IF EXISTS `scratch_db`."+quoteIdent(name)+" SYNC")
+		s.AdminExec(t, "DROP TABLE IF EXISTS `_rudderstack`."+quoteIdent(name)+" SYNC")
 	}
 }

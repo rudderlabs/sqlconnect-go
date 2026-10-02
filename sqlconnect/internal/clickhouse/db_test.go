@@ -25,7 +25,7 @@ import (
 func validJSONInternal() json.RawMessage {
 	b, _ := json.Marshal(map[string]any{
 		"host": "ch.example.com", "database": "analytics", "user": "rudder_retl",
-		"password": "s3cret", "secure": true, "scratchDatabase": "_rudderstack_ws",
+		"password": "s3cret", "secure": true,
 	})
 	return b
 }

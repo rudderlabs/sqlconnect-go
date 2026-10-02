@@ -215,7 +215,7 @@ func TestSQ22_MidStreamErrors(t *testing.T) {
 
 func TestSQ22_IntegrationClassification(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
-	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "scratch_db", false)
+	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
 	srv.AdminExec(t, "CREATE TABLE customer_db.secret (k UInt8) ENGINE = MergeTree ORDER BY k")
 	srv.AdminExec(t, "REVOKE SELECT ON customer_db.secret FROM rudder_retl")
 	scoped, admin, bad := openScoped(t, srv, "rudder_retl", "pw_Retl_123"), openAdmin(t, srv), openScoped(t, srv, "rudder_retl", "wrong")

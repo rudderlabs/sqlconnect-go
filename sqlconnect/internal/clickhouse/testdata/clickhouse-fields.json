@@ -1,5 +1,5 @@
 {
-  "$comment": "Shared ClickHouse account field cases, catalog LLD section 3.8. rudder-integrations-config owns this file. sqlconnect-go, rudder-config-backend, rudder-control-plane and rudder-lookout keep byte-identical copies. Inputs use JSON escapes.",
+  "$comment": "ClickHouse account field cases after D33. Derived from the shared rudder-integrations-config fixture. Inputs use JSON escapes.",
   "cases": [
     {
       "id": "H01",
@@ -239,92 +239,6 @@
       "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "verdict": "fail",
       "error": "Use letters, digits and underscores, start with a letter or underscore, at most 128 characters."
-    },
-    {
-      "id": "S01",
-      "field": "scratchDatabase",
-      "input": "_rudderstack_ws1",
-      "verdict": "pass",
-      "database": "analytics"
-    },
-    {
-      "id": "S02",
-      "field": "scratchDatabase",
-      "input": "analytics_scratch",
-      "verdict": "pass",
-      "database": "analytics"
-    },
-    {
-      "id": "S20",
-      "field": "scratchDatabase",
-      "input": "analytics",
-      "verdict": "fail",
-      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
-      "database": "analytics",
-      "schemaVerdict": "pass"
-    },
-    {
-      "id": "S21",
-      "field": "scratchDatabase",
-      "input": "ANALYTICS",
-      "verdict": "fail",
-      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
-      "database": "analytics",
-      "schemaVerdict": "pass"
-    },
-    {
-      "id": "S22",
-      "field": "scratchDatabase",
-      "input": "default",
-      "verdict": "fail",
-      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
-      "database": "analytics",
-      "schemaVerdict": "pass"
-    },
-    {
-      "id": "S23",
-      "field": "scratchDatabase",
-      "input": "DEFAULT",
-      "verdict": "fail",
-      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
-      "database": "analytics",
-      "schemaVerdict": "pass"
-    },
-    {
-      "id": "S24",
-      "field": "scratchDatabase",
-      "input": "system",
-      "verdict": "fail",
-      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
-      "database": "analytics",
-      "schemaVerdict": "pass"
-    },
-    {
-      "id": "S25",
-      "field": "scratchDatabase",
-      "input": "System",
-      "verdict": "fail",
-      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
-      "database": "analytics",
-      "schemaVerdict": "pass"
-    },
-    {
-      "id": "S26",
-      "field": "scratchDatabase",
-      "input": "information_schema",
-      "verdict": "fail",
-      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
-      "database": "analytics",
-      "schemaVerdict": "pass"
-    },
-    {
-      "id": "S27",
-      "field": "scratchDatabase",
-      "input": "INFORMATION_SCHEMA",
-      "verdict": "fail",
-      "error": "The scratch database must differ from the customer database, default, system and information_schema.",
-      "database": "analytics",
-      "schemaVerdict": "pass"
     },
     {
       "id": "P01",

@@ -53,13 +53,30 @@ func TestValidation_EngineRules(t *testing.T) {
 	}
 }
 
+func TestValidation_RudderSchemaMissing(t *testing.T) {
+	var stub validationStub
+	db := stub.db(t, nil, nil)
+	pool := answerDB(t, func(query string, args []any) ([]string, [][]driver.Value, error) {
+		require.Equal(t, engineSQL, query)
+		require.Equal(t, []any{defaultRudderSchema}, args)
+		return []string{"engine"}, nil, nil
+	}, nil)
+	err := db.checkEngine(context.Background(), pool)
+	requireCode(t, err, "CH_CONFIG_INVALID")
+	requireStage(t, err, 3, "engine")
+	var configErr *cherr.Error
+	require.ErrorAs(t, err, &configErr)
+	require.Equal(t, "workingDatabase", configErr.Field)
+	require.Contains(t, err.Error(), "the _rudderstack database does not exist")
+}
+
 // fixed returns an acquire function that hands out ex for every step.
 func fixed(ex sqlconnect.QueryExecutor) func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
 	return func(context.Context) (sqlconnect.QueryExecutor, func(), error) { return ex, func() {}, nil }
 }
 
 func TestProbeCleanup_Codes(t *testing.T) {
-	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("scratch_db"))
+	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("_rudderstack"))
 	db := unitDB(t)
 	for name, c := range map[string]probeCleanup{
 		"acquisition fails": {
@@ -92,7 +109,7 @@ func TestProbeCleanup_Codes(t *testing.T) {
 		},
 	}.run(context.Background()))
 	require.Equal(t, []int{2, 2}, []int{acquired, released}, "the DROP and the absence check each take and release a connection")
-	require.True(t, strings.HasPrefix(good.lastExec, "DROP TABLE `scratch_db`.`_rudder_probe_"), good.lastExec)
+	require.True(t, strings.HasPrefix(good.lastExec, "DROP TABLE `_rudderstack`.`_rudder_probe_"), good.lastExec)
 	require.Contains(t, unknownLastExec(t), "DROP TABLE IF EXISTS", "an unknown CREATE outcome drops only if the table exists")
 }
 
@@ -148,7 +165,7 @@ func (l *lateCreate) exec(t *testing.T) *sql.DB {
 }
 
 func TestProbeCleanup_WaitsForUnknownCreate(t *testing.T) {
-	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("scratch_db"))
+	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("_rudderstack"))
 	db := unitDB(t)
 	orig := sleep
 	sleep = func(context.Context, time.Duration) error { return nil }
@@ -177,7 +194,7 @@ func TestProbeCleanup_WaitsForUnknownCreate(t *testing.T) {
 		err := cleanup(l).run(context.Background())
 		requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
 		requireStage(t, err, 4, "scratch_cleanup")
-		require.Contains(t, l.log, "DROP TABLE IF EXISTS `scratch_db`.`_rudder_probe_0123456789abcdef` SYNC", name)
+		require.Contains(t, l.log, "DROP TABLE IF EXISTS `_rudderstack`.`_rudder_probe_0123456789abcdef` SYNC", name)
 		require.LessOrEqual(t, countOf(l.log, processesSQL), probeSettlePolls, name+": a bounded number of outcome reads")
 	}
 
@@ -190,7 +207,7 @@ func TestProbeCleanup_WaitsForUnknownCreate(t *testing.T) {
 }
 
 func TestProbeCleanup_OutcomeReadKeepsDropTime(t *testing.T) {
-	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("scratch_db"))
+	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("_rudderstack"))
 	orig := probeLookupTimeout
 	probeLookupTimeout = 20 * time.Millisecond
 	t.Cleanup(func() { probeLookupTimeout = orig })
@@ -225,7 +242,7 @@ func TestProbeCleanup_OutcomeReadKeepsDropTime(t *testing.T) {
 }
 
 func TestProbeCleanup_BadConnOnOutcomeRead(t *testing.T) {
-	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("scratch_db"))
+	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("_rudderstack"))
 	orig := sleep
 	sleep = func(context.Context, time.Duration) error { return nil }
 	t.Cleanup(func() { sleep = orig })
@@ -289,7 +306,7 @@ func TestProbeCleanup_ReusesValidationConnection(t *testing.T) {
 }
 
 func TestProbeCleanup_RefusedDropRunsOnce(t *testing.T) {
-	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("scratch_db"))
+	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("_rudderstack"))
 	for _, refused := range []error{
 		&cherr.Error{Code: cherr.CodeNetwork, Detail: "HTTP 403 from a proxy"},
 		&cherr.Error{Code: cherr.CodeRateLimited},
@@ -358,17 +375,17 @@ func TestValidation_ScriptedPass(t *testing.T) {
 	require.Contains(t, queries, "SELECT hostName()", "Atomic compares hosts")
 	var creates, drops int
 	for _, q := range queries {
-		if strings.HasPrefix(q, "CREATE TABLE `_rudderstack_ws`.`_rudder_probe_") {
+		if strings.HasPrefix(q, "CREATE TABLE `_rudderstack`.`_rudder_probe_") {
 			creates++
-			require.Regexp(t, "^CREATE TABLE `_rudderstack_ws`\\.`_rudder_probe_[0-9a-f]{16}` \\(probe UInt8\\)\\nENGINE = MergeTree\\nORDER BY tuple\\(\\)$", q)
+			require.Regexp(t, "^CREATE TABLE `_rudderstack`\\.`_rudder_probe_[0-9a-f]{16}` \\(probe UInt8\\)\\nENGINE = MergeTree\\nORDER BY tuple\\(\\)$", q)
 		}
-		if strings.HasPrefix(q, "DROP TABLE `_rudderstack_ws`.`_rudder_probe_") {
+		if strings.HasPrefix(q, "DROP TABLE `_rudderstack`.`_rudder_probe_") {
 			drops++
 			require.True(t, strings.HasSuffix(q, " SYNC"), q)
 		}
 	}
 	require.Equal(t, []int{1, 1}, []int{creates, drops})
-	for _, q := range []string{"CHECK GRANT ALTER DELETE ON `_rudderstack_ws`.`sync_log`", "CHECK GRANT SELECT ON `analytics`.*"} {
+	for _, q := range []string{"CHECK GRANT ALTER DELETE ON `_rudderstack`.`sync_log`", "CHECK GRANT SELECT ON `analytics`.*"} {
 		require.Contains(t, queries, q)
 	}
 
@@ -380,7 +397,7 @@ func TestValidation_ScriptedPass(t *testing.T) {
 	_, err = runValidationScriptErr(t, map[string]any{"SELECT version(), currentDatabase()": []driver.Value{"26.3.1.1", "other"}})
 	requireCode(t, err, "CH_CONFIG_INVALID")
 	requireStage(t, err, 1, "configuration")
-	_, err = runValidationScriptErr(t, map[string]any{"CHECK GRANT INSERT ON `_rudderstack_ws`.*": int64(0)})
+	_, err = runValidationScriptErr(t, map[string]any{"CHECK GRANT INSERT ON `_rudderstack`.*": int64(0)})
 	requireStage(t, err, 3, "grant_check")
 	var ce *cherr.Error
 	require.ErrorAs(t, err, &ce)
@@ -388,6 +405,58 @@ func TestValidation_ScriptedPass(t *testing.T) {
 	_, err = runValidationScriptErr(t, map[string]any{"SELECT hostName()": hostSeq{"h1", "h2"}})
 	requireCode(t, err, "CH_CLUSTER_UNSUPPORTED")
 	requireStage(t, err, 3, "engine")
+}
+
+func TestValidation_RudderSchemaOverride(t *testing.T) {
+	stub := validationStub{rudderSchema: "custom_rudder"}
+	db := stub.db(t, nil, nil)
+	ctx := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{WorkingDatabase: "custom_rudder", SyncLogPruning: true})
+	_, err := db.ValidateContext(ctx)
+	require.NoError(t, err)
+	for _, privilege := range []string{"SELECT", "INSERT", "CREATE TABLE", "DROP TABLE"} {
+		require.Contains(t, stub.statement, "CHECK GRANT "+privilege+" ON `custom_rudder`.*")
+	}
+	require.Contains(t, stub.statement, "CHECK GRANT ALTER DELETE ON `custom_rudder`.`sync_log`")
+	var creates, drops int
+	for _, query := range stub.statement {
+		if strings.HasPrefix(query, "CREATE TABLE `custom_rudder`.`_rudder_probe_") {
+			creates++
+		}
+		if strings.HasPrefix(query, "DROP TABLE `custom_rudder`.`_rudder_probe_") {
+			drops++
+		}
+	}
+	require.Equal(t, []int{1, 1}, []int{creates, drops})
+}
+
+func TestValidation_WorkingDatabaseDefault(t *testing.T) {
+	for _, ctx := range []context.Context{
+		context.Background(),
+		sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{}),
+	} {
+		stub := validationStub{}
+		_, err := stub.db(t, nil, nil).ValidateContext(ctx)
+		require.NoError(t, err)
+		require.Contains(t, stub.statement, "CHECK GRANT CREATE TABLE ON `_rudderstack`.*")
+	}
+}
+
+func TestValidation_WorkingDatabaseExclusions(t *testing.T) {
+	for _, name := range []string{
+		"default", "DEFAULT", "Default", "system", "SYSTEM", "System",
+		"information_schema", "INFORMATION_SCHEMA", "Information_Schema", "analytics", "ANALYTICS", "my-db",
+	} {
+		t.Run(name, func(t *testing.T) {
+			stub := validationStub{}
+			ctx := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{WorkingDatabase: name})
+			_, err := stub.db(t, nil, nil).ValidateContext(ctx)
+			var configErr *cherr.Error
+			require.ErrorAs(t, err, &configErr)
+			require.Equal(t, cherr.CodeConfigInvalid, configErr.Code)
+			require.Equal(t, "workingDatabase", configErr.Field)
+			require.Empty(t, stub.statement)
+		})
+	}
 }
 
 func TestValidation_RefusedCreateSendsNoDrop(t *testing.T) {
@@ -518,11 +587,12 @@ type hostSeq []string
 // validationStub is a DB on the stub driver that answers every validation
 // statement with a passing value, except the overrides keyed by exact SQL.
 type validationStub struct {
-	mu        sync.Mutex
-	statement []string
-	execs     []string
-	created   bool
-	hostReads int
+	mu           sync.Mutex
+	statement    []string
+	execs        []string
+	created      bool
+	hostReads    int
+	rudderSchema string
 }
 
 func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail func(q string) error) *DB {
@@ -532,7 +602,7 @@ func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail fun
 	one := func(v driver.Value) ([]string, [][]driver.Value, error) {
 		return []string{"v"}, [][]driver.Value{{v}}, nil
 	}
-	pool := answerDB(t, func(q string, _ []any) ([]string, [][]driver.Value, error) {
+	pool := answerDB(t, func(q string, args []any) ([]string, [][]driver.Value, error) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		s.statement = append(s.statement, q)
@@ -554,6 +624,11 @@ func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail fun
 		case q == "SELECT 1", strings.HasPrefix(q, "CHECK GRANT "), strings.HasPrefix(q, "SELECT probe FROM "):
 			return one(int64(1))
 		case q == engineSQL:
+			working := defaultRudderSchema
+			if s.rudderSchema != "" {
+				working = s.rudderSchema
+			}
+			require.Equal(t, []any{working}, args)
 			return one("Atomic")
 		case q == hostNameSQL:
 			return one("h1")

@@ -16,11 +16,11 @@ import (
 // TestClickHouseDB runs the shared database suite over HTTPS and plain HTTP.
 func TestClickHouseDB(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
-	srv.AdminExec(t, "CREATE DATABASE IF NOT EXISTS tsqlcon_scratch") // Ping runs validation
+	srv.AdminExec(t, "CREATE DATABASE IF NOT EXISTS _rudderstack") // Ping runs validation
 	for mode, secure := range map[string]bool{"https": true, "http": false} {
 		t.Run(mode, func(t *testing.T) {
 			integrationtest.TestDatabaseScenarios(t, clickhouse.DatabaseType,
-				srv.Config(srv.AdminUser, srv.AdminPassword, "default", "tsqlcon_scratch", secure),
+				srv.Config(srv.AdminUser, srv.AdminPassword, "default", secure),
 				func(s string) string { return s },
 				integrationtest.Options{
 					CreateTableSuffix:          " ENGINE = MergeTree ORDER BY tuple()",
