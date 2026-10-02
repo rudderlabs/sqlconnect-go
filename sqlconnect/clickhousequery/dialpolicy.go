@@ -32,9 +32,10 @@ func SetDialPolicy(p DialPolicy) error {
 	})
 }
 
-// ParseBlockedCIDRs parses the comma-separated value of
-// RSOURCES_SQLSOURCE_CLICKHOUSE_BLOCKEDCIDRS. One bad entry fails the whole
-// list, so rudder-sources never runs with a partial list.
+// ParseBlockedCIDRs parses a comma-separated list of CIDR ranges. One bad
+// entry fails the whole call. rudder-sources calls it once per entry of
+// RSOURCES_SQLSOURCE_CLICKHOUSE_BLOCKEDCIDRS and skips a bad entry with a
+// warning, so the block list never stops the service.
 func ParseBlockedCIDRs(s string) ([]netip.Prefix, error) {
 	var out []netip.Prefix
 	for part := range strings.SplitSeq(s, ",") {
