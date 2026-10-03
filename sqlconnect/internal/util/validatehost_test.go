@@ -1,6 +1,12 @@
 package util_test
 
 import (
+	"bytes"
+	"encoding/json"
+	"net"
+	"os"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -103,4 +109,82 @@ func TestValidateHost(t *testing.T) {
 			}
 		})
 	})
+}
+
+type addressCase struct {
+	Name         string  `json:"name"`
+	Address      string  `json:"address"`
+	Verdict      string  `json:"verdict"`
+	Class        *string `json:"class"`
+	EmbeddedIPv4 string  `json:"embeddedIPv4,omitempty"`
+}
+
+func TestSQ26_SharedFixtureRefusedSet(t *testing.T) {
+	raw, err := os.ReadFile("../../clickhousequery/testdata/addresses.json")
+	require.NoError(t, err)
+	var f struct {
+		Version int           `json:"version"`
+		Cases   []addressCase `json:"cases"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	require.NoError(t, dec.Decode(&f))
+	require.Equal(t, 1, f.Version)
+	require.GreaterOrEqual(t, len(f.Cases), 30)
+	require.True(t, slices.IsSortedFunc(f.Cases, func(a, b addressCase) int { return strings.Compare(a.Name, b.Name) }), "cases sorted by name")
+	for i := 1; i < len(f.Cases); i++ {
+		require.NotEqual(t, f.Cases[i-1].Name, f.Cases[i].Name, "case names are unique")
+	}
+	for _, c := range f.Cases {
+		ip := net.ParseIP(c.Address)
+		require.NotNil(t, ip, c.Name)
+		class, embedded := util.RefusedClass(ip)
+		if c.Verdict == "allowed" {
+			require.Nil(t, c.Class, c.Name)
+			require.Empty(t, c.EmbeddedIPv4, c.Name)
+			require.Empty(t, class, c.Name)
+			require.Nil(t, embedded, c.Name)
+			require.Empty(t, util.DisallowedAddrReason(ip), c.Name)
+			continue
+		}
+		require.Equal(t, "refused", c.Verdict, c.Name)
+		require.NotNil(t, c.Class, c.Name)
+		require.Equal(t, *c.Class, class, c.Name)
+		require.NotEmpty(t, util.DisallowedAddrReason(ip), c.Name)
+		if c.EmbeddedIPv4 != "" {
+			require.Equal(t, c.EmbeddedIPv4, embedded.String(), c.Name)
+		} else {
+			require.Nil(t, embedded, c.Name)
+		}
+	}
+	again, err := json.MarshalIndent(f, "", "  ")
+	require.NoError(t, err)
+	require.Equal(t, string(raw), string(again)+"\n", "2-space indent, LF, trailing newline")
+}
+
+func TestEmbeddedIPv4(t *testing.T) {
+	for addr, want := range map[string][]string{
+		"127.0.0.1":            nil,
+		"::ffff:127.0.0.1":     nil,
+		"2001:4860:4860::8888": nil,
+		"64:ff9b::a9fe:a9fe":   {"169.254.169.254"},
+		// 64:ff9b:1::/48 yields the reading of each RFC 6052 layout whose u octet
+		// and suffix are zero, without 0.0.0.0 unless no other reading is left.
+		"64:ff9b:1::":                  {"0.0.0.0"},
+		"64:ff9b:1:a9fe:a9:fe00::":     {"169.254.169.254", "254.169.254.0", "169.254.0.0"},
+		"64:ff9b:1::7f00:1":            {"127.0.0.1"},
+		"64:ff9b:1:100::a9fe:a9fe":     {"169.254.169.254"},
+		"64:ff9b:1:87f:0:1::":          {"127.0.0.1", "0.0.1.0"},
+		"64:ff9b:1:808:a9:fea9:fe00::": {"169.254.169.254", "254.0.0.0"},
+		"64:ff9b:1:808:8:808:808:808":  {"8.8.8.8"},
+		"64:ff9b:1:808:8:800::":        {"8.8.8.8", "8.8.8.0", "8.8.0.0"},
+		"2002:7f00:1::":                {"127.0.0.1"},
+		"2001:0:808:808::80ff:fffe":    {"8.8.8.8", "127.0.0.1"},
+	} {
+		var got []string
+		for _, v4 := range util.EmbeddedIPv4(net.ParseIP(addr)) {
+			got = append(got, v4.String())
+		}
+		require.Equal(t, want, got, addr)
+	}
 }
