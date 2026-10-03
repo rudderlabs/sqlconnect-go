@@ -13,6 +13,9 @@ import (
 // The policy is process-wide and installs once, so this is the only test in
 // the package that calls SetDialPolicy.
 func TestSQ26_SetDialPolicyOnce(t *testing.T) {
+	chpolicy.ResetForTest()
+	t.Cleanup(chpolicy.ResetForTest)
+
 	_, err := clickhousequery.ParseBlockedCIDRs("10.0.0.0/8,not-a-cidr")
 	require.Error(t, err)
 	_, err = clickhousequery.ParseBlockedCIDRs("10.1.2.3/8") // host bits set
