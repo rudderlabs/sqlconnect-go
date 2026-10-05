@@ -241,11 +241,11 @@ func TestSQ25_SQ30_ValidationHelloFaults(t *testing.T) {
 	require.Zero(t, second.Load(), "the second host receives zero requests")
 }
 
-func TestValidation_PingDelegates(t *testing.T) {
+func TestValidation_PingAndExplicitValidation(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
 	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
 	db := openScoped(t, srv, "rudder_retl", "pw_Retl_123")
-	require.NoError(t, db.Ping(), "metadata warnings never fail Ping")
+	require.NoError(t, db.Ping(), "reachability does not require validation")
 	r1, err := db.ValidateContext(context.Background())
 	require.NoError(t, err)
 	r2, err := db.ValidateContext(context.Background())
@@ -256,6 +256,27 @@ func TestValidation_PingDelegates(t *testing.T) {
 	cctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.Error(t, db.PingContext(cctx))
+}
+
+func TestValidation_NewPinnedCONSTProfiles(t *testing.T) {
+	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
+	for _, tc := range []struct{ setting, value string }{
+		{"additional_table_filters", "{'default.source': 'x > 2'}"},
+		{"log_queries_min_type", "EXCEPTION_WHILE_PROCESSING"},
+		{"log_queries_probability", "0"},
+		{"log_queries_min_query_duration_ms", "100000"},
+	} {
+		t.Run(tc.setting, func(t *testing.T) {
+			db := openAs(t, srv, srv.CreateUserWithConstraint(t, tc.setting, tc.value))
+			require.NoError(t, db.Ping(), "a settings constraint is not a reachability failure")
+			_, err := db.ValidateContext(context.Background())
+			details, ok := clickhousequery.Describe(err)
+			require.True(t, ok)
+			require.Equal(t, tc.setting, details.Field)
+			require.EqualValues(t, 452, details.ServerCode)
+			requireStage(t, err, 2, "settings")
+		})
+	}
 }
 
 func TestValidation_VisibilityDisconnectAndWarmPool(t *testing.T) {

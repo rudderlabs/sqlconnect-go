@@ -16,7 +16,6 @@ import (
 // TestClickHouseDB runs the shared database suite over HTTPS and plain HTTP.
 func TestClickHouseDB(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
-	srv.AdminExec(t, "CREATE DATABASE IF NOT EXISTS _rudderstack") // Ping runs validation
 	for mode, secure := range map[string]bool{"https": true, "http": false} {
 		t.Run(mode, func(t *testing.T) {
 			integrationtest.TestDatabaseScenarios(t, clickhouse.DatabaseType,

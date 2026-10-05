@@ -44,30 +44,27 @@ type DB struct {
 
 // openEnv is what NewDB takes from the process. Tests replace it.
 type openEnv struct {
-	policy    chpolicy.Policy
-	policySet bool
-	resolver  resolver
+	policy        chpolicy.Policy
+	dynamicPolicy bool
+	resolver      resolver
 	// rootCAs is test-only; production passes nil and uses the system roots.
 	rootCAs                  *x509.CertPool
 	dialTimeout, readTimeout time.Duration
 }
 
 func productionEnv() openEnv {
-	p, ok := chpolicy.Current()
+	p, _ := chpolicy.Current()
 	return openEnv{
-		policy: p, policySet: ok, resolver: net.DefaultResolver,
+		policy: p, dynamicPolicy: true, resolver: net.DefaultResolver,
 		dialTimeout: dialTimeout, readTimeout: clickhousequery.MaxRunBudget + 60*time.Second,
 	}
 }
 
 // NewDB parses the account config and opens a lazy pool. It sends no request.
-// It fails until clickhousequery.SetDialPolicy has run.
+// Without an explicit dial policy, the fixed refused address set still applies.
 func NewDB(configJSON json.RawMessage) (*DB, error) { return newDB(configJSON, productionEnv()) }
 
 func newDB(configJSON json.RawMessage, env openEnv) (*DB, error) {
-	if !env.policySet {
-		return nil, cherr.New(cherr.CodeConfigInvalid, "", "the ClickHouse dial policy is not installed; call clickhousequery.SetDialPolicy at start")
-	}
 	cfg, err := parseConfig(configJSON, env.policy.AllowPlainHTTP)
 	if err != nil {
 		return nil, err
@@ -79,6 +76,7 @@ func newDB(configJSON json.RawMessage, env openEnv) (*DB, error) {
 		tlsConfig = &tls.Config{RootCAs: env.rootCAs, MinVersion: tls.VersionTLS12}
 	}
 	dialer := newGuardedDialer(cfg.Host, env.policy, env.resolver, env.dialTimeout)
+	dialer.dynamicPolicy = env.dynamicPolicy
 	opts := &ch.Options{
 		Protocol:         ch.HTTP,
 		Addr:             []string{net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.PortOrDefault()))},

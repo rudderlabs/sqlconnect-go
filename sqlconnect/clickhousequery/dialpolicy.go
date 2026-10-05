@@ -22,8 +22,13 @@ type DialPolicy struct {
 	AllowPlainHTTP bool
 }
 
-// SetDialPolicy installs the policy. rudder-sources calls it once at start,
-// before the first NewDB. A malformed prefix or a second call returns an error.
+// SetDialPolicy installs the operator policy once. rudder-sources calls it
+// lazily from NewClient. Before installation, connections use the fixed
+// refused address set without operator CIDRs or test switches. Installation
+// affects subsequent dials, including those from existing pools, but does not
+// close established connections. AllowPlainHTTP is checked when NewDB parses
+// the config, so that test switch must be installed before NewDB. A malformed
+// prefix or a second explicit call returns an error.
 func SetDialPolicy(p DialPolicy) error {
 	return chpolicy.Install(chpolicy.Policy{
 		Blocked:        p.BlockedPrefixes,

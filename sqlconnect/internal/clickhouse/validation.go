@@ -83,13 +83,14 @@ const (
 	roleGrantSQL    = "SELECT access_type, database, table, column, is_partial_revoke, grant_option\nFROM system.grants\nWHERE role_name = ?"
 )
 
-// Ping runs the full validation and returns only its error.
+// Ping checks reachability without validating materialization permissions.
 func (db *DB) Ping() error { return db.PingContext(context.Background()) }
 
-// PingContext runs the full validation and returns only its error.
+// PingContext checks reachability through the driver's transport and hello settings.
 func (db *DB) PingContext(ctx context.Context) error {
-	_, err := db.ValidateContext(ctx)
-	return err
+	var one uint8
+	ctx = clickhousequery.WithStatement(ctx, helloSettings(), clickhousequery.NewQueryID())
+	return bound("ping", "", db.QueryRowContext(ctx, "SELECT 1").Scan(&one))
 }
 
 // stageErr is the only form of a validation failure. It wraps the bounded

@@ -26,7 +26,7 @@ func TestMoveCopyBeforeDrop(t *testing.T) {
 		wantSteps      []string
 		explicitColumn string
 	}{
-		{"success", "", nil, "", []string{"describe", "create", "visible", "describe", "insert", "drop"}, ""},
+		{"success", "", nil, "", []string{"describe", "create", "visible", "describe", "insert", "count source", "count copy", "drop"}, ""},
 		{"describe_denied", "describe", &ch.Exception{Code: 497}, "CH_PERMISSION", []string{"describe"}, ""},
 		{"create_denied", "create", &ch.Exception{Code: 497}, "CH_PERMISSION", []string{"describe", "create"}, ""},
 		{"visibility_denied", "visible", &ch.Exception{Code: 497}, "CH_PERMISSION", []string{"describe", "create", "visible"}, ""},
@@ -34,8 +34,8 @@ func TestMoveCopyBeforeDrop(t *testing.T) {
 		{"copy_timeout", "insert", &ch.Exception{Code: 159}, "CH_TIMEOUT", []string{"describe", "create", "visible", "describe", "insert"}, ""},
 		{"copy_cancelled", "insert", context.Canceled, "CH_CANCELLED", []string{"describe", "create", "visible", "describe", "insert"}, ""},
 		{"copy_lost_response", "insert", io.ErrUnexpectedEOF, "CH_NETWORK", []string{"describe", "create", "visible", "describe", "insert"}, ""},
-		{"drop_denied", "drop", &ch.Exception{Code: 497}, "CH_PERMISSION", []string{"describe", "create", "visible", "describe", "insert", "drop"}, ""},
-		{"explicit_match", "", nil, "", []string{"create", "visible", "describe", "insert", "drop"}, "a"},
+		{"drop_denied", "drop", &ch.Exception{Code: 497}, "CH_PERMISSION", []string{"describe", "create", "visible", "describe", "insert", "count source", "count copy", "drop"}, ""},
+		{"explicit_match", "", nil, "", []string{"create", "visible", "describe", "insert", "count source", "count copy", "drop"}, "a"},
 		{"projection_mismatch", "", nil, "CH_SCHEMA_MISMATCH", []string{"create", "visible", "describe"}, "b"},
 		{"explicit_describe_denied", "describe", &ch.Exception{Code: 497}, "CH_PERMISSION", []string{"create", "visible", "describe"}, "a"},
 	} {
@@ -51,6 +51,12 @@ func TestMoveCopyBeforeDrop(t *testing.T) {
 			}
 			pool := sql.OpenDB(stubConnector{
 				query: func(_ context.Context, q string, _ []driver.NamedValue) (driver.Rows, error) {
+					if q == "SELECT count() FROM `scratch`.`old`" {
+						return &stubRows{vals: []string{"5"}}, stage("count source")
+					}
+					if q == "SELECT count() FROM `scratch`.`new`" {
+						return &stubRows{vals: []string{"5"}}, stage("count copy")
+					}
 					if strings.HasPrefix(q, "DESCRIBE (") {
 						require.Contains(t, q, "SELECT * FROM `scratch`.`old`")
 						return &describeRows{}, stage("describe")

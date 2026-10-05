@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chsql"
@@ -256,7 +257,8 @@ func (db *DB) CreateTableFromQueryWithOptions(ctx context.Context, ex sqlconnect
 }
 
 // MoveTableWithOptions copies oldRef into a new table newRef in the same
-// database, then drops oldRef. A failed copy drops nothing. A failed drop
+// database, verifies equal row counts, then drops oldRef. A failed copy or
+// count check drops nothing. A failed drop
 // returns an error that joins sqlconnect.ErrDropOldTablePostCopy.
 func (db *DB) MoveTableWithOptions(ctx context.Context, ex sqlconnect.QueryExecutor, oldRef, newRef sqlconnect.RelationRef, o sqlconnect.MaterializationOptions) (string, error) {
 	if err := checkExecutor(ex); err != nil {
@@ -276,6 +278,18 @@ func (db *DB) MoveTableWithOptions(ctx context.Context, ex sqlconnect.QueryExecu
 	uuid, err := db.CreateTableFromQueryWithOptions(ctx, ex, newRef, "SELECT * FROM "+db.QuoteTable(oldRef), o)
 	if err != nil {
 		return "", err
+	}
+	var sourceCount, copyCount uint64
+	for _, count := range []struct {
+		ref   sqlconnect.RelationRef
+		value *uint64
+	}{{oldRef, &sourceCount}, {newRef, &copyCount}} {
+		if err := ex.QueryRowContext(clickhousequery.WithStatement(ctx, driverReadSettings(), clickhousequery.NewQueryID()), "SELECT count() FROM "+db.QuoteTable(count.ref)).Scan(count.value); err != nil {
+			return "", bound("count moved table rows", "", err)
+		}
+	}
+	if sourceCount != copyCount {
+		return "", cherr.New(cherr.CodeRowCountMismatch, "", fixedMessages[cherr.CodeRowCountMismatch])
 	}
 	if _, err := ex.ExecContext(ctx, "DROP TABLE IF EXISTS "+db.QuoteTable(oldRef)+" SYNC"); err != nil {
 		return "", errors.Join(sqlconnect.ErrDropOldTablePostCopy, bound("drop old table", "", err))

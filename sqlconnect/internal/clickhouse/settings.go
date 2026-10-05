@@ -16,9 +16,10 @@ func driverScratchSettings() map[string]any {
 	m := map[string]any{
 		"join_use_nulls": 1, "session_timezone": "UTC", "select_sequential_consistency": 1,
 		"transform_null_in": 0, "data_type_default_nullable": 0, "enable_parallel_replicas": 0,
-		"limit": 0, "offset": 0, "additional_result_filter": "",
+		"limit": 0, "offset": 0, "additional_result_filter": "", "additional_table_filters": "{}",
 		"async_insert": 0, "wait_for_async_insert": 1, "send_progress_in_http_headers": 0,
-		"log_queries": 1,
+		"log_queries": 1, "log_queries_min_type": "QUERY_START",
+		"log_queries_probability": 1, "log_queries_min_query_duration_ms": 0,
 		// A NULL into a non-nullable column fails instead of becoming the default.
 		"insert_null_as_default": 0,
 	}

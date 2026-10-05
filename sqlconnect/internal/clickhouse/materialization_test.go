@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"io"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -12,7 +13,86 @@ import (
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 )
+
+func TestMoveTable_RowCountGuard(t *testing.T) {
+	for _, tc := range []struct {
+		name                         string
+		source, copy                 uint64
+		countErr, insertErr, dropErr error
+		failCount                    int
+		wantCode                     string
+		wantDrop                     bool
+	}{
+		{name: "equal", source: 5, copy: 5, wantDrop: true},
+		{name: "empty", wantDrop: true},
+		{name: "fewer rows", source: 5, copy: 2, wantCode: cherr.CodeRowCountMismatch},
+		{name: "extra rows", source: 5, copy: 6, wantCode: cherr.CodeRowCountMismatch},
+		{name: "source count fails", countErr: &cherr.Error{Code: cherr.CodePermission}, failCount: 1, wantCode: cherr.CodePermission},
+		{name: "copy count fails", countErr: &cherr.Error{Code: cherr.CodePermission}, failCount: 2, wantCode: cherr.CodePermission},
+		{name: "insert fails", insertErr: &cherr.Error{Code: cherr.CodePermission}, wantCode: cherr.CodePermission},
+		{name: "drop fails", source: 5, copy: 5, dropErr: &cherr.Error{Code: cherr.CodePermission}, wantCode: cherr.CodePermission, wantDrop: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db := unitDB(t)
+			var statements []string
+			counts := 0
+			pool := sql.OpenDB(stubConnector{
+				query: func(ctx context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
+					statements = append(statements, query)
+					switch {
+					case strings.HasPrefix(query, "SELECT count()"):
+						counts++
+						require.Equal(t, "{}", p12SettingsAt(t, ctx)["additional_table_filters"])
+						if counts == tc.failCount {
+							return nil, tc.countErr
+						}
+						count := tc.source
+						if strings.Contains(query, "`copy`") {
+							count = tc.copy
+						}
+						return &tableRows{cols: []string{"count"}, rows: [][]driver.Value{{count}}}, nil
+					case strings.HasPrefix(query, "DESCRIBE"):
+						return &describeRows{}, nil
+					default:
+						return &tableRows{cols: []string{"uuid"}, rows: [][]driver.Value{{"copy-uuid"}}}, nil
+					}
+				},
+				exec: func(_ context.Context, query string, _ []driver.NamedValue) (driver.Result, error) {
+					statements = append(statements, query)
+					if strings.HasPrefix(query, "INSERT") {
+						return nil, tc.insertErr
+					}
+					if strings.HasPrefix(query, "DROP") {
+						return nil, tc.dropErr
+					}
+					return driver.RowsAffected(0), nil
+				},
+			})
+			defer pool.Close()
+			conn, err := pool.Conn(context.Background())
+			require.NoError(t, err)
+			defer conn.Close()
+			ex := driverExec{conn: conn, settings: driverScratchSettings}
+			uuid, err := db.MoveTableWithOptions(context.Background(), ex, sqlconnect.NewRelationRef("source"), sqlconnect.NewRelationRef("copy"), sqlconnect.MaterializationOptions{})
+			if tc.wantCode == "" {
+				require.NoError(t, err)
+				require.Equal(t, "copy-uuid", uuid)
+			} else {
+				requireCode(t, err, tc.wantCode)
+			}
+			dropped := false
+			for _, statement := range statements {
+				dropped = dropped || strings.HasPrefix(statement, "DROP")
+			}
+			require.Equal(t, tc.wantDrop, dropped, "%v", statements)
+			if tc.dropErr != nil {
+				require.ErrorIs(t, err, sqlconnect.ErrDropOldTablePostCopy)
+			}
+		})
+	}
+}
 
 func TestSortingKey_Rules(t *testing.T) {
 	cols := []sqlconnect.ColumnRef{

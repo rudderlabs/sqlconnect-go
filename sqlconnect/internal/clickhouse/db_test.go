@@ -8,7 +8,9 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +36,7 @@ func validJSONInternal() json.RawMessage {
 func mustDBInternal(t *testing.T) *DB {
 	t.Helper()
 	db, err := newDB(validJSONInternal(), openEnv{
-		policySet: true, resolver: net.DefaultResolver,
+		resolver:    net.DefaultResolver,
 		dialTimeout: time.Second, readTimeout: clickhousequery.MaxRunBudget + 60*time.Second,
 	})
 	require.NoError(t, err)
@@ -42,9 +44,39 @@ func mustDBInternal(t *testing.T) *DB {
 	return db
 }
 
-func TestNewDB_RefusesBeforePolicy(t *testing.T) {
-	_, err := newDB(validJSONInternal(), openEnv{policy: chpolicy.Policy{}, policySet: false})
+func TestNewDB_DefaultPolicyAndLateInstall(t *testing.T) {
+	previous, wasInstalled := chpolicy.Current()
+	chpolicy.ResetForTest()
+	t.Cleanup(func() {
+		chpolicy.ResetForTest()
+		if wasInstalled {
+			require.NoError(t, chpolicy.Install(previous))
+		}
+	})
+	cfg := json.RawMessage(strings.ReplaceAll(string(validJSONInternal()), "ch.example.com", "203.0.113.7"))
+	db, err := NewDB(cfg)
+	require.NoError(t, err, "NewDB works without caller setup")
+	defer db.Close()
+	require.Equal(t, chpolicy.Policy{}, db.env.policy)
+	_, err = NewDB(json.RawMessage(strings.ReplaceAll(string(cfg), `"secure":true`, `"secure":false`)))
 	requireCode(t, err, "CH_CONFIG_INVALID")
+	_, installed := chpolicy.Current()
+	require.False(t, installed, "the default does not consume the explicit install")
+	blocked, err := NewDB(json.RawMessage(strings.ReplaceAll(string(cfg), "203.0.113.7", "169.254.169.254")))
+	require.NoError(t, err)
+	defer blocked.Close()
+	_, err = blocked.opts.DialContext(context.Background(), "169.254.169.254:8443")
+	requireCode(t, err, "CH_HOST_NOT_ALLOWED")
+	require.NoError(t, clickhousequery.SetDialPolicy(clickhousequery.DialPolicy{BlockedPrefixes: []netip.Prefix{netip.MustParsePrefix("203.0.113.0/24")}}))
+	_, err = db.opts.DialContext(context.Background(), "203.0.113.7:8443")
+	requireCode(t, err, "CH_HOST_NOT_ALLOWED")
+	later, err := NewDB(cfg)
+	require.NoError(t, err)
+	defer later.Close()
+	require.Equal(t, []netip.Prefix{netip.MustParsePrefix("203.0.113.0/24")}, later.env.policy.Blocked)
+	_, err = later.opts.DialContext(context.Background(), "203.0.113.7:8443")
+	requireCode(t, err, "CH_HOST_NOT_ALLOWED")
+	require.Error(t, clickhousequery.SetDialPolicy(clickhousequery.DialPolicy{}))
 }
 
 func TestSQ23_UnsupportedAPIs(t *testing.T) {

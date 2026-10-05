@@ -39,7 +39,8 @@ func NewDBForTest(cfg json.RawMessage, policy chpolicy.Policy, roots *x509.CertP
 // net.DefaultResolver.
 func NewDBForTestWith(cfg json.RawMessage, o TestEnv) (*DB, error) {
 	env := productionEnv()
-	env.policy, env.policySet, env.rootCAs = o.Policy, true, o.Roots
+	env.policy, env.rootCAs = o.Policy, o.Roots
+	env.dynamicPolicy = false
 	if o.Resolver != nil {
 		env.resolver = o.Resolver
 	}

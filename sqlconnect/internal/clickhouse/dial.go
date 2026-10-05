@@ -20,10 +20,11 @@ type resolver interface {
 // checks every answer against the dial policy and dials only the address it
 // checked. It never makes a second lookup between the check and the dial.
 type guardedDialer struct {
-	host     string
-	policy   chpolicy.Policy
-	resolver resolver
-	dial     func(ctx context.Context, network, addr string) (net.Conn, error)
+	host          string
+	policy        chpolicy.Policy
+	dynamicPolicy bool
+	resolver      resolver
+	dial          func(ctx context.Context, network, addr string) (net.Conn, error)
 	// timeout bounds the lookup and the TCP dial together. The fork applies
 	// DialTimeout only to its own dialer, not to a custom DialContext.
 	timeout time.Duration
@@ -63,10 +64,14 @@ func (g *guardedDialer) DialContext(ctx context.Context, addr string) (net.Conn,
 // answer. One refused answer refuses the whole host, so a mixed answer set
 // cannot win a race toward an internal address.
 func (g *guardedDialer) pick(ctx context.Context) (net.IP, error) {
+	policy := g.policy
+	if g.dynamicPolicy {
+		policy, _ = chpolicy.Current()
+	}
 	refused := cherr.New(cherr.CodeHostNotAllowed, "host", "the host resolves to an address RudderStack does not connect to")
 	if lit := net.ParseIP(g.host); lit != nil {
 		// The host rule admits only dotted-decimal IPv4 literals.
-		if lit.To4() == nil || g.policy.RefusedReason(lit) != "" {
+		if lit.To4() == nil || policy.RefusedReason(lit) != "" {
 			return nil, refused
 		}
 		return lit.To4(), nil
@@ -80,7 +85,7 @@ func (g *guardedDialer) pick(ctx context.Context) (net.IP, error) {
 	}
 	var first, firstV4 net.IP
 	for _, a := range answers {
-		if g.policy.RefusedReason(a.IP) != "" {
+		if policy.RefusedReason(a.IP) != "" {
 			return nil, refused
 		}
 		if first == nil {

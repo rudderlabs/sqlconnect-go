@@ -24,27 +24,48 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 )
 
-func TestValidation_NamesLogQueriesConstraint(t *testing.T) {
-	pool := sql.OpenDB(stubConnector{query: func(ctx context.Context, _ string, _ []driver.NamedValue) (driver.Rows, error) {
-		if p12SettingsAt(t, ctx)["log_queries"] == 1 {
-			return nil, &ch.Exception{Code: 452}
-		}
-		return &tableRows{cols: []string{"1"}, rows: [][]driver.Value{{uint8(1)}}}, nil
-	}})
-	t.Cleanup(func() { _ = pool.Close() })
-	conn, err := pool.Conn(context.Background())
-	require.NoError(t, err)
-	defer conn.Close()
-	err = settingFailure(context.Background(), conn, &ch.Exception{Code: 452})
-	details, ok := clickhousequery.Describe(err)
-	require.True(t, ok)
-	require.Equal(t, "CH_PERMISSION", details.Code)
-	require.Equal(t, "log_queries", details.Field)
-	require.EqualValues(t, 452, details.ServerCode)
-	var stage sqlconnect.ValidationStageError
-	require.ErrorAs(t, err, &stage)
-	require.Equal(t, 2, stage.Stage)
-	require.Equal(t, "settings", stage.Tag)
+func TestValidation_NamesPinnedConstraints(t *testing.T) {
+	for _, setting := range []string{"log_queries", "additional_table_filters", "log_queries_min_type", "log_queries_probability", "log_queries_min_query_duration_ms"} {
+		t.Run(setting, func(t *testing.T) {
+			pool := sql.OpenDB(stubConnector{query: func(ctx context.Context, _ string, _ []driver.NamedValue) (driver.Rows, error) {
+				if _, ok := p12SettingsAt(t, ctx)[setting]; ok {
+					return nil, &ch.Exception{Code: 452}
+				}
+				return &tableRows{cols: []string{"1"}, rows: [][]driver.Value{{uint8(1)}}}, nil
+			}})
+			t.Cleanup(func() { _ = pool.Close() })
+			conn, err := pool.Conn(context.Background())
+			require.NoError(t, err)
+			defer conn.Close()
+			err = settingFailure(context.Background(), conn, &ch.Exception{Code: 452})
+			details, ok := clickhousequery.Describe(err)
+			require.True(t, ok)
+			require.Equal(t, "CH_PERMISSION", details.Code)
+			require.Equal(t, setting, details.Field)
+			require.EqualValues(t, 452, details.ServerCode)
+			var stage sqlconnect.ValidationStageError
+			require.ErrorAs(t, err, &stage)
+			require.Equal(t, 2, stage.Stage)
+			require.Equal(t, "settings", stage.Tag)
+		})
+	}
+}
+
+func TestPing_ReachabilityOnly(t *testing.T) {
+	db, recorder := unitDBWithRows(t, []string{"1"}, [][]driver.Value{{uint8(1)}})
+	ctx := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{WorkingDatabase: "invalid!"})
+	require.NoError(t, db.Ping())
+	require.NoError(t, db.PingContext(ctx))
+	for _, call := range recorder.calls() {
+		require.Equal(t, "SELECT 1", call.q)
+		require.Equal(t, helloSettings(), p12SettingsAt(t, call.ctx))
+	}
+	require.Len(t, recorder.calls(), 2)
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	require.ErrorIs(t, db.PingContext(cancelled), context.Canceled)
+	_, err := db.ValidateContext(ctx)
+	require.Error(t, err, "explicit validation still checks the working database")
 }
 
 func TestValidation_RoleClosure(t *testing.T) {
