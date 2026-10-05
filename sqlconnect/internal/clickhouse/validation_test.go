@@ -118,7 +118,7 @@ func TestValidation_RudderSchemaMissing(t *testing.T) {
 		calls = append(calls, stubCall{q: query, args: args})
 		return []string{"engine"}, nil, nil
 	}, nil)
-	err := db.checkEngine(ctx, pool)
+	err := db.checkEngine(ctx, pool, driverReadSettings)
 	for _, call := range calls {
 		require.Equal(t, engineSQL, call.q)
 		require.Equal(t, []any{working}, call.args)
@@ -575,6 +575,66 @@ func TestValidation_CancelledBeforeSlot(t *testing.T) {
 	requireStage(t, err, 0, "network")
 }
 
+func TestValidation_ReadsCarryTheRemainingBudget(t *testing.T) {
+	reads := []string{
+		"SELECT version(), currentDatabase()", "CHECK GRANT INSERT ON `_rudderstack`.*", engineSQL, hostNameSQL,
+		settingsSQL, currentRolesSQL, roleGrantsSQL, userGrantsSQL, roleGrantSQL,
+	}
+	for name, c := range map[string]struct {
+		callerDeadline time.Duration // 0 sets none
+		limit, open    int
+	}{
+		"no caller deadline":  {0, int(validationBudget.Seconds()), int(validationOpenTimeout.Seconds())},
+		"run deadline":        {2 * time.Hour, int(validationBudget.Seconds()), int(validationOpenTimeout.Seconds())},
+		"short call deadline": {30 * time.Second, 30, 30},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := workingCtx(context.Background())
+			if c.callerDeadline > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, c.callerDeadline)
+				defer cancel()
+			}
+			s := &validationStub{}
+			_, err := s.db(t, map[string]any{currentRolesSQL: "r"}, nil).ValidateContext(ctx)
+			require.NoError(t, err)
+			seen := map[string]int{}
+			for _, r := range s.reads {
+				if !slices.Contains(reads, r.q) && !strings.HasPrefix(r.q, "CHECK GRANT ") {
+					continue
+				}
+				seen[r.q]++
+				require.NoError(t, r.err, r.q)
+				require.False(t, r.deadline, "the fork replaces max_execution_time from a deadline: %s", r.q)
+				limit, ok := r.settings["max_execution_time"].(int)
+				require.True(t, ok, "no time limit: %s", r.q)
+				want := c.limit
+				if r.q == reads[0] {
+					want = c.open
+				}
+				require.True(t, limit >= want-2 && limit <= want, "%s: max_execution_time %d, want about %d", r.q, limit, want)
+			}
+			for _, q := range reads {
+				require.Positive(t, seen[q], "the validation sent no %s", q)
+			}
+		})
+	}
+}
+
+func TestValidation_SnapshotIgnoresItsOwnTimeLimit(t *testing.T) {
+	snapshot := func(rows [][]driver.Value) []sqlconnect.ValidationWarning {
+		ex := answerDB(t, func(q string, _ []any) ([]string, [][]driver.Value, error) {
+			if q == settingsSQL {
+				return []string{"name", "value", "changed"}, rows, nil
+			}
+			return []string{"v"}, nil, nil
+		}, nil)
+		return filterOp(unitDB(t).diagnostics(context.Background(), ex, &sqlconnect.ValidationResult{}), "settings_snapshot")
+	}
+	require.Empty(t, snapshot([][]driver.Value{{"max_execution_time", "180", int64(1)}}), "the read sets max_execution_time itself")
+	require.Len(t, snapshot([][]driver.Value{{"join_use_nulls", "0", int64(1)}}), 1)
+}
+
 var execOK = stubResult{}
 
 func execErr(err error) stubResult { return stubResult{err: err} }
@@ -604,13 +664,21 @@ type answerFunc func(q string, args []any) ([]string, [][]driver.Value, error)
 // answerDB is a pool on the stub driver. Queries go to answer, execs to exec.
 func answerDB(t *testing.T, answer answerFunc, exec func(q string) error) *sql.DB {
 	t.Helper()
+	return answerDBCtx(t, func(_ context.Context, q string, args []any) ([]string, [][]driver.Value, error) {
+		return answer(q, args)
+	}, exec)
+}
+
+// answerDBCtx is answerDB with the statement context passed to answer.
+func answerDBCtx(t *testing.T, answer func(ctx context.Context, q string, args []any) ([]string, [][]driver.Value, error), exec func(q string) error) *sql.DB {
+	t.Helper()
 	pool := sql.OpenDB(stubConnector{
-		query: func(_ context.Context, q string, nv []driver.NamedValue) (driver.Rows, error) {
+		query: func(ctx context.Context, q string, nv []driver.NamedValue) (driver.Rows, error) {
 			var args []any
 			for _, a := range nv {
 				args = append(args, a.Value)
 			}
-			cols, rows, err := answer(q, args)
+			cols, rows, err := answer(ctx, q, args)
 			if err != nil {
 				return nil, err
 			}
@@ -680,6 +748,7 @@ type hostSeq []string
 type validationStub struct {
 	mu           sync.Mutex
 	statement    []string
+	reads        []stubRead
 	execs        []string
 	created      bool
 	hostReads    int
@@ -706,10 +775,13 @@ func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail fun
 	one := func(v driver.Value) ([]string, [][]driver.Value, error) {
 		return []string{"v"}, [][]driver.Value{{v}}, nil
 	}
-	pool := answerDB(t, func(q string, args []any) ([]string, [][]driver.Value, error) {
+	pool := answerDBCtx(t, func(ctx context.Context, q string, args []any) ([]string, [][]driver.Value, error) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		s.statement = append(s.statement, q)
+		settings, err := p12SettingsAtErr(ctx)
+		_, deadline := ctx.Deadline()
+		s.reads = append(s.reads, stubRead{q: q, settings: settings, err: err, deadline: deadline})
 		if v, ok := overrides[q]; ok {
 			switch v := v.(type) {
 			case []driver.Value:
@@ -763,6 +835,15 @@ func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail fun
 	d := &DB{cfg: cfg, validateSem: make(chan struct{}, maxConcurrentValidations)}
 	d.DB = base.NewDB(pool, func() error { return nil }, base.WithDialect(newDialect()))
 	return d
+}
+
+// stubRead is one query the validation stub answered: its text, the
+// settings map it carried and whether its context had a deadline.
+type stubRead struct {
+	q        string
+	settings map[string]any
+	err      error
+	deadline bool
 }
 
 func (s *validationStub) queries() []string {

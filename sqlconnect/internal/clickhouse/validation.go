@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -35,6 +36,10 @@ const (
 	// validationOpenTimeout bounds the first validation request: the dial,
 	// the TLS handshake and the hello query.
 	validationOpenTimeout = 90 * time.Second
+	// validationBudget bounds the validation reads when the caller sets no
+	// earlier deadline. It covers the open, the stage 3 reads, the probe and
+	// the stage 5 reads.
+	validationBudget = 3 * time.Minute
 	// probeCleanupTimeout bounds the probe cleanup, which runs on a context
 	// detached from the caller.
 	probeCleanupTimeout = 60 * time.Second
@@ -120,6 +125,7 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 		return res, stageErr(0, "network", ctx.Err())
 	}
 	refused := func(code int32) string { return db.refusedOpenSetting(ctx, code) }
+	budget := newReadBudget(ctx, validationBudget)
 	openCtx, cancel := context.WithTimeout(ctx, validationOpenTimeout)
 	defer cancel()
 	conn, err := db.Conn(openCtx)
@@ -131,11 +137,14 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 
 	// Stage 1: connect and version. It carries the control map, as the hello
 	// does, so a refused driver setting is named by stage 2.
-	control := driverExec{conn: conn, settings: helloSettings}
 	var version, current string
 	// On a warm pool db.Conn sends nothing, so this read can be the first
 	// request: it runs under the same 90 s bound.
-	if err := control.QueryRowContext(openCtx, "SELECT version(), currentDatabase()").Scan(&version, &current); err != nil {
+	openBudget := budget.within(validationOpenTimeout)
+	versionCtx, stopVersion := openBudget.context(ctx)
+	defer stopVersion()
+	control := driverExec{conn: conn, settings: openBudget.settings(helloSettings)}
+	if err := control.QueryRowContext(versionCtx, "SELECT version(), currentDatabase()").Scan(&version, &current); err != nil {
 		return res, openFailure(err, refused)
 	}
 	if v, err := parseVersion(version); err != nil || less(v, versionFloor) {
@@ -163,12 +172,15 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 	}
 
 	// Stage 3: grants and engine.
-	warnings, err := db.checkGrants(ctx, ex)
+	readCtx, stopReads := budget.context(ctx)
+	defer stopReads()
+	reads := driverExec{conn: conn, settings: budget.settings(driverScratchSettings)}
+	warnings, err := db.checkGrants(readCtx, reads)
 	if err != nil {
 		return res, err
 	}
 	res.Warnings = append(res.Warnings, warnings...)
-	if err := db.checkEngine(ctx, ex); err != nil {
+	if err := db.checkEngine(readCtx, reads, budget.settings(driverReadSettings)); err != nil {
 		return res, err
 	}
 
@@ -179,8 +191,59 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 
 	// Stage 5: diagnostics, never fatal. The control map keeps the driver's
 	// own settings out of the system.settings snapshot.
-	res.Warnings = append(res.Warnings, db.diagnostics(ctx, control, &res)...)
+	diagnostics := driverExec{conn: conn, settings: budget.settings(helloSettings)}
+	res.Warnings = append(res.Warnings, db.diagnostics(readCtx, diagnostics, &res)...)
 	return res, nil
+}
+
+// readBudget is the time limit of the validation reads. The fork replaces
+// max_execution_time with the remaining time of a context deadline plus 5 s,
+// so a read runs on a context without a deadline and sends the remaining
+// budget itself, as stage 2 does. A timer ends that context at the limit.
+type readBudget struct{ end time.Time }
+
+// newReadBudget ends after d, or at the deadline of ctx when that is earlier.
+func newReadBudget(ctx context.Context, d time.Duration) readBudget {
+	end := time.Now().Add(d)
+	if dl, ok := ctx.Deadline(); ok && dl.Before(end) {
+		end = dl
+	}
+	return readBudget{end: end}
+}
+
+// within returns the budget cut to end after d at the latest.
+func (b readBudget) within(d time.Duration) readBudget {
+	if end := time.Now().Add(d); end.Before(b.end) {
+		return readBudget{end: end}
+	}
+	return b
+}
+
+// seconds is the remaining budget in whole seconds, rounded up, at least 1.
+// The server reads 0 as no limit.
+func (b readBudget) seconds() int {
+	return max(1, int(math.Ceil(time.Until(b.end).Seconds())))
+}
+
+// settings adds the remaining budget as max_execution_time to each map from
+// base, when the statement is sent.
+func (b readBudget) settings(base func() map[string]any) func() map[string]any {
+	return func() map[string]any {
+		m := base()
+		m["max_execution_time"] = b.seconds()
+		return m
+	}
+}
+
+// context returns ctx without its deadline. It ends when ctx ends or when the
+// budget runs out.
+func (b readBudget) context(ctx context.Context) (context.Context, func()) {
+	c, stop := withoutDeadline(ctx)
+	timer := time.AfterFunc(time.Until(b.end), stop)
+	return c, func() {
+		timer.Stop()
+		stop()
+	}
 }
 
 // checkGrants runs one CHECK GRANT per required privilege, so CH_PERMISSION
@@ -237,8 +300,9 @@ func checkGrant(ctx context.Context, ex sqlconnect.QueryExecutor, stmt string) (
 }
 
 // checkEngine refuses a scratch engine other than Atomic or Shared. For
-// Atomic it compares the host of four connections.
-func (db *DB) checkEngine(ctx context.Context, ex sqlconnect.QueryExecutor) error {
+// Atomic it compares the host of four connections; readSettings is the map
+// of the three extra reads.
+func (db *DB) checkEngine(ctx context.Context, ex sqlconnect.QueryExecutor, readSettings func() map[string]any) error {
 	var engine string
 	switch err := ex.QueryRowContext(ctx, engineSQL, workingDatabase(ctx)).Scan(&engine); {
 	case errors.Is(err, sql.ErrNoRows):
@@ -250,7 +314,7 @@ func (db *DB) checkEngine(ctx context.Context, ex sqlconnect.QueryExecutor) erro
 	case "Shared": // Cloud replicas differ by design, so no host comparison.
 		return nil
 	case "Atomic":
-		if err := db.sameHost(ctx, ex); err != nil {
+		if err := db.sameHost(ctx, ex, readSettings); err != nil {
 			return stageErr(3, "engine", err)
 		}
 		return nil
@@ -262,7 +326,7 @@ func (db *DB) checkEngine(ctx context.Context, ex sqlconnect.QueryExecutor) erro
 
 // sameHost compares hostName() on ex and on three more connections that it
 // holds at the same time. It is a heuristic and can miss a load balancer.
-func (db *DB) sameHost(ctx context.Context, ex sqlconnect.QueryExecutor) error {
+func (db *DB) sameHost(ctx context.Context, ex sqlconnect.QueryExecutor, readSettings func() map[string]any) error {
 	var first string
 	if err := ex.QueryRowContext(ctx, hostNameSQL).Scan(&first); err != nil {
 		return bound("host check", "", err)
@@ -282,7 +346,7 @@ func (db *DB) sameHost(ctx context.Context, ex sqlconnect.QueryExecutor) error {
 	}
 	for _, c := range conns {
 		var host string
-		if err := (driverExec{conn: c, settings: driverReadSettings}).QueryRowContext(ctx, hostNameSQL).Scan(&host); err != nil {
+		if err := (driverExec{conn: c, settings: readSettings}).QueryRowContext(ctx, hostNameSQL).Scan(&host); err != nil {
 			return bound("host check", "", err)
 		}
 		if host != first {
@@ -414,7 +478,9 @@ func (db *DB) diagnostics(ctx context.Context, ex sqlconnect.QueryExecutor, res 
 		for rows.Next() {
 			var name, value string
 			var changed uint8
-			if rows.Scan(&name, &value, &changed) == nil && changed == 1 && known[name] {
+			// The read sends max_execution_time itself, so that row shows the
+			// read's own limit, not the user's default.
+			if rows.Scan(&name, &value, &changed) == nil && changed == 1 && known[name] && name != "max_execution_time" {
 				warnings = append(warnings, sqlconnect.ValidationWarning{Info: sqlconnect.ErrorInfo{Category: "configuration"}, Operation: "settings_snapshot"})
 			}
 		}
