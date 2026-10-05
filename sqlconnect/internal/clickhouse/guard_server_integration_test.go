@@ -144,7 +144,7 @@ func TestGuardOnTheServer(t *testing.T) {
 				g.run(t, id, checked)
 			}
 		}
-		require.NotEmpty(t, sent, "some generated inputs pass the guard, so the property runs")
+		require.GreaterOrEqual(t, len(sent), 5, "enough generated inputs pass the guard and reach the server, so the property runs")
 		t.Logf("%d of %d inputs passed the guard and ran on the server", len(sent), len(inputs))
 		outcomes := g.outcomes(t, sent)
 		for _, id := range slices.Sorted(maps.Keys(sent)) {
