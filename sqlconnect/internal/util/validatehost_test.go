@@ -166,6 +166,9 @@ func TestEmbeddedIPv4(t *testing.T) {
 	for addr, want := range map[string][]string{
 		"127.0.0.1":            nil,
 		"::ffff:127.0.0.1":     nil,
+		"::7f00:1":             {"127.0.0.1"},
+		"::a9fe:a9fe":          {"169.254.169.254"},
+		"::808:808":            {"8.8.8.8"},
 		"2001:4860:4860::8888": nil,
 		"64:ff9b::a9fe:a9fe":   {"169.254.169.254"},
 		// 64:ff9b:1::/48 yields the reading of each RFC 6052 layout whose u octet

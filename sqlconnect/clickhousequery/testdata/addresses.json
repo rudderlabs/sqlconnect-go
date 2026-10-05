@@ -2,6 +2,33 @@
   "version": 1,
   "cases": [
     {
+      "name": "compatible_link_local_v4_metadata",
+      "address": "::a9fe:a9fe",
+      "verdict": "refused",
+      "class": "link_local",
+      "embeddedIPv4": "169.254.169.254"
+    },
+    {
+      "name": "compatible_loopback_v4",
+      "address": "::7f00:1",
+      "verdict": "refused",
+      "class": "loopback",
+      "embeddedIPv4": "127.0.0.1"
+    },
+    {
+      "name": "compatible_multicast_v4",
+      "address": "::e000:1",
+      "verdict": "refused",
+      "class": "multicast",
+      "embeddedIPv4": "224.0.0.1"
+    },
+    {
+      "name": "compatible_public_v4",
+      "address": "::808:808",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
       "name": "link_local_v4",
       "address": "169.254.1.1",
       "verdict": "refused",

@@ -132,6 +132,7 @@ func classReason(ip net.IP) string {
 
 var (
 	nat64WellKnown = mustCIDR("64:ff9b::/96")
+	ipv4Compatible = mustCIDR("::/96")
 	nat64Local     = mustCIDR("64:ff9b:1::/48")
 	sixToFour      = mustCIDR("2002::/16")
 	teredo         = mustCIDR("2001::/32")
@@ -146,7 +147,7 @@ func mustCIDR(s string) *net.IPNet {
 }
 
 // EmbeddedIPv4 returns the IPv4 addresses that an IPv6 address carries under
-// the NAT64 (64:ff9b::/96, 64:ff9b:1::/48), 6to4 (2002::/16) and Teredo
+// the IPv4-compatible (::/96), NAT64 (64:ff9b::/96, 64:ff9b:1::/48), 6to4 (2002::/16) and Teredo
 // (2001::/32) prefixes. IPv4 and ::ffff: forms return nil, because the class
 // checks already read them as IPv4.
 func EmbeddedIPv4(ip net.IP) []net.IP {
@@ -155,7 +156,7 @@ func EmbeddedIPv4(ip net.IP) []net.IP {
 		return nil
 	}
 	switch {
-	case nat64WellKnown.Contains(b):
+	case ipv4Compatible.Contains(b), nat64WellKnown.Contains(b):
 		return []net.IP{net.IPv4(b[12], b[13], b[14], b[15])}
 	case nat64Local.Contains(b):
 		return nat64LocalReadings(b)
