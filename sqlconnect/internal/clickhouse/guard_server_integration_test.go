@@ -66,6 +66,18 @@ var guardProbes = []string{
 	"remote('127.0.0.1:9000', system.one)", "url('http://127.0.0.1:8123/', 'CSV', 'a String')",
 	"file('x.csv')", "numbers(3)", "merge('system', 'query_log')", "{p:Identifier}",
 	"(SELECT query FROM system.query_log)", "/* c */ system /* c */ . /* c */ processes",
+	"* APPLY(file)", "* APPLY(`file`)", "(EXPLAIN SELECT 1)",
+}
+
+// guardProbeQueries are whole queries that reach past the customer databases
+// unless the guard refuses them. Each one stays a probe after a fix: the
+// guard must keep refusing it.
+var guardProbeQueries = []string{
+	"SELECT * APPLY(file) FROM (SELECT url FROM db.users)",
+	"SELECT COLUMNS('url') APPLY(file) FROM db.users",
+	"SELECT * FROM (EXPLAIN SELECT 1)",
+	"SELECT hasColumnInTable('127.0.0.1:9000', 'system', 'one', 'dummy')",
+	"SELECT query FROM system.query_log",
 }
 
 func TestGuardOnTheServer(t *testing.T) {
@@ -119,10 +131,13 @@ func TestGuardOnTheServer(t *testing.T) {
 		t.Logf("seed %d, %d inputs", seed, n)
 		rng := rand.New(rand.NewPCG(seed, seed))
 		sent := map[string]string{}
-		for i := range n {
+		inputs := slices.Clone(guardProbeQueries)
+		for range n {
 			words := strings.Split(accepted[rng.IntN(len(accepted))], " ")
 			words = slices.Insert(words, 1+rng.IntN(len(words)), guardProbes[rng.IntN(len(guardProbes))])
-			sql := strings.Join(words, " ")
+			inputs = append(inputs, strings.Join(words, " "))
+		}
+		for i, sql := range inputs {
 			if checked, err := clickhousequery.CheckAudienceSQL(sql); err == nil {
 				id := "guard-generated-" + strconv.Itoa(i)
 				sent[id] = sql
@@ -130,7 +145,7 @@ func TestGuardOnTheServer(t *testing.T) {
 			}
 		}
 		require.NotEmpty(t, sent, "some generated inputs pass the guard, so the property runs")
-		t.Logf("%d of %d generated inputs passed the guard and ran on the server", len(sent), n)
+		t.Logf("%d of %d inputs passed the guard and ran on the server", len(sent), len(inputs))
 		outcomes := g.outcomes(t, sent)
 		for _, id := range slices.Sorted(maps.Keys(sent)) {
 			requireStaysInside(t, sent[id], outcomes[id])
