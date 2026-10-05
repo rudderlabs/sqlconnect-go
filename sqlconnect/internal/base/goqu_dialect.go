@@ -15,15 +15,25 @@ import (
 )
 
 func NewGoquDialect(dialect string, o *sqlgen.SQLDialectOptions, expressions *Expressions) *GoquDialect {
+	return NewGoquDialectWithSQLPostProcessor(dialect, o, expressions, nil)
+}
+
+// NewGoquDialectWithSQLPostProcessor creates a Goqu dialect and applies an optional final SQL rewrite hook.
+func NewGoquDialectWithSQLPostProcessor(dialect string, o *sqlgen.SQLDialectOptions, expressions *Expressions, sqlPostProcessor func(string) string) *GoquDialect {
+	if sqlPostProcessor == nil {
+		sqlPostProcessor = func(sql string) string { return sql }
+	}
 	return &GoquDialect{
-		esg:         sqlgen.NewExpressionSQLGenerator(dialect, o),
-		expressions: expressions,
+		esg:              sqlgen.NewExpressionSQLGenerator(dialect, o),
+		expressions:      expressions,
+		sqlPostProcessor: sqlPostProcessor,
 	}
 }
 
 type GoquDialect struct {
-	esg         sqlgen.ExpressionSQLGenerator
-	expressions *Expressions
+	esg              sqlgen.ExpressionSQLGenerator
+	expressions      *Expressions
+	sqlPostProcessor func(string) string
 }
 
 type Expressions struct {
@@ -141,7 +151,7 @@ func (gq *GoquDialect) ParseGoquExpression(goquExpression sqlconnect.GoquExpress
 	if err != nil {
 		return nil, err
 	}
-	return &expression{Expression: goquExpression, sql: sql}, nil
+	return &expression{Expression: goquExpression, sql: gq.sqlPostProcessor(sql)}, nil
 }
 
 func (gq *GoquDialect) Expressions() sqlconnect.Expressions {
@@ -168,7 +178,7 @@ func (gq *GoquDialect) TimestampAdd(timeValue any, interval int, unit string) (s
 
 	goquExpression := gq.expressions.TimestampAdd(v, interval, unit)
 	sql, _, err := sqlgen.GenerateExpressionSQL(gq.esg, false, goquExpression)
-	return &expression{Expression: goquExpression, sql: sql}, err
+	return &expression{Expression: goquExpression, sql: gq.sqlPostProcessor(sql)}, err
 }
 
 func (gq *GoquDialect) DateAdd(timeValue any, interval int, unit string) (sqlconnect.Expression, error) {
@@ -191,13 +201,13 @@ func (gq *GoquDialect) DateAdd(timeValue any, interval int, unit string) (sqlcon
 
 	goquExpression := gq.expressions.DateAdd(v, interval, unit)
 	sql, _, err := sqlgen.GenerateExpressionSQL(gq.esg, false, goquExpression)
-	return &expression{Expression: goquExpression, sql: sql}, err
+	return &expression{Expression: goquExpression, sql: gq.sqlPostProcessor(sql)}, err
 }
 
 func (gq *GoquDialect) Literal(sql string, args ...any) (sqlconnect.Expression, error) {
 	goquExpression := goqu.L(sql, args...)
 	sql, _, err := sqlgen.GenerateExpressionSQL(gq.esg, false, goquExpression)
-	return &expression{Expression: goquExpression, sql: sql}, err
+	return &expression{Expression: goquExpression, sql: gq.sqlPostProcessor(sql)}, err
 }
 
 type expression struct {

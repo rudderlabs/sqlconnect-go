@@ -4,6 +4,7 @@ Sqlconnect provides a uniform client interface for accessing multiple warehouses
 
 - bigquery ([configuration](sqlconnect/internal/bigquery/config.go))
 - databricks ([configuration](sqlconnect/internal/databricks/config.go))
+- Microsoft Fabric ([configuration](sqlconnect/internal/fabric/config.go))
 - mysql ([configuration](sqlconnect/internal/mysql/config.go))
 - postgres ([configuration](sqlconnect/internal/postgres/config.go))
 - redshift using data API driver ([configuration](sqlconnect/internal/redshift/config.go))

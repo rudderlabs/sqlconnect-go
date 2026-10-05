@@ -45,8 +45,13 @@ func (d Dialect) ParseRelationRef(identifier string) (sqlconnect.RelationRef, er
 }
 
 func ParseRelationRef(identifier string, quote rune, normF func(string) string) (sqlconnect.RelationRef, error) {
-	normalised := doNormaliseIdentifier(identifier, quote, normF, true)
-	parts := strings.Split(normalised, ".")
+	return ParseRelationRefWithDelimiters(identifier, quote, quote, normF)
+}
+
+// ParseRelationRefWithDelimiters parses a relation reference whose quoted identifiers
+// use distinct opening and closing delimiters, such as SQL Server's [identifier].
+func ParseRelationRefWithDelimiters(identifier string, openQuote, closeQuote rune, normF func(string) string) (sqlconnect.RelationRef, error) {
+	parts := normaliseIdentifierParts(identifier, openQuote, closeQuote, normF, true)
 	switch len(parts) {
 	case 1:
 		return sqlconnect.RelationRef{Name: parts[0]}, nil
@@ -60,50 +65,59 @@ func ParseRelationRef(identifier string, quote rune, normF func(string) string) 
 }
 
 func NormaliseIdentifier(identifier string, quote rune, normF func(string) string) string {
-	return doNormaliseIdentifier(identifier, quote, normF, false)
+	return NormaliseIdentifierWithDelimiters(identifier, quote, quote, normF)
 }
 
-func doNormaliseIdentifier(identifier string, quote rune, normF func(string) string, stripQuotes bool) string {
-	var result strings.Builder
-	var inQuotedIdentifier bool
-	var inEscapedQuote bool
-	next := func(input string, i int) (rune, bool) {
-		runes := []rune(input)
-		if len(input) > i+1 {
-			return runes[i+1], true
-		}
-		return 0, false
-	}
-	for i, c := range identifier {
-		if c == quote {
+// NormaliseIdentifierWithDelimiters normalises only unquoted identifier parts.
+func NormaliseIdentifierWithDelimiters(identifier string, openQuote, closeQuote rune, normF func(string) string) string {
+	return strings.Join(normaliseIdentifierParts(identifier, openQuote, closeQuote, normF, false), ".")
+}
+
+func normaliseIdentifierParts(identifier string, openQuote, closeQuote rune, normF func(string) string, stripQuotes bool) []string {
+	var (
+		parts              []string
+		part               strings.Builder
+		inQuotedIdentifier bool
+	)
+	runes := []rune(identifier)
+	for i := 0; i < len(runes); i++ {
+		c := runes[i]
+		if !inQuotedIdentifier && c == openQuote {
+			inQuotedIdentifier = true
 			if !stripQuotes {
-				result.WriteRune(c)
+				part.WriteRune(c)
 			}
-			if inQuotedIdentifier {
-				if inEscapedQuote {
-					inEscapedQuote = false
-					if stripQuotes {
-						result.WriteRune(c)
-					}
+			continue
+		}
+		if inQuotedIdentifier && c == closeQuote {
+			if i+1 < len(runes) && runes[i+1] == closeQuote {
+				if stripQuotes {
+					part.WriteRune(closeQuote)
 				} else {
-					if next, ok := next(identifier, i); ok {
-						if next == quote {
-							inEscapedQuote = true
-						} else {
-							inQuotedIdentifier = false
-						}
-					}
+					part.WriteRune(closeQuote)
+					part.WriteRune(closeQuote)
 				}
-			} else {
-				inQuotedIdentifier = true
+				i++
+				continue
 			}
-		} else if !inQuotedIdentifier {
-			result.WriteString(normF(string(c)))
+			inQuotedIdentifier = false
+			if !stripQuotes {
+				part.WriteRune(c)
+			}
+			continue
+		}
+		if !inQuotedIdentifier && c == '.' {
+			parts = append(parts, part.String())
+			part.Reset()
+			continue
+		}
+		if inQuotedIdentifier {
+			part.WriteRune(c)
 		} else {
-			result.WriteRune(c)
+			part.WriteString(normF(string(c)))
 		}
 	}
-	return result.String()
+	return append(parts, part.String())
 }
 
 // EscapeSqlString escapes a string for use in SQL, e.g. by doubling single quotes

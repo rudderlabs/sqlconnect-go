@@ -38,3 +38,9 @@
 ## ACT2-859 — Compatible factory registry extension
 
 - Legacy and option-aware factory registrations are mutually exclusive for each warehouse key: registering either form removes the previous entry of the other form, preserving the registry's last-registration-wins semantics even though construction uses two maps (`sqlconnect/db_factory.go`).
+
+## INT-7271 — Fabric timeout and metadata safeguards
+
+- Fabric uses one configured timeout for both the DSN dial timeout and the optional REST bootstrap deadline; zero preserves driver/default behavior, and DSN serialization intentionally truncates to whole seconds for parity with the upstream connection implementation (`sqlconnect/internal/fabric/config.go`, `sqlconnect/internal/fabric/db.go`).
+- Catalog-qualified Fabric metadata queries guard missing databases with `DB_ID` and defer the qualified `information_schema` query through `EXEC(N'...')`. SQL Server can bind a missing three-part database name before choosing an `IF` branch, so dynamic SQL is required; the absent branch returns zero rows with the expected aliases to preserve shared admin semantics (`sqlconnect/internal/fabric/db.go`).
+- Fabric bootstrap failures preserve the `spn_token_bootstrap:` classification prefix, and successful principal bootstraps are cached for 24 hours with concurrent calls coalesced (`sqlconnect/internal/fabric`).
