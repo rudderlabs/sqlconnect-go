@@ -31,5 +31,8 @@ type QueryCanceller interface {
 	// QueryOutcome reads system.processes, then system.query_log, for queryID
 	// on the replica that answers. It reads only rows of the given kind and
 	// of the connector's own user. It runs under its own fresh query id.
+	// The target statement must have log_queries = 1 to record its completed
+	// outcome. Callers supplying their own settings map must enable it there;
+	// enabling it on this lookup cannot recover an unlogged target statement.
 	QueryOutcome(ctx context.Context, queryID string, kind QueryKind) (QueryOutcome, error)
 }

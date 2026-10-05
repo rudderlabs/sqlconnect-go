@@ -16,6 +16,7 @@ func TestSettingsLiteralContract(t *testing.T) {
 		"limit": 0, "offset": 0, "additional_result_filter": "",
 		"async_insert": 0, "wait_for_async_insert": 1, "send_progress_in_http_headers": 0,
 		"insert_null_as_default": 0,
+		"log_queries":            1,
 		"timeout_overflow_mode":  "throw", "timeout_overflow_mode_leaf": "throw",
 		"read_overflow_mode": "throw", "read_overflow_mode_leaf": "throw",
 		"group_by_overflow_mode": "throw", "sort_overflow_mode": "throw",
