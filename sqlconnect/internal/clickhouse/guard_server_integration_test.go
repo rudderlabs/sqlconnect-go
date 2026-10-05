@@ -165,9 +165,12 @@ func startGuardServer(t *testing.T) *guardServer {
 // an unqualified table resolves inside it. The outcome is read from query_log.
 func (g *guardServer) run(t *testing.T, queryID, sql string) {
 	t.Helper()
-	// p binds a forbidden table, so an Identifier parameter that passes the
-	// guard reads it and shows in query_log.
-	q := url.Values{"query_id": {queryID}, "database": {"db"}, "param_e": {"a@x"}, "param_p": {"system.query_log"}, "max_execution_time": {"10"}}
+	q := url.Values{"query_id": {queryID}, "database": {"db"}, "param_e": {"a@x"}, "max_execution_time": {"10"}}
+	// Every Identifier parameter name the corpus and the probes use binds a
+	// forbidden object, so a parameter that passes the guard shows in query_log.
+	for name, value := range map[string]string{"p": "system.query_log", "tbl": "system.query_log", "db": "system", "cols": "['query']"} {
+		q.Set("param_"+name, value)
+	}
 	u := url.URL{Scheme: "http", Host: "127.0.0.1:" + strconv.Itoa(g.srv.HTTPPort), Path: "/", RawQuery: q.Encode()}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
