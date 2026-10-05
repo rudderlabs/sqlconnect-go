@@ -27,6 +27,9 @@ const (
 	connMaxLifetime = 30 * time.Minute
 	// dialTimeout bounds the lookup and the TCP dial of one connection.
 	dialTimeout = 90 * time.Second
+	// controlConns is the size of the control pool. KillQuery and QueryOutcome
+	// use it, so they never wait for a slot in the main pool.
+	controlConns = 2
 )
 
 // DB is the ClickHouse client.
@@ -40,6 +43,9 @@ type DB struct {
 	// connector opens connections outside the pool, for the validation
 	// lookup of a refused hello setting.
 	connector *connectGuard
+	// control is the pool of KillQuery and QueryOutcome. A run can hold every
+	// main pool connection, and a kill must still reach the server.
+	control *sql.DB
 }
 
 // openEnv is what NewDB takes from the process. Tests replace it.
@@ -97,8 +103,12 @@ func newDB(configJSON json.RawMessage, env openEnv) (*DB, error) {
 	sqldb.SetMaxOpenConns(maxOpenConns)
 	sqldb.SetMaxIdleConns(maxIdleConns)
 	sqldb.SetConnMaxLifetime(connMaxLifetime)
-	d := &DB{cfg: cfg, env: env, opts: opts, validateSem: make(chan struct{}, maxConcurrentValidations), connector: connector}
-	d.DB = base.NewDB(sqldb, func() error { return nil },
+	control := sql.OpenDB(connector)
+	control.SetMaxOpenConns(controlConns)
+	control.SetMaxIdleConns(1)
+	control.SetConnMaxLifetime(connMaxLifetime)
+	d := &DB{cfg: cfg, env: env, opts: opts, validateSem: make(chan struct{}, maxConcurrentValidations), connector: connector, control: control}
+	d.DB = base.NewDB(sqldb, control.Close,
 		base.WithDialect(newDialect()),
 		base.WithColumnTypeMapper(func(c base.ColumnType) string { return canonicalType(c.DatabaseTypeName()) }),
 	)

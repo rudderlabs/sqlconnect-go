@@ -36,10 +36,19 @@ func (db *DB) controlCtx(ctx context.Context) context.Context {
 	return clickhousequery.WithStatement(ctx, controlSettings(), fresh)
 }
 
+// controlPool returns the control pool. A DB that a unit test builds by hand
+// has none and uses the main pool.
+func (db *DB) controlPool() *sql.DB {
+	if db.control != nil {
+		return db.control
+	}
+	return db.DB.DB
+}
+
 // KillQuery implements sqlconnect.QueryCanceller. It returns every kill row
 // and interprets none; only the caller decides what a kill_status means.
 func (db *DB) KillQuery(ctx context.Context, queryID string) (sqlconnect.KillResult, error) {
-	rows, err := db.QueryContext(db.controlCtx(ctx), killSQL, queryID)
+	rows, err := db.controlPool().QueryContext(db.controlCtx(ctx), killSQL, queryID)
 	if err != nil {
 		return sqlconnect.KillResult{}, bound("kill query", "", err)
 	}
@@ -76,7 +85,7 @@ func (db *DB) KillQuery(ctx context.Context, queryID string) (sqlconnect.KillRes
 // QueryOutcome implements sqlconnect.QueryCanceller.
 func (db *DB) QueryOutcome(ctx context.Context, queryID string, kind sqlconnect.QueryKind) (sqlconnect.QueryOutcome, error) {
 	return queryOutcome(func(q string, args ...any) *sql.Row {
-		return db.QueryRowContext(db.controlCtx(ctx), q, args...)
+		return db.controlPool().QueryRowContext(db.controlCtx(ctx), q, args...)
 	}, queryID, kind)
 }
 

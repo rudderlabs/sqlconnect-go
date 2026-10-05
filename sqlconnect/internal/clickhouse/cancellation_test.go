@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -189,4 +190,40 @@ func (r *tableRows) Next(dest []driver.Value) error {
 	copy(dest, r.rows[r.i])
 	r.i++
 	return nil
+}
+
+func TestControlPool_KillAndOutcomeSkipABusyMainPool(t *testing.T) {
+	db, _ := unitDBWithRows(t, []string{"count()"}, [][]driver.Value{{uint64(0)}})
+	db.SetMaxOpenConns(1)
+	held, err := db.Conn(context.Background()) // a run holds every main pool connection
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = held.Close() })
+	control := &stubRecorder{}
+	db.control = sql.OpenDB(stubConnector{query: func(ctx context.Context, q string, _ []driver.NamedValue) (driver.Rows, error) {
+		control.add(stubCall{ctx: ctx, q: q})
+		if q == killSQL {
+			return &tableRows{cols: []string{"kill_status", "query_id"}, rows: [][]driver.Value{{"waiting", "retl-x"}}}, nil
+		}
+		return &tableRows{cols: []string{"count()"}, rows: [][]driver.Value{{uint64(1)}}}, nil
+	}})
+	t.Cleanup(func() { _ = db.control.Close() })
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	res, err := db.KillQuery(ctx, "retl-x")
+	require.NoError(t, err)
+	require.Equal(t, []sqlconnect.KillRow{{QueryID: "retl-x", KillStatus: "waiting"}}, res.Rows)
+	got, err := db.QueryOutcome(ctx, "retl-x", "Insert")
+	require.NoError(t, err)
+	require.Equal(t, sqlconnect.QueryRunning, got)
+	require.Equal(t, []string{killSQL, processesSQL}, control.queries())
+}
+
+func TestControlPool_OpenedAndClosedWithTheDB(t *testing.T) {
+	db := mustDBInternal(t)
+	require.NotNil(t, db.control)
+	require.NotSame(t, db.DB.DB, db.control)
+	require.Equal(t, controlConns, db.control.Stats().MaxOpenConnections)
+	require.NoError(t, db.Close())
+	require.ErrorContains(t, db.control.PingContext(context.Background()), "database is closed")
 }
