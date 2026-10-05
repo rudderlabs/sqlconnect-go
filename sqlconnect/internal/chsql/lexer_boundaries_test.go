@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chsql"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chsql"
 )
 
 func TestNumberTokenKinds(t *testing.T) {
@@ -13,9 +14,18 @@ func TestNumberTokenKinds(t *testing.T) {
 		text string
 		kind chsql.TokenKind
 	}{
-		{"0", chsql.Number}, {"9", chsql.Number}, {"0xAf", chsql.Number}, {"0b10", chsql.Number},
-		{"1_000", chsql.Number}, {".5", chsql.Number}, {"1e-5", chsql.Number}, {"0x1p-2", chsql.Number},
-		{"0x", chsql.Word}, {"0b2", chsql.Word}, {"1abc", chsql.Word}, {"1__0", chsql.Word},
+		{"0", chsql.Number},
+		{"9", chsql.Number},
+		{"0xAf", chsql.Number},
+		{"0b10", chsql.Number},
+		{"1_000", chsql.Number},
+		{".5", chsql.Number},
+		{"1e-5", chsql.Number},
+		{"0x1p-2", chsql.Number},
+		{"0x", chsql.Word},
+		{"0b2", chsql.Word},
+		{"1abc", chsql.Word},
+		{"1__0", chsql.Word},
 	} {
 		t.Run(tc.text, func(t *testing.T) {
 			tokens, err := chsql.Tokenize(tc.text)
@@ -75,9 +85,17 @@ func TestQuotedTokenKinds(t *testing.T) {
 		text string
 		kind chsql.TokenKind
 	}{
-		{"x'4142'", chsql.String}, {"X'4142'", chsql.String}, {"b'01'", chsql.String}, {"B'01'", chsql.String},
-		{"x''", chsql.String}, {"b''", chsql.String}, {"'a''b'", chsql.String}, {"‘x’", chsql.String},
-		{"\"x\"", chsql.QuotedIdent}, {"`x`", chsql.QuotedIdent}, {"“x”", chsql.QuotedIdent},
+		{"x'4142'", chsql.String},
+		{"X'4142'", chsql.String},
+		{"b'01'", chsql.String},
+		{"B'01'", chsql.String},
+		{"x''", chsql.String},
+		{"b''", chsql.String},
+		{"'a''b'", chsql.String},
+		{"‘x’", chsql.String},
+		{"\"x\"", chsql.QuotedIdent},
+		{"`x`", chsql.QuotedIdent},
+		{"“x”", chsql.QuotedIdent},
 	} {
 		tokens, err := chsql.Tokenize(tc.text)
 		require.NoError(t, err)

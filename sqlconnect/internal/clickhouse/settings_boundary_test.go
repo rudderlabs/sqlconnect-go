@@ -6,10 +6,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	ch "github.com/rudderlabs/clickhouse-go/v2"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chctx"
-	"github.com/stretchr/testify/require"
 )
 
 func p12SettingsAt(t *testing.T, ctx context.Context) map[string]any {

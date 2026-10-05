@@ -7,6 +7,7 @@ import (
 	"time"
 
 	ch "github.com/rudderlabs/clickhouse-go/v2"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chctx"
 )
 
