@@ -2,7 +2,6 @@ package clickhouse
 
 import (
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -43,12 +42,12 @@ func (g *guardedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	}
 	switch {
 	case resp.StatusCode >= 300 && resp.StatusCode < 400:
-		drainClose(resp.Body)
+		_ = resp.Body.Close()
 		return nil, cherr.New(cherr.CodeRedirectRefused, "host", fixedMessages[cherr.CodeRedirectRefused])
 	case resp.StatusCode == http.StatusTooManyRequests:
 		e := cherr.New(cherr.CodeRateLimited, "", fixedMessages[cherr.CodeRateLimited])
 		e.RetryAfter = parseRetryAfter(resp.Header.Get("Retry-After"), g.now())
-		drainClose(resp.Body)
+		_ = resp.Body.Close()
 		return nil, e
 	}
 	return resp, nil
@@ -57,13 +56,6 @@ func (g *guardedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 // CloseIdleConnections lets http.Client.CloseIdleConnections, which the fork
 // calls on Close, reach the wrapped transport.
 func (g *guardedTransport) CloseIdleConnections() { g.next.CloseIdleConnections() }
-
-// drainClose reads a bounded prefix so a small body can return the connection
-// to the pool, and never reads an unbounded body from the server.
-func drainClose(b io.ReadCloser) {
-	_, _ = io.CopyN(io.Discard, b, 4096)
-	_ = b.Close()
-}
 
 // parseRetryAfter reads delay-seconds or an HTTP date. A missing, negative,
 // past or malformed value gives zero; every result is at most maxRetryAfter.

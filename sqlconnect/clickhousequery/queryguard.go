@@ -23,6 +23,8 @@ var fromEnders = map[string]bool{
 // naming the first refused construct. The normalised text is the input less
 // one terminal semicolon and the trailing whitespace; nothing else changes.
 // The error never contains query text.
+// The guard allows system and information_schema databases on purpose; the
+// credential's grants decide access to them.
 func CheckAudienceSQL(sql string) (string, error) {
 	if len(sql) > MaxAudienceSQLBytes {
 		return "", refuse("SIZE")

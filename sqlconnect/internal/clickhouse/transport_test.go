@@ -1,6 +1,8 @@
 package clickhouse
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -75,6 +77,61 @@ func TestSQ22_RateLimited(t *testing.T) {
 			require.Equal(t, "transient", d.Category)
 			require.Equal(t, want, d.RetryAfter)
 			require.NotContains(t, err.Error(), "DB::Exception", "the response body never reaches the error text")
+		})
+	}
+}
+
+func TestTransportRejectsStalledBodies(t *testing.T) {
+	for _, tc := range []struct {
+		status  int
+		code    string
+		message string
+	}{
+		{http.StatusFound, "CH_REDIRECT_REFUSED", "the server sent a redirect, which is refused"},
+		{http.StatusTooManyRequests, "CH_RATE_LIMITED", "the server limited the request rate"},
+	} {
+		t.Run(fmt.Sprint(tc.status), func(t *testing.T) {
+			client, server := net.Pipe()
+			defer client.Close()
+			defer server.Close()
+			closed := make(chan struct{})
+			go func() {
+				defer server.Close()
+				if _, err := http.ReadRequest(bufio.NewReader(server)); err != nil {
+					return
+				}
+				if _, err := fmt.Fprintf(server, "HTTP/1.1 %d %s\r\nContent-Length: 10000\r\n\r\n", tc.status, http.StatusText(tc.status)); err != nil {
+					return
+				}
+				var b [1]byte
+				_, _ = server.Read(b[:])
+				close(closed)
+			}()
+			inner := &http.Transport{DialContext: func(context.Context, string, string) (net.Conn, error) { return client, nil }}
+			rt, err := newTransportFunc()(inner)
+			require.NoError(t, err)
+			defer rt.(*guardedTransport).CloseIdleConnections()
+			result := make(chan error, 1)
+			go func() {
+				resp, err := (&http.Client{Transport: rt}).Get("http://clickhouse.test/")
+				if resp != nil {
+					_ = resp.Body.Close()
+				}
+				result <- err
+			}()
+			select {
+			case err := <-result:
+				d, _ := clickhousequery.Describe(err)
+				require.Equal(t, tc.code, d.Code)
+				require.ErrorContains(t, err, tc.message)
+			case <-time.After(time.Second):
+				t.Fatal("status response blocked on its stalled body")
+			}
+			select {
+			case <-closed:
+			case <-time.After(time.Second):
+				t.Fatal("status response body was not closed")
+			}
 		})
 	}
 }
