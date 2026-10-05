@@ -518,6 +518,24 @@
       "clause": "PARENTHESIZED SELECT"
     },
     {
+      "name": "refuse_parenthesized_select_nested",
+      "sql": "((SELECT id FROM db.t))",
+      "verdict": "refuse",
+      "clause": "PARENTHESIZED SELECT"
+    },
+    {
+      "name": "refuse_parenthesized_select_nested_spaced",
+      "sql": "( (SELECT id FROM db.t))",
+      "verdict": "refuse",
+      "clause": "PARENTHESIZED SELECT"
+    },
+    {
+      "name": "refuse_parenthesized_select_with",
+      "sql": "(WITH x AS (SELECT 1) SELECT id FROM x)",
+      "verdict": "refuse",
+      "clause": "PARENTHESIZED SELECT"
+    },
+    {
       "name": "refuse_prewhere",
       "sql": "SELECT id FROM db.users PREWHERE id > 1",
       "verdict": "refuse",
