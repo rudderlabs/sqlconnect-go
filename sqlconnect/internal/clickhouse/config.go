@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chpolicy"
 )
@@ -51,16 +52,6 @@ var (
 	passwordPattern = regexp.MustCompile("^[^\\x00-\\x20\\x7F-\\xA0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]([^\\x00-\\x1F\\x7F-\\x9F]*[^\\x00-\\x20\\x7F-\\xA0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff])?$")
 )
 
-var accountKeys = []string{"host", "port", "database", "user", "password", "secure", "skipVerify"}
-
-// excludedKeys are options that other drivers or older drafts accept. An error
-// names one of them; any other unknown key stays unnamed, because a key can
-// carry a pasted secret.
-var excludedKeys = []string{
-	"protocol", "nativePort", "caCertificate", "tunnel_info", "sshHost", "cluster", "settings",
-	"timeout", "allowLoopback", "allowPlainHTTP", "skipHostValidation",
-}
-
 func invalid(field, detail string) error { return cherr.New(cherr.CodeConfigInvalid, field, detail) }
 
 // ParseConfig validates an account config. Only the installed dial policy can
@@ -78,7 +69,7 @@ func parseConfig(raw json.RawMessage, allowPlainHTTP bool) (Config, error) {
 	var c Config
 	if err := json.Unmarshal(raw, &c); err != nil {
 		var field string
-		if te := new(json.UnmarshalTypeError); errors.As(err, &te) && slices.Contains(accountKeys, te.Field) {
+		if te := new(json.UnmarshalTypeError); errors.As(err, &te) && slices.Contains(clickhousequery.AccountKeys(), te.Field) {
 			field = te.Field
 		}
 		return Config{}, invalid(field, documentErr)
@@ -108,7 +99,11 @@ func parseConfig(raw json.RawMessage, allowPlainHTTP bool) (Config, error) {
 // case and keeps the last duplicate, so a key such as "Secure" or a second
 // "host" could reach a field that the account schema never checked. Only the
 // exact account keys, each at most once, with non-null values, pass.
+// An error names known excluded options; any other unknown key stays unnamed,
+// because a key can carry a pasted secret.
 func checkKeys(raw json.RawMessage) (map[string]bool, error) {
+	accountKeys := clickhousequery.AccountKeys()
+	excludedKeys := clickhousequery.ExcludedKeys()
 	dec := json.NewDecoder(bytes.NewReader(raw))
 	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
 		return nil, invalid("", documentErr)
