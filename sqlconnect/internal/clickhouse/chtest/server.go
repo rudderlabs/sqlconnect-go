@@ -313,27 +313,52 @@ func (s *Server) FlushLogs(t *testing.T) {
 	s.AdminExec(t, "SYSTEM FLUSH LOGS")
 }
 
-// CreateScopedUser provisions a runtime user with the published grant script:
-// grants-and-security section 2.1, plus section 2.2 when pruning is true.
-func (s *Server) CreateScopedUser(t *testing.T, name, password, customerDB, rudderDB string, pruning bool) {
-	t.Helper()
-	user, customer, scratch := quoteIdent(name), quoteIdent(customerDB), quoteIdent(rudderDB)
+// customerGrants is the grant set customers run, in the order of the Setup
+// SQL panel. It mirrors GRANTS in rudder-lookout src/lib/clickhouse-grants.ts
+// (rudder-lookout c9d9d407a), the one source of truth. Change both together.
+var customerGrants = []struct {
+	privileges string
+	scope      string // customer, working, working.sync_log, or a system table
+}{
+	{"SELECT", "customer"},
+	{"SELECT, INSERT, CREATE TABLE, DROP TABLE", "working"},
+	{"ALTER DELETE", "working.sync_log"},
+	{"SELECT", "system.processes"},
+	{"SELECT", "system.query_log"},
+}
+
+// scopedUserStatements renders CreateScopedUser's statements: the user, both
+// databases, then customerGrants. syncLog also creates working.sync_log.
+func scopedUserStatements(name, password, customerDB, rudderDB string, syncLog bool) []string {
+	user, customer, working := quoteIdent(name), quoteIdent(customerDB), quoteIdent(rudderDB)
 	stmts := []string{
 		fmt.Sprintf("CREATE USER %s IDENTIFIED WITH sha256_password BY %s", user, quoteString(password)),
-		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", scratch),
+		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", working),
 		fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", customer),
-		fmt.Sprintf("GRANT SELECT ON %s.* TO %s", customer, user),
-		fmt.Sprintf("GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON %s.* TO %s", scratch, user),
-		fmt.Sprintf("GRANT SELECT ON system.processes TO %s", user),
-		fmt.Sprintf("GRANT SELECT ON system.query_log TO %s", user),
 	}
-	if pruning {
-		stmts = append(stmts,
-			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.`sync_log` (id UInt8) ENGINE = MergeTree ORDER BY id", scratch),
-			fmt.Sprintf("GRANT ALTER DELETE ON %s.`sync_log` TO %s", scratch, user),
-		)
+	for _, g := range customerGrants {
+		scope := g.scope
+		switch g.scope {
+		case "customer":
+			scope = customer + ".*"
+		case "working":
+			scope = working + ".*"
+		case "working.sync_log":
+			scope = working + ".`sync_log`"
+		}
+		stmts = append(stmts, fmt.Sprintf("GRANT %s ON %s TO %s", g.privileges, scope, user))
 	}
-	for _, stmt := range stmts {
+	if syncLog {
+		stmts = append(stmts, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s.`sync_log` (id UInt8) ENGINE = MergeTree ORDER BY id", working))
+	}
+	return stmts
+}
+
+// CreateScopedUser provisions a runtime user with the customer grant set,
+// customerGrants. syncLog also creates the working database's sync_log table.
+func (s *Server) CreateScopedUser(t *testing.T, name, password, customerDB, rudderDB string, syncLog bool) {
+	t.Helper()
+	for _, stmt := range scopedUserStatements(name, password, customerDB, rudderDB, syncLog) {
 		s.AdminExec(t, stmt)
 	}
 }

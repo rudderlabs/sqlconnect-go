@@ -91,17 +91,27 @@ func TestValidation_Grants(t *testing.T) {
 	require.NoError(t, err, "the published script validates with options that only name the working database")
 	require.False(t, res.GrantsChecked)
 	require.Len(t, filterOp(res.Warnings, "inspect_grants"), 1)
+	require.Empty(t, filterOp(res.Warnings, "check_alter_delete"), "the published script grants ALTER DELETE on sync_log")
+	user, db := fresh(t, false)
+	srv.AdminExec(t, "REVOKE ALTER DELETE ON _rudderstack.sync_log FROM "+user)
+	res, err = db.ValidateContext(named)
+	require.NoError(t, err)
 	require.Len(t, filterOp(res.Warnings, "check_alter_delete"), 1, "pruning off: a missing ALTER DELETE is a warning")
-	for privilege, revoke := range map[string]string{
-		"CREATE TABLE": "REVOKE CREATE TABLE ON _rudderstack.* FROM ", "SELECT ON system.processes": "REVOKE SELECT ON system.processes FROM ",
-		"SELECT ON system.query_log": "REVOKE SELECT ON system.query_log FROM ", "ALTER DELETE": "", // pruning on, no sync_log grant
+	for privilege, c := range map[string]struct {
+		revoke  string
+		pruning bool
+	}{
+		"CREATE TABLE":               {"REVOKE CREATE TABLE ON _rudderstack.* FROM ", false},
+		"SELECT ON system.processes": {"REVOKE SELECT ON system.processes FROM ", false},
+		"SELECT ON system.query_log": {"REVOKE SELECT ON system.query_log FROM ", false},
+		"ALTER DELETE":               {"REVOKE ALTER DELETE ON _rudderstack.sync_log FROM ", true},
 	} {
 		user, db := fresh(t, false)
-		ctx := pruning
-		if revoke != "" {
-			ctx = withWorkingDB(context.Background())
-			srv.AdminExec(t, revoke+user)
+		ctx := withWorkingDB(context.Background())
+		if c.pruning {
+			ctx = pruning
 		}
+		srv.AdminExec(t, c.revoke+user)
 		_, err := db.ValidateContext(ctx)
 		d, _ := clickhousequery.Describe(err)
 		require.Equal(t, [2]string{"CH_PERMISSION", privilege}, [2]string{d.Code, d.Field})
