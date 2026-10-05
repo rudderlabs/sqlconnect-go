@@ -516,7 +516,8 @@ func bounded(e sqlconnect.Expression, err error) (sqlconnect.Expression, error) 
 	if err == nil {
 		return e, nil
 	}
-	if _, ok := errors.AsType[*cherr.Error](err); ok {
+	var ce *cherr.Error
+	if errors.As(err, &ce) {
 		return nil, err
 	}
 	return nil, cherr.New(cherr.CodeQueryInvalid, "expression", "the expression cannot be rendered: check the operator, the argument count, the unit and the value types")

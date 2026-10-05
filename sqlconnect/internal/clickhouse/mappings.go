@@ -63,7 +63,8 @@ func position(i int) string { return strconv.Itoa(i + 1) }
 
 func columnError(i int, err error) error {
 	code, detail := cherr.CodeValueEncoding, "the value cannot be exported"
-	if ce, ok := errors.AsType[*cherr.Error](err); ok {
+	var ce *cherr.Error
+	if errors.As(err, &ce) {
 		code, detail = ce.Code, ce.Detail
 	}
 	return wrap(code, "", "column "+position(i)+": "+detail, err)

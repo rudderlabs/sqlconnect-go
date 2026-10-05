@@ -10,7 +10,6 @@ package chsql
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 )
 
@@ -402,8 +401,8 @@ func TrimTerminalSemicolon(s string) (string, error) {
 		return "", err
 	}
 	last := -1
-	for i, tok := range slices.Backward(toks) {
-		if tok.Kind != Space {
+	for i := len(toks) - 1; i >= 0; i-- {
+		if toks[i].Kind != Space {
 			last = i
 			break
 		}

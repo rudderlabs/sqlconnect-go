@@ -37,8 +37,10 @@ func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sql
 const trinoCatalogNotFoundErrorCode = 44
 
 func isCatalogNotFoundError(err error) bool {
-	if queryErr, ok := errors.AsType[*trino.ErrQueryFailed](err); ok {
-		if trinoErr, ok := errors.AsType[*trino.ErrTrino](queryErr.Unwrap()); ok {
+	var queryErr *trino.ErrQueryFailed
+	if errors.As(err, &queryErr) {
+		var trinoErr *trino.ErrTrino
+		if errors.As(queryErr.Unwrap(), &trinoErr) {
 			return trinoErr.ErrorCode == trinoCatalogNotFoundErrorCode
 		}
 	}
