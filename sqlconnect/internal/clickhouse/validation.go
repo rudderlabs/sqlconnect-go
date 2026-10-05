@@ -212,8 +212,9 @@ func (db *DB) checkGrants(ctx context.Context, ex sqlconnect.QueryExecutor) ([]s
 		return sqlconnect.ValidationWarning{Info: info(cherr.CodePermission, 0), Operation: op}
 	}
 	var warnings []sqlconnect.ValidationWarning
-	// Account-only validation has no options: a missing ALTER DELETE warns.
-	if !hasOpts {
+	// When the run does not prune sync_log (account validation passes options only to name the
+	// working database), a missing ALTER DELETE warns instead of failing.
+	if !opts.SyncLogPruning {
 		if ok, err := checkGrant(ctx, ex, alterDelete); err == nil && !ok {
 			warnings = append(warnings, warn("check_alter_delete"))
 		}

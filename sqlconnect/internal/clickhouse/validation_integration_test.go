@@ -86,6 +86,10 @@ func TestValidation_Grants(t *testing.T) {
 	require.False(t, res.GrantsChecked)
 	require.Len(t, filterOp(res.Warnings, "inspect_grants"), 1)
 	require.Len(t, filterOp(res.Warnings, "check_alter_delete"), 1, "no options: a missing ALTER DELETE is a warning")
+	named := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{WorkingDatabase: "_rudderstack"})
+	res, err = db.ValidateContext(named)
+	require.NoError(t, err, "options that only name the working database validate")
+	require.Len(t, filterOp(res.Warnings, "check_alter_delete"), 1, "pruning off: a missing ALTER DELETE is still a warning")
 	for privilege, revoke := range map[string]string{
 		"CREATE TABLE": "REVOKE CREATE TABLE ON _rudderstack.* FROM ", "SELECT ON system.processes": "REVOKE SELECT ON system.processes FROM ",
 		"SELECT ON system.query_log": "REVOKE SELECT ON system.query_log FROM ", "ALTER DELETE": "", // pruning on, no sync_log grant
