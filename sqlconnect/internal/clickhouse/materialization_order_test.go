@@ -41,6 +41,7 @@ func TestMoveCopyBeforeDrop(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var steps []string
+			var sourceStatements []string
 			var visibilityReads int
 			stage := func(name string) error {
 				steps = append(steps, name)
@@ -58,7 +59,7 @@ func TestMoveCopyBeforeDrop(t *testing.T) {
 						return &stubRows{vals: []string{"5"}}, stage("count copy")
 					}
 					if strings.HasPrefix(q, "DESCRIBE (") {
-						require.Contains(t, q, "SELECT * FROM `scratch`.`old`")
+						sourceStatements = append(sourceStatements, q)
 						return &describeRows{}, stage("describe")
 					}
 					if q == visibilitySQL {
@@ -75,7 +76,7 @@ func TestMoveCopyBeforeDrop(t *testing.T) {
 					case strings.HasPrefix(q, "CREATE TABLE `scratch`.`new` "):
 						return driver.RowsAffected(0), stage("create")
 					case strings.HasPrefix(q, "INSERT INTO `scratch`.`new` "):
-						require.Contains(t, q, "SELECT * FROM `scratch`.`old`")
+						sourceStatements = append(sourceStatements, q)
 						return driver.RowsAffected(0), stage("insert")
 					case q == "DROP TABLE IF EXISTS `scratch`.`old` SYNC":
 						return driver.RowsAffected(0), stage("drop")
@@ -96,6 +97,9 @@ func TestMoveCopyBeforeDrop(t *testing.T) {
 			got, err := admin.MoveTableWithOptions(context.Background(), conn,
 				sqlconnect.NewRelationRef("old", sqlconnect.WithSchema("scratch")),
 				sqlconnect.NewRelationRef("new", sqlconnect.WithSchema("scratch")), opts)
+			for _, statement := range sourceStatements {
+				require.Contains(t, statement, "SELECT * FROM `scratch`.`old`")
+			}
 			if tc.wantCode == "" {
 				require.NoError(t, err)
 				require.Equal(t, p07WantUUID, got)

@@ -27,8 +27,14 @@ import (
 func TestValidation_NamesPinnedConstraints(t *testing.T) {
 	for _, setting := range []string{"log_queries", "additional_table_filters", "log_queries_min_type", "log_queries_probability", "log_queries_min_query_duration_ms"} {
 		t.Run(setting, func(t *testing.T) {
+			var settingsContexts []context.Context
 			pool := sql.OpenDB(stubConnector{query: func(ctx context.Context, _ string, _ []driver.NamedValue) (driver.Rows, error) {
-				if _, ok := p12SettingsAt(t, ctx)[setting]; ok {
+				settingsContexts = append(settingsContexts, ctx)
+				settings, err := p12SettingsAtErr(ctx)
+				if err != nil {
+					return nil, err
+				}
+				if _, ok := settings[setting]; ok {
 					return nil, &ch.Exception{Code: 452}
 				}
 				return &tableRows{cols: []string{"1"}, rows: [][]driver.Value{{uint8(1)}}}, nil
@@ -38,6 +44,9 @@ func TestValidation_NamesPinnedConstraints(t *testing.T) {
 			require.NoError(t, err)
 			defer conn.Close()
 			err = settingFailure(context.Background(), conn, &ch.Exception{Code: 452})
+			for _, settingsCtx := range settingsContexts {
+				p12SettingsAt(t, settingsCtx)
+			}
 			details, ok := clickhousequery.Describe(err)
 			require.True(t, ok)
 			require.Equal(t, "CH_PERMISSION", details.Code)
@@ -104,12 +113,16 @@ func TestValidation_RudderSchemaMissing(t *testing.T) {
 	db := stub.db(t, nil, nil)
 	working := "custom_working_db"
 	ctx := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{WorkingDatabase: working})
+	var calls []stubCall
 	pool := answerDB(t, func(query string, args []any) ([]string, [][]driver.Value, error) {
-		require.Equal(t, engineSQL, query)
-		require.Equal(t, []any{working}, args)
+		calls = append(calls, stubCall{q: query, args: args})
 		return []string{"engine"}, nil, nil
 	}, nil)
 	err := db.checkEngine(ctx, pool)
+	for _, call := range calls {
+		require.Equal(t, engineSQL, call.q)
+		require.Equal(t, []any{working}, call.args)
+	}
 	requireCode(t, err, "CH_CONFIG_INVALID")
 	requireStage(t, err, 3, "engine")
 	var configErr *cherr.Error
@@ -174,13 +187,25 @@ type lateCreate struct {
 }
 
 func (l *lateCreate) exec(t *testing.T) *sql.DB {
+	var outcomeCalls []stubCall
+	t.Cleanup(func() {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+		for _, call := range outcomeCalls {
+			want := []any{"retl-create"}
+			if call.q == queryLogSQL {
+				want = append(want, "Create")
+			}
+			require.Equal(t, want, call.args, "%s", call.q)
+		}
+	})
 	return answerDB(t, func(q string, args []any) ([]string, [][]driver.Value, error) {
 		l.mu.Lock()
 		defer l.mu.Unlock()
 		l.log = append(l.log, q)
 		switch q {
 		case processesSQL:
-			require.Equal(t, []any{"retl-create"}, args)
+			outcomeCalls = append(outcomeCalls, stubCall{q: q, args: args})
 			if l.running > 0 {
 				l.running--
 				if l.running == 0 {
@@ -190,7 +215,7 @@ func (l *lateCreate) exec(t *testing.T) *sql.DB {
 			}
 			return []string{"count()"}, [][]driver.Value{{int64(0)}}, nil
 		case queryLogSQL:
-			require.Equal(t, []any{"retl-create", "Create"}, args)
+			outcomeCalls = append(outcomeCalls, stubCall{q: q, args: args})
 			if l.logRow == "" {
 				return []string{"type"}, nil, nil
 			}
@@ -651,6 +676,18 @@ func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail fun
 	t.Helper()
 	cfg, err := parseConfig(validJSONInternal(), false)
 	require.NoError(t, err)
+	var engineArgs [][]any
+	t.Cleanup(func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		working := defaultRudderSchema
+		if s.rudderSchema != "" {
+			working = s.rudderSchema
+		}
+		for _, args := range engineArgs {
+			require.Equal(t, []any{working}, args)
+		}
+	})
 	one := func(v driver.Value) ([]string, [][]driver.Value, error) {
 		return []string{"v"}, [][]driver.Value{{v}}, nil
 	}
@@ -676,11 +713,7 @@ func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail fun
 		case q == "SELECT 1", strings.HasPrefix(q, "CHECK GRANT "), strings.HasPrefix(q, "SELECT probe FROM "):
 			return one(int64(1))
 		case q == engineSQL:
-			working := defaultRudderSchema
-			if s.rudderSchema != "" {
-				working = s.rudderSchema
-			}
-			require.Equal(t, []any{working}, args)
+			engineArgs = append(engineArgs, args)
 			return one("Atomic")
 		case q == hostNameSQL:
 			return one("h1")

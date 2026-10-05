@@ -37,6 +37,7 @@ func TestMoveTable_RowCountGuard(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			db := unitDB(t)
 			var statements []string
+			var countContexts []context.Context
 			counts := 0
 			pool := sql.OpenDB(stubConnector{
 				query: func(ctx context.Context, query string, _ []driver.NamedValue) (driver.Rows, error) {
@@ -44,7 +45,7 @@ func TestMoveTable_RowCountGuard(t *testing.T) {
 					switch {
 					case strings.HasPrefix(query, "SELECT count()"):
 						counts++
-						require.Equal(t, "{}", p12SettingsAt(t, ctx)["additional_table_filters"])
+						countContexts = append(countContexts, ctx)
 						if counts == tc.failCount {
 							return nil, tc.countErr
 						}
@@ -76,6 +77,9 @@ func TestMoveTable_RowCountGuard(t *testing.T) {
 			defer conn.Close()
 			ex := driverExec{conn: conn, settings: driverScratchSettings}
 			uuid, err := db.MoveTableWithOptions(context.Background(), ex, sqlconnect.NewRelationRef("source"), sqlconnect.NewRelationRef("copy"), sqlconnect.MaterializationOptions{})
+			for _, countCtx := range countContexts {
+				require.Equal(t, "{}", p12SettingsAt(t, countCtx)["additional_table_filters"])
+			}
 			if tc.wantCode == "" {
 				require.NoError(t, err)
 				require.Equal(t, "copy-uuid", uuid)

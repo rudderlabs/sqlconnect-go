@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"maps"
 	"reflect"
@@ -17,7 +18,14 @@ import (
 
 func p12SettingsAt(t *testing.T, ctx context.Context) map[string]any {
 	t.Helper()
+	settings, err := p12SettingsAtErr(ctx)
+	require.NoError(t, err)
+	return settings
+}
+
+func p12SettingsAtErr(ctx context.Context) (map[string]any, error) {
 	m := map[string]any{}
+	var settingsErr error
 	_ = ch.Context(ctx, func(o *ch.QueryOptions) error {
 		it := reflect.ValueOf(o).Elem().FieldByName("settings").MapRange()
 		for it.Next() {
@@ -28,12 +36,28 @@ func p12SettingsAt(t *testing.T, ctx context.Context) map[string]any {
 			case reflect.String:
 				m[it.Key().String()] = v.String()
 			default:
-				t.Fatalf("unexpected settings type %s", v.Kind())
+				settingsErr = fmt.Errorf("unexpected settings type %s", v.Kind())
+				return settingsErr
 			}
 		}
 		return nil
 	})
-	return m
+	return m, settingsErr
+}
+
+func TestP12SettingsAtErr(t *testing.T) {
+	settings, err := p12SettingsAtErr(context.Background())
+	require.NoError(t, err)
+	require.Empty(t, settings)
+
+	ctx := ch.Context(context.Background(), ch.WithSettings(ch.Settings{"limit": 7, "additional_table_filters": "{}"}))
+	settings, err = p12SettingsAtErr(ctx)
+	require.NoError(t, err)
+	require.Equal(t, map[string]any{"limit": 7, "additional_table_filters": "{}"}, settings)
+
+	ctx = ch.Context(context.Background(), ch.WithSettings(ch.Settings{"unsupported": true}))
+	_, err = p12SettingsAtErr(ctx)
+	require.EqualError(t, err, "unexpected settings type bool")
 }
 
 func TestDriverConnectionReceivesSettings(t *testing.T) {
