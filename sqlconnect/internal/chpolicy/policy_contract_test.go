@@ -10,7 +10,7 @@ import (
 
 // Install is process-wide. Restore the initial state so -count and the existing
 // external CurrentBeforeInstall test remain order independent. No parallel tests.
-func TestP12PolicyInstallOwnsItsSnapshot(t *testing.T) {
+func TestPolicyInstallOwnsItsSnapshot(t *testing.T) {
 	mu.Lock()
 	old, wasSet := current, set
 	current, set = Policy{}, false
@@ -40,7 +40,7 @@ func TestP12PolicyInstallOwnsItsSnapshot(t *testing.T) {
 	require.True(t, second.AllowPlainHTTP)
 }
 
-func FuzzP12PolicyBlocksMappedIPv4(f *testing.F) {
+func FuzzPolicyBlocksMappedIPv4(f *testing.F) {
 	f.Add(byte(10), byte(1), byte(2), byte(3))
 	f.Add(byte(127), byte(0), byte(0), byte(1))
 	f.Fuzz(func(t *testing.T, a, b, c, d byte) {

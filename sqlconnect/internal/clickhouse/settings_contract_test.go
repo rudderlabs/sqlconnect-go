@@ -41,7 +41,7 @@ func p12UnionWant(seconds int) map[string]any {
 	return m
 }
 
-func TestP12DriverSettingsLiteralContract(t *testing.T) {
+func TestDriverSettingsLiteralContract(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		build func() map[string]any
@@ -69,7 +69,7 @@ func TestP12DriverSettingsLiteralContract(t *testing.T) {
 	}
 }
 
-func FuzzP12UnionBudget(f *testing.F) {
+func FuzzUnionBudget(f *testing.F) {
 	for _, seconds := range []int{1, 2, 37, 120, 3600} {
 		f.Add(seconds)
 	}

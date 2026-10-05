@@ -17,7 +17,7 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 )
 
-func TestP07MoveCopyBeforeDrop(t *testing.T) {
+func TestMoveCopyBeforeDrop(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
 		failStage      string

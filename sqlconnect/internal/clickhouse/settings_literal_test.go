@@ -9,7 +9,7 @@ import (
 
 // This contract deliberately does not derive its keys from overflowModes.
 // Removing a safety setting must not also remove the assertion for that key.
-func TestP07SettingsLiteralContract(t *testing.T) {
+func TestSettingsLiteralContract(t *testing.T) {
 	want := map[string]any{
 		"join_use_nulls": 1, "session_timezone": "UTC", "select_sequential_consistency": 1,
 		"transform_null_in": 0, "data_type_default_nullable": 0, "enable_parallel_replicas": 0,

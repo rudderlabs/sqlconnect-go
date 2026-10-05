@@ -37,7 +37,7 @@ func p12StatementOptions(t *testing.T, ctx context.Context) (map[string]any, str
 	return m, id
 }
 
-func TestP12StatementCopiesReplacesAndMarks(t *testing.T) {
+func TestStatementCopiesReplacesAndMarks(t *testing.T) {
 	parent := WithStatement(context.Background(), map[string]any{"readonly": 0, "limit": 99}, "parent")
 	input := map[string]any{"readonly": 2, "join_use_nulls": 1, "read_overflow_mode": "throw"}
 	child := WithStatement(parent, input, "child")
@@ -63,7 +63,7 @@ func TestP12StatementCopiesReplacesAndMarks(t *testing.T) {
 	}
 }
 
-func FuzzP12StatementIsolation(f *testing.F) {
+func FuzzStatementIsolation(f *testing.F) {
 	f.Add("readonly", 2)
 	f.Add("limit", 0)
 	f.Add("join_use_nulls", 1)

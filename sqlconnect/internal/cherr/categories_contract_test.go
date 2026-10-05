@@ -15,9 +15,9 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 )
 
-func TestP15LiteralCategories(t *testing.T) {
+func TestLiteralCategories(t *testing.T) {
 	// This fixture is a literal contract, never generated from Category or Codes.
-	b, err := os.ReadFile("p15_categories_test.json")
+	b, err := os.ReadFile("testdata/categories.json")
 	require.NoError(t, err)
 	var want map[string]string
 	require.NoError(t, json.Unmarshal(b, &want))
@@ -38,7 +38,7 @@ func TestP15LiteralCategories(t *testing.T) {
 	require.Equal(t, codes, cherr.Codes())
 }
 
-func FuzzP15CherrFormatting(f *testing.F) {
+func FuzzCherrFormatting(f *testing.F) {
 	f.Add([]byte("password='customer-value'"))
 	f.Add([]byte{0, 10, 255})
 	f.Fuzz(func(t *testing.T, payload []byte) {

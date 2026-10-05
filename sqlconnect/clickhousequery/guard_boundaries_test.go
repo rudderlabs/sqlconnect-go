@@ -31,7 +31,7 @@ func p09Refused(t testing.TB, sql, clause string) {
 	}
 }
 
-func TestP09GuardCatalogVariants(t *testing.T) {
+func TestGuardCatalogVariants(t *testing.T) {
 	for _, name := range p09Names(t) {
 		t.Run(name, func(t *testing.T) {
 			for _, callName := range []string{name, strings.ToUpper(name), "`" + name + "`", "\"" + name + "\"", "“" + name + "”", "db." + name} {
@@ -53,7 +53,7 @@ func TestP09GuardCatalogVariants(t *testing.T) {
 	}
 }
 
-func TestP09GuardBoundaryAndStructure(t *testing.T) {
+func TestGuardBoundaryAndStructure(t *testing.T) {
 	for _, sql := range []string{"SELECT ([1)]", "SELECT {x", "SELECT 1)", "SELECT [1", "SELECT (1]", "SELECT 1 /* outer /* inner */"} {
 		p09Refused(t, sql, "SYNTAX")
 	}
@@ -76,7 +76,7 @@ func TestP09GuardBoundaryAndStructure(t *testing.T) {
 	p09Refused(t, exact+" ", "SIZE")
 }
 
-func TestP09GuardNormalization(t *testing.T) {
+func TestGuardNormalization(t *testing.T) {
 	for input, want := range map[string]string{
 		"  SELECT 1 \t; \n":       "  SELECT 1",
 		"SELECT 'é'\u0085;\u0085": "SELECT 'é'",
@@ -94,7 +94,7 @@ func TestP09GuardNormalization(t *testing.T) {
 	}
 }
 
-func FuzzP09Guard(f *testing.F) {
+func FuzzGuard(f *testing.F) {
 	raw, err := os.ReadFile("testdata/audience-sql.json")
 	if err != nil {
 		f.Fatal(err)
@@ -132,7 +132,7 @@ func FuzzP09Guard(f *testing.F) {
 	})
 }
 
-func FuzzP09BlockedCalls(f *testing.F) {
+func FuzzBlockedCalls(f *testing.F) {
 	names := p09Names(f)
 	for i := range names {
 		f.Add(uint16(i), uint8(0), uint8(0), uint8(0))
@@ -147,7 +147,7 @@ func FuzzP09BlockedCalls(f *testing.F) {
 	})
 }
 
-func TestP09GuardRejectsIncompleteExponentAfterNormalization(t *testing.T) {
+func TestGuardRejectsIncompleteExponentAfterNormalization(t *testing.T) {
 	for _, sql := range []string{"SELECT 0.E ", "SELECT 0.E;", "SELECT 0.E"} {
 		p09Refused(t, sql, "SYNTAX")
 	}

@@ -17,7 +17,7 @@ const (
 	p07WantUUID = "22222222-2222-4222-8222-222222222222"
 )
 
-func TestP07VisibilityExpectedUUID(t *testing.T) {
+func TestVisibilityExpectedUUID(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		script []stubResult
@@ -45,7 +45,7 @@ func TestP07VisibilityExpectedUUID(t *testing.T) {
 // The model accepts the first visible row matching the requested identity,
 // or any visible row for an empty request. Permission errors terminate it.
 // The terminal match/error bounds every generated sequence and mutant run.
-func FuzzP07VisibilitySequence(f *testing.F) {
+func FuzzVisibilitySequence(f *testing.F) {
 	f.Add([]byte{}, false)
 	f.Add([]byte{0, 1, 0, 1}, false)
 	f.Add([]byte{1, 2, 1}, false)
@@ -105,7 +105,7 @@ func FuzzP07VisibilitySequence(f *testing.F) {
 
 // Check policy normalization without polling: a deadline regression should
 // fail immediately, rather than forcing the suite to wait for that deadline.
-func TestP07VisibilityPolicyDefaults(t *testing.T) {
+func TestVisibilityPolicyDefaults(t *testing.T) {
 	defaults := sqlconnect.VisibilityPolicy{
 		InitialBackoff: 250 * time.Millisecond,
 		MaxBackoff:     5 * time.Second,

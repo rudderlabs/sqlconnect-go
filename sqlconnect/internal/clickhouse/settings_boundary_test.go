@@ -33,7 +33,7 @@ func p12SettingsAt(t *testing.T, ctx context.Context) map[string]any {
 	return m
 }
 
-func TestP12DriverConnectionReceivesSettings(t *testing.T) {
+func TestDriverConnectionReceivesSettings(t *testing.T) {
 	stub := &recordingConn{rows: &errRows{err: io.EOF}}
 	g := &guardConn{inner: stub}
 	_, err := g.ExecContext(context.Background(), "INSERT INTO t SELECT 1", nil)

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestP09NumberTokenKinds(t *testing.T) {
+func TestNumberTokenKinds(t *testing.T) {
 	for _, tc := range []struct {
 		text string
 		kind chsql.TokenKind
@@ -27,7 +27,7 @@ func TestP09NumberTokenKinds(t *testing.T) {
 	}
 }
 
-func TestP09UTF8WhitespaceBoundaries(t *testing.T) {
+func TestUTF8WhitespaceBoundaries(t *testing.T) {
 	// ClickHouse 26.3 skipWhitespacesUTF8 includes zero-width separators; Go's
 	// and JavaScript's general-purpose Unicode whitespace sets do not match it.
 	spaces := []rune{0x85, 0xa0, 0x180e, 0x2028, 0x2029, 0x202f, 0x205f, 0x2060, 0x3000, 0xfeff}
@@ -51,7 +51,7 @@ func TestP09UTF8WhitespaceBoundaries(t *testing.T) {
 	}
 }
 
-func TestP09CommentsAreSingleTokens(t *testing.T) {
+func TestCommentsAreSingleTokens(t *testing.T) {
 	for _, sql := range []string{"-- hidden", "// hidden", "# hidden", "#!hidden", "/* outer /* inner */ tail */"} {
 		tokens, err := chsql.Tokenize(sql)
 		require.NoError(t, err)
@@ -61,7 +61,7 @@ func TestP09CommentsAreSingleTokens(t *testing.T) {
 	}
 }
 
-func TestP09TruncatedUTF8FailsWithoutPanic(t *testing.T) {
+func TestTruncatedUTF8FailsWithoutPanic(t *testing.T) {
 	for _, whole := range []string{"‘x’", "“x”", "\u0085", "\u180e", "\u200b", "\u2060", "\ufeff", "−"} {
 		for end := 1; end < len(whole); end++ {
 			_, err := chsql.Tokenize(whole[:end])
@@ -70,7 +70,7 @@ func TestP09TruncatedUTF8FailsWithoutPanic(t *testing.T) {
 	}
 }
 
-func TestP09QuotedTokenKinds(t *testing.T) {
+func TestQuotedTokenKinds(t *testing.T) {
 	for _, tc := range []struct {
 		text string
 		kind chsql.TokenKind
@@ -91,14 +91,14 @@ func TestP09QuotedTokenKinds(t *testing.T) {
 	}
 }
 
-func TestP09InvalidUTF8BytesFailClosed(t *testing.T) {
+func TestInvalidUTF8BytesFailClosed(t *testing.T) {
 	for _, sql := range []string{"\x80", "\xff", "SELECT \x80", "SELECT \xc2", "SELECT \xe2\x80"} {
 		_, err := chsql.Tokenize(sql)
 		require.Error(t, err, "invalid unquoted bytes %x", sql)
 	}
 }
 
-func TestP09NumericSeparatorPreservesFollowingComment(t *testing.T) {
+func TestNumericSeparatorPreservesFollowingComment(t *testing.T) {
 	for _, prefix := range []string{"1_e", "0x1_p"} {
 		tokens, err := chsql.Tokenize(prefix + "-- file(1)")
 		require.NoError(t, err)
