@@ -42,6 +42,7 @@ func TestValidation_EngineRules(t *testing.T) {
 	queries, err := runValidationScriptErr(t, map[string]any{engineSQL: "Replicated"}) // Replicated needs Keeper, so it is scripted
 	requireCode(t, err, "CH_CONFIG_INVALID")
 	require.Contains(t, err.Error(), "Replicated")
+	require.Contains(t, err.Error(), "the RudderStack working database engine")
 	for _, q := range queries {
 		require.False(t, strings.HasPrefix(q, "CREATE TABLE"), "no probe after an engine refusal")
 	}
@@ -56,18 +57,21 @@ func TestValidation_EngineRules(t *testing.T) {
 func TestValidation_RudderSchemaMissing(t *testing.T) {
 	var stub validationStub
 	db := stub.db(t, nil, nil)
+	working := "custom_working_db"
+	ctx := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{WorkingDatabase: working})
 	pool := answerDB(t, func(query string, args []any) ([]string, [][]driver.Value, error) {
 		require.Equal(t, engineSQL, query)
-		require.Equal(t, []any{defaultRudderSchema}, args)
+		require.Equal(t, []any{working}, args)
 		return []string{"engine"}, nil, nil
 	}, nil)
-	err := db.checkEngine(context.Background(), pool)
+	err := db.checkEngine(ctx, pool)
 	requireCode(t, err, "CH_CONFIG_INVALID")
 	requireStage(t, err, 3, "engine")
 	var configErr *cherr.Error
 	require.ErrorAs(t, err, &configErr)
 	require.Equal(t, "workingDatabase", configErr.Field)
-	require.Contains(t, err.Error(), "the _rudderstack database does not exist")
+	require.Contains(t, err.Error(), "the RudderStack working database does not exist")
+	require.NotContains(t, err.Error(), working)
 }
 
 // fixed returns an acquire function that hands out ex for every step.
@@ -455,6 +459,9 @@ func TestValidation_WorkingDatabaseExclusions(t *testing.T) {
 			require.Equal(t, cherr.CodeConfigInvalid, configErr.Code)
 			require.Equal(t, "workingDatabase", configErr.Field)
 			require.Empty(t, stub.statement)
+			if namePattern.MatchString(name) {
+				require.Contains(t, err.Error(), "the RudderStack working database must differ")
+			}
 		})
 	}
 }

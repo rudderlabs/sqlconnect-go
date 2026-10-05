@@ -110,7 +110,7 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 	switch strings.ToLower(working) {
 	case strings.ToLower(db.cfg.Database), "default", "system", "information_schema":
 		return res, stageErr(3, "engine", invalid("workingDatabase",
-			"The _rudderstack database must differ from the customer database, default, system and information_schema."))
+			"the RudderStack working database must differ from the customer database, default, system and information_schema."))
 	}
 	select {
 	case db.validateSem <- struct{}{}:
@@ -240,7 +240,7 @@ func (db *DB) checkEngine(ctx context.Context, ex sqlconnect.QueryExecutor) erro
 	var engine string
 	switch err := ex.QueryRowContext(ctx, engineSQL, workingDatabase(ctx)).Scan(&engine); {
 	case errors.Is(err, sql.ErrNoRows):
-		return stageErr(3, "engine", cherr.New(cherr.CodeConfigInvalid, "workingDatabase", "the _rudderstack database does not exist"))
+		return stageErr(3, "engine", cherr.New(cherr.CodeConfigInvalid, "workingDatabase", "the RudderStack working database does not exist"))
 	case err != nil:
 		return stageErr(3, "engine", err)
 	}
@@ -254,7 +254,7 @@ func (db *DB) checkEngine(ctx context.Context, ex sqlconnect.QueryExecutor) erro
 		return nil
 	default:
 		return stageErr(3, "engine", cherr.New(cherr.CodeConfigInvalid, "workingDatabase",
-			"the _rudderstack database engine "+engineLabel(engine)+" is not Atomic or Shared"))
+			"the RudderStack working database engine "+engineLabel(engine)+" is not Atomic or Shared"))
 	}
 }
 

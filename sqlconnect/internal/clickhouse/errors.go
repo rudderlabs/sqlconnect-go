@@ -74,7 +74,7 @@ var fixedMessages = map[string]string{
 	cherr.CodeSchemaMismatch:          "the schema does not match",
 	cherr.CodeLostResponse:            "the response was lost after the statement was sent",
 	cherr.CodeOutcomeUnknown:          "the statement outcome is unknown",
-	cherr.CodeScratchCleanupFailed:    "the _rudderstack database cleanup failed",
+	cherr.CodeScratchCleanupFailed:    "the RudderStack working database cleanup failed",
 	cherr.CodeAuthentication:          "the server refused the credentials",
 	cherr.CodePermission:              "the user lacks a required privilege or setting",
 	cherr.CodeTimeout:                 "the request timed out",

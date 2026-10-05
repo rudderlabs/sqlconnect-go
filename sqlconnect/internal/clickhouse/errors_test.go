@@ -23,6 +23,10 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 )
 
+func TestScratchCleanup_WorkingDatabaseMessage(t *testing.T) {
+	require.Equal(t, "the RudderStack working database cleanup failed", fixedMessages[cherr.CodeScratchCleanupFailed])
+}
+
 func TestSQ22_ServerCodes(t *testing.T) {
 	cases := map[string][]int32{
 		"CH_AUTHENTICATION":   {516, 192, 193, 194},
