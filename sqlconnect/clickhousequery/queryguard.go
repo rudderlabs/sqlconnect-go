@@ -68,6 +68,8 @@ func refuse(clause string) error {
 		message = "table-function calls, including scalar format(), are refused"
 	case "SYSTEM TABLE":
 		message = "system and information_schema tables, and escapes in qualified quoted names, are refused"
+	case "NETWORK FUNCTION":
+		message = "scalar functions that open a network connection are refused"
 	case "IDENTIFIER PARAMETER":
 		message = "query parameters typed Identifier are refused"
 	}
@@ -156,6 +158,10 @@ func (g *guard) scan() string {
 			continue
 		}
 		switch {
+		case isNetworkFunctionCall(tk, g.at(i+1)):
+			// hasColumnInTable('host:port', ...) makes the server open a
+			// native connection to any address without the REMOTE grant.
+			return "NETWORK FUNCTION"
 		case isTableFunctionCall(tk, g.at(i+1)):
 			// A call of a 26.3 table function name, or of the scalar file(),
 			// is refused in any position. This is defence in depth: the
@@ -241,6 +247,20 @@ func (g *guard) identifierParameter(i int) bool {
 		}
 	}
 	return false
+}
+
+// networkFunctionNames holds the scalar functions, in lower case, that can
+// make the server open a network connection. Every form is refused, the
+// local three-argument hasColumnInTable included, so arity cannot matter.
+var networkFunctionNames = map[string]bool{"hascolumnintable": true}
+
+// isNetworkFunctionCall reports a call of a networkFunctionNames entry, bare
+// or quoted, in any letter case.
+func isNetworkFunctionCall(tk, next chsql.Token) bool {
+	if !isOpener(next) || !isNameToken(tk) {
+		return false
+	}
+	return networkFunctionNames[strings.ToLower(strings.Trim(tk.Text, "`\"\u201c\u201d"))]
 }
 
 func isNameToken(tk chsql.Token) bool { return tk.Kind == chsql.Word || tk.Kind == chsql.QuotedIdent }

@@ -488,6 +488,36 @@
       "clause": "MULTIPLE STATEMENTS"
     },
     {
+      "name": "refuse_network_function_has_column_in_table_credentials",
+      "sql": "SELECT hasColumnInTable('127.0.0.1:9000', 'default', '', 'system', 'one', 'dummy') AS h",
+      "verdict": "refuse",
+      "clause": "NETWORK FUNCTION"
+    },
+    {
+      "name": "refuse_network_function_has_column_in_table_local",
+      "sql": "SELECT HASCOLUMNINTABLE('db', 'users', 'id') AS h",
+      "verdict": "refuse",
+      "clause": "NETWORK FUNCTION"
+    },
+    {
+      "name": "refuse_network_function_has_column_in_table_remote",
+      "sql": "SELECT hasColumnInTable('10.255.255.1:9000', 'system', 'one', 'dummy') AS h",
+      "verdict": "refuse",
+      "clause": "NETWORK FUNCTION"
+    },
+    {
+      "name": "refuse_network_function_has_column_in_table_user",
+      "sql": "SELECT `hasColumnInTable`('10.0.0.1:9000', 'default', 'db', 'users', 'id') AS h",
+      "verdict": "refuse",
+      "clause": "NETWORK FUNCTION"
+    },
+    {
+      "name": "refuse_network_function_has_column_in_table_where",
+      "sql": "SELECT id FROM db.users WHERE hasColumnInTable('10.0.0.1:9000', 'db', 'users', 'id')",
+      "verdict": "refuse",
+      "clause": "NETWORK FUNCTION"
+    },
+    {
       "name": "refuse_paren_list_after_subquery_url",
       "sql": "SELECT count() FROM ((SELECT 1 AS id) AS a, url('https://attacker.example/x', 'LineAsString') AS b)",
       "verdict": "refuse",

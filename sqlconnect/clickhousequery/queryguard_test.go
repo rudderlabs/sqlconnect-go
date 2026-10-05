@@ -58,7 +58,7 @@ func TestQueryGuard_SharedCorpus(t *testing.T) {
 		})
 	}
 	require.Positive(t, accepts)
-	for _, want := range []string{"SETTINGS", "PREWHERE", "FINAL", "SAMPLE", "LIMIT BY", "ARRAY JOIN", "TABLE FUNCTION", "INTO OUTFILE", "FORMAT", "MULTIPLE STATEMENTS", "SYSTEM TABLE", "IDENTIFIER PARAMETER"} {
+	for _, want := range []string{"SETTINGS", "PREWHERE", "FINAL", "SAMPLE", "LIMIT BY", "ARRAY JOIN", "TABLE FUNCTION", "INTO OUTFILE", "FORMAT", "MULTIPLE STATEMENTS", "SYSTEM TABLE", "IDENTIFIER PARAMETER", "NETWORK FUNCTION"} {
 		require.True(t, clauses[want], "the corpus refuses %s at least once", want)
 	}
 	for c := range clauses {
