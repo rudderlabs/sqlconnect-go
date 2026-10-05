@@ -25,7 +25,8 @@ type ValidationReporter interface {
 // ValidationOptions carries run inputs that are not account fields.
 type ValidationOptions struct {
 	SyncLogPruning bool
-	// WorkingDatabase selects the validation working database; ClickHouse defaults to _rudderstack.
+	// WorkingDatabase names the validation working database. ClickHouse has no
+	// default and refuses an empty name with CH_CONFIG_INVALID.
 	WorkingDatabase string
 }
 

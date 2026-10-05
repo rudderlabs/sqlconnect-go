@@ -24,7 +24,7 @@ import (
 )
 
 func TestScratchCleanup_WorkingDatabaseMessage(t *testing.T) {
-	require.Equal(t, "the RudderStack working database cleanup failed", fixedMessages[cherr.CodeScratchCleanupFailed])
+	require.Equal(t, "the working database cleanup failed", fixedMessages[cherr.CodeScratchCleanupFailed])
 }
 
 func TestSQ22_ServerCodes(t *testing.T) {

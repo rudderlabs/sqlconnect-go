@@ -583,3 +583,11 @@ func filterOp(w []sqlconnect.ValidationWarning, op string) []sqlconnect.Validati
 	}
 	return out
 }
+
+// withWorkingDB returns ctx with the validation options of ctx and the
+// working database _rudderstack, which CreateScopedUser grants.
+func withWorkingDB(ctx context.Context) context.Context {
+	o, _ := sqlconnect.ValidationOptionsFrom(ctx)
+	o.WorkingDatabase = "_rudderstack"
+	return sqlconnect.WithValidationOptions(ctx, o)
+}

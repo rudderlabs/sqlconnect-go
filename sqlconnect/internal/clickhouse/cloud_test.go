@@ -41,7 +41,7 @@ func cloudDB(t *testing.T, port int) *clickhouse.DB {
 
 func TestSQ24_CloudSmoke(t *testing.T) {
 	db, ctx := cloudDB(t, 0), context.Background()
-	res, err := db.ValidateContext(ctx)
+	res, err := db.ValidateContext(sqlconnect.WithValidationOptions(ctx, sqlconnect.ValidationOptions{WorkingDatabase: scratchOf(t)}))
 	require.NoError(t, err)
 	t.Logf("cloud version=%s", res.ServerVersion)
 	scratch := scratchOf(t)
@@ -248,7 +248,7 @@ func withPort(t *testing.T, raw json.RawMessage, port int) json.RawMessage {
 	return out
 }
 
-// scratchOf checks the account and returns the default working database.
+// scratchOf checks the account and returns the working database that the cloud tests use.
 func scratchOf(t *testing.T) string {
 	t.Helper()
 	_, err := clickhouse.ParseConfig(json.RawMessage(os.Getenv("CLICKHOUSE_CLOUD_CONFIG")))

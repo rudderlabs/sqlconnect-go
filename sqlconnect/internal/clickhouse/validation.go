@@ -55,13 +55,10 @@ var probeLookupTimeout = 5 * time.Second
 
 const probeCleanupReserve = 20 * time.Second
 
-const defaultRudderSchema = "_rudderstack"
-
+// workingDatabase returns the caller's working database. The driver has no
+// default: rudder-sources owns the name and always passes it.
 func workingDatabase(ctx context.Context) string {
 	opts, _ := sqlconnect.ValidationOptionsFrom(ctx)
-	if opts.WorkingDatabase == "" {
-		return defaultRudderSchema
-	}
 	return opts.WorkingDatabase
 }
 
@@ -105,13 +102,16 @@ func stageErr(stage int, tag string, err error) error {
 func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult, error) {
 	var res sqlconnect.ValidationResult
 	working := workingDatabase(ctx)
+	if working == "" {
+		return res, stageErr(3, "engine", invalid("workingDatabase", "the working database is required"))
+	}
 	if !namePattern.MatchString(working) {
 		return res, stageErr(3, "engine", invalid("workingDatabase", nameErr))
 	}
 	switch strings.ToLower(working) {
 	case strings.ToLower(db.cfg.Database), "default", "system", "information_schema":
 		return res, stageErr(3, "engine", invalid("workingDatabase",
-			"the RudderStack working database must differ from the customer database, default, system and information_schema."))
+			"the working database must differ from the customer database, default, system and information_schema."))
 	}
 	select {
 	case db.validateSem <- struct{}{}:
@@ -242,7 +242,7 @@ func (db *DB) checkEngine(ctx context.Context, ex sqlconnect.QueryExecutor) erro
 	var engine string
 	switch err := ex.QueryRowContext(ctx, engineSQL, workingDatabase(ctx)).Scan(&engine); {
 	case errors.Is(err, sql.ErrNoRows):
-		return stageErr(3, "engine", cherr.New(cherr.CodeConfigInvalid, "workingDatabase", "the RudderStack working database does not exist"))
+		return stageErr(3, "engine", cherr.New(cherr.CodeConfigInvalid, "workingDatabase", "the working database does not exist"))
 	case err != nil:
 		return stageErr(3, "engine", err)
 	}
@@ -256,7 +256,7 @@ func (db *DB) checkEngine(ctx context.Context, ex sqlconnect.QueryExecutor) erro
 		return nil
 	default:
 		return stageErr(3, "engine", cherr.New(cherr.CodeConfigInvalid, "workingDatabase",
-			"the RudderStack working database engine "+engineLabel(engine)+" is not Atomic or Shared"))
+			"the working database engine "+engineLabel(engine)+" is not Atomic or Shared"))
 	}
 }
 
@@ -646,7 +646,7 @@ func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 		return ex.QueryRowContext(rctx, "SELECT probe FROM "+t).Scan(&value)
 	})
 	if werr == nil && value != 1 {
-		werr = cherr.New(cherr.CodeScratchCleanupFailed, "", "the probe read returned an unexpected value")
+		werr = cherr.New(cherr.CodeSchemaMismatch, "probe", "the probe read returned a value that differs from the written value")
 	}
 	if werr != nil {
 		return fail(werr)

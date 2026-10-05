@@ -96,7 +96,7 @@ func TestValidation_EngineRules(t *testing.T) {
 	queries, err := runValidationScriptErr(t, map[string]any{engineSQL: "Replicated"}) // Replicated needs Keeper, so it is scripted
 	requireCode(t, err, "CH_CONFIG_INVALID")
 	require.Contains(t, err.Error(), "Replicated")
-	require.Contains(t, err.Error(), "the RudderStack working database engine")
+	require.Contains(t, err.Error(), "the working database engine")
 	for _, q := range queries {
 		require.False(t, strings.HasPrefix(q, "CREATE TABLE"), "no probe after an engine refusal")
 	}
@@ -128,7 +128,7 @@ func TestValidation_RudderSchemaMissing(t *testing.T) {
 	var configErr *cherr.Error
 	require.ErrorAs(t, err, &configErr)
 	require.Equal(t, "workingDatabase", configErr.Field)
-	require.Contains(t, err.Error(), "the RudderStack working database does not exist")
+	require.Contains(t, err.Error(), "the working database does not exist")
 	require.NotContains(t, err.Error(), working)
 }
 
@@ -503,15 +503,19 @@ func TestValidation_RudderSchemaOverride(t *testing.T) {
 	require.Equal(t, []int{1, 1}, []int{creates, drops})
 }
 
-func TestValidation_WorkingDatabaseDefault(t *testing.T) {
+func TestValidation_WorkingDatabaseRequired(t *testing.T) {
 	for _, ctx := range []context.Context{
 		context.Background(),
 		sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{}),
+		sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{SyncLogPruning: true}),
 	} {
 		stub := validationStub{}
 		_, err := stub.db(t, nil, nil).ValidateContext(ctx)
-		require.NoError(t, err)
-		require.Contains(t, stub.statement, "CHECK GRANT CREATE TABLE ON `_rudderstack`.*")
+		var configErr *cherr.Error
+		require.ErrorAs(t, err, &configErr)
+		require.Equal(t, [2]string{cherr.CodeConfigInvalid, "workingDatabase"}, [2]string{configErr.Code, configErr.Field})
+		requireStage(t, err, 3, "engine")
+		require.Empty(t, stub.statement, "no query runs without a working database")
 	}
 }
 
@@ -530,7 +534,7 @@ func TestValidation_WorkingDatabaseExclusions(t *testing.T) {
 			require.Equal(t, "workingDatabase", configErr.Field)
 			require.Empty(t, stub.statement)
 			if namePattern.MatchString(name) {
-				require.Contains(t, err.Error(), "the RudderStack working database must differ")
+				require.Contains(t, err.Error(), "the working database must differ")
 			}
 		})
 	}
@@ -543,18 +547,28 @@ func TestValidation_RefusedCreateSendsNoDrop(t *testing.T) {
 			return &ch.Exception{Code: 57} // TABLE_ALREADY_EXISTS: the name belongs to someone else
 		}
 		return nil
-	}).ValidateContext(context.Background())
+	}).ValidateContext(workingCtx(context.Background()))
 	requireStage(t, err, 4, "scratch_write")
 	for _, q := range s.execs {
 		require.False(t, strings.HasPrefix(q, "DROP"), "a refused CREATE leaves the existing table alone: %s", q)
 	}
 }
 
+func TestValidation_ProbeValueMismatch(t *testing.T) {
+	s := &validationStub{probeValue: int64(2)}
+	_, err := s.db(t, nil, nil).ValidateContext(workingCtx(context.Background()))
+	requireCode(t, err, "CH_SCHEMA_MISMATCH")
+	requireStage(t, err, 4, "scratch_write")
+	require.True(t, slices.ContainsFunc(s.execs, func(q string) bool { return strings.HasPrefix(q, "DROP TABLE `_rudderstack`.`_rudder_probe_") }),
+		"the cleanup drops the probe after a wrong read")
+	require.False(t, s.created)
+}
+
 func TestValidation_CancelledBeforeSlot(t *testing.T) {
 	db := unitDB(t)
 	db.validateSem <- struct{}{}
 	db.validateSem <- struct{}{}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(workingCtx(context.Background()))
 	cancel()
 	_, err := db.ValidateContext(ctx)
 	require.ErrorIs(t, err, context.Canceled)
@@ -670,6 +684,7 @@ type validationStub struct {
 	created      bool
 	hostReads    int
 	rudderSchema string
+	probeValue   driver.Value // the probe read answer; nil answers 1
 }
 
 func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail func(q string) error) *DB {
@@ -680,7 +695,7 @@ func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail fun
 	t.Cleanup(func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		working := defaultRudderSchema
+		working := testWorkingDB
 		if s.rudderSchema != "" {
 			working = s.rudderSchema
 		}
@@ -710,6 +725,8 @@ func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail fun
 		switch {
 		case q == "SELECT version(), currentDatabase()":
 			return []string{"version()", "currentDatabase()"}, [][]driver.Value{{"26.3.33.24", "analytics"}}, nil
+		case strings.HasPrefix(q, "SELECT probe FROM ") && s.probeValue != nil:
+			return one(s.probeValue)
 		case q == "SELECT 1", strings.HasPrefix(q, "CHECK GRANT "), strings.HasPrefix(q, "SELECT probe FROM "):
 			return one(int64(1))
 		case q == engineSQL:
@@ -759,7 +776,7 @@ func (s *validationStub) queries() []string {
 func runValidationScriptErr(t *testing.T, overrides map[string]any) ([]string, error) {
 	t.Helper()
 	s := &validationStub{}
-	_, err := s.db(t, overrides, nil).ValidateContext(context.Background())
+	_, err := s.db(t, overrides, nil).ValidateContext(workingCtx(context.Background()))
 	return s.queries(), err
 }
 
@@ -781,7 +798,7 @@ func unknownLastExec(t *testing.T) string {
 			return io.ErrUnexpectedEOF
 		}
 		return nil
-	}).ValidateContext(context.Background())
+	}).ValidateContext(workingCtx(context.Background()))
 	requireStage(t, err, 4, "scratch_cleanup") // the stub answers no outcome read, so the outcome stays open
 	s.mu.Lock()
 	defer s.mu.Unlock()

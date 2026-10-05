@@ -24,34 +24,37 @@ All available `DB` methods can be found [here](sqlconnect/db.go)
 
 ## ClickHouse setup
 
-The customer creates the `_rudderstack` database before connection validation.
+The driver needs a working database for validation and working tables.
+The driver has no default name for it.
+rudder-sources owns the name and passes it in `ValidationOptions.WorkingDatabase`.
+Validation refuses an empty name with `CH_CONFIG_INVALID` (field `workingDatabase`).
+The rudder-sources ClickHouse client docs give the default name and the `rudderSchema` override.
+
+The customer creates the working database before connection validation.
 The driver does not create this database.
-Run these statements as an administrator, with your sync user and customer database names:
+Run these statements as an administrator.
+Replace `<working_database>`, `rudder_retl` and `analytics` with your working database, sync user and customer database:
 
 ```sql
-CREATE DATABASE IF NOT EXISTS _rudderstack;
+CREATE DATABASE IF NOT EXISTS <working_database>;
 GRANT SELECT ON analytics.* TO rudder_retl;
-GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON _rudderstack.* TO rudder_retl;
+GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON <working_database>.* TO rudder_retl;
 GRANT SELECT ON system.processes TO rudder_retl;
 GRANT SELECT ON system.query_log TO rudder_retl;
 ```
 
-Sync-log pruning also requires `GRANT ALTER DELETE ON _rudderstack.sync_log TO rudder_retl` after that table exists.
-The optional `rudderSchema` credential key overrides `_rudderstack` in rudder-sources.
-rudder-sources strips this hidden key before calling the driver and passes the name through `ValidationOptions.WorkingDatabase`.
-Account-only validation defaults to `_rudderstack`; the driver rejects `rudderSchema` and `scratchDatabase` account keys.
-It is not an account form field.
-Use the override in setup, grants, revoke, and teardown statements.
+Sync-log pruning also requires `GRANT ALTER DELETE ON <working_database>.sync_log TO rudder_retl` after that table exists.
+The driver rejects `rudderSchema` and `scratchDatabase` account keys.
 Validation checks database existence, its engine, and the required privileges.
 
 To revoke access and remove working tables, run:
 
 ```sql
-REVOKE SELECT, INSERT, CREATE TABLE, DROP TABLE ON _rudderstack.* FROM rudder_retl;
-DROP DATABASE IF EXISTS _rudderstack SYNC;
+REVOKE SELECT, INSERT, CREATE TABLE, DROP TABLE ON <working_database>.* FROM rudder_retl;
+DROP DATABASE IF EXISTS <working_database> SYNC;
 ```
 
-Revoke `ALTER DELETE` on `_rudderstack.sync_log` first if you granted it.
+Revoke `ALTER DELETE` on `<working_database>.sync_log` first if you granted it.
 Drop the database only when no sync uses its tables.
 
 ## Usage
