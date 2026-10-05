@@ -45,7 +45,7 @@ func TestSQ10_ZeroRowMetadata(t *testing.T) {
 		"SELECT 1) UNION ALL (SELECT 2",
 		"SELECT 1; SELECT 2",
 	} {
-		_, err = db.ListColumnsForSqlQuery(ctx, q)
+		_, err = clickhousequery.CheckAudienceSQL(q)
 		requireCode(t, err, "CH_QUERY_INVALID")
 	}
 	require.Empty(t, srv.RawHTTPS(t, "SELECT id FROM "+src+" WHERE 0", url.Values{"default_format": {"Native"}}), "negative control: zero-row Native over HTTP is an empty body")

@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
-	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chsql"
 )
 
 // viewEngines are the engines that ListTables reports as views.
@@ -126,21 +126,21 @@ ORDER BY position`, ref.Schema, ref.Name)
 	return res, nil
 }
 
-// ListColumnsForSqlQuery returns the result columns of an audience query
+// ListColumnsForSqlQuery returns the result columns of a SQL query
 // without running it. A zero-row HTTP answer carries no column metadata, so
-// the query goes through DESCRIBE. The query guard runs first and its error
-// returns unchanged, so a refused query sends no request.
+// the query goes through DESCRIBE. Callers that require audience policy checks
+// must opt in with clickhousequery.CheckAudienceSQL before calling this method.
 func (db *DB) ListColumnsForSqlQuery(ctx context.Context, q string) ([]sqlconnect.ColumnRef, error) {
-	normalized, err := clickhousequery.CheckAudienceSQL(q)
+	normalized, err := chsql.TrimTerminalSemicolon(q)
 	if err != nil {
-		return nil, err
+		return nil, wrap(cherr.CodeQueryInvalid, "", "describe: invalid SQL statement", err)
 	}
 	return db.describe(db.readCtx(ctx), poolExec{db.DB.DB}, normalized)
 }
 
 // describe reads the result columns of q through DESCRIBE on ex. It runs no
-// guard: callers pass a query that CheckAudienceSQL accepted. The newlines
-// around q end a trailing line comment before the closing bracket.
+// audience policy guard. The newlines around q end a trailing line comment
+// before the closing bracket.
 func (db *DB) describe(ctx context.Context, ex sqlconnect.QueryExecutor, q string) ([]sqlconnect.ColumnRef, error) {
 	rows, err := ex.QueryContext(ctx, "DESCRIBE (\n"+q+"\n)")
 	if err != nil {
