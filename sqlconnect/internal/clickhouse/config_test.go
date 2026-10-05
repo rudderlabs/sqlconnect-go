@@ -199,8 +199,8 @@ func fixtureTargets(field string) []string {
 }
 
 // fieldFixtureSHA256 pins the account field fixture, a byte copy of
-// rudder-integrations-config commit e4c12dfb14de322cda8876066a4da2f3e6b3b461.
-const fieldFixtureSHA256 = "4c57c26b91ccd050a7431b5702dd51e93724a1b697f336b210d7dbf6c39a6c3d"
+// rudder-integrations-config commit a7d07bf5efdc70ea8fc30e52becac6b9b9967387.
+const fieldFixtureSHA256 = "81dd6044cc630c119d4b72a5c8df1fbdcf0d84defcbf9a09650a742cae0cb7f9"
 
 func TestSQ2_SharedFieldFixtures(t *testing.T) {
 	raw, err := os.ReadFile("testdata/clickhouse-fields.json")
