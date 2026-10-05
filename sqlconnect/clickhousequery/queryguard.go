@@ -72,6 +72,10 @@ func refuse(clause string) error {
 		message = "scalar functions that open a network connection are refused"
 	case "IDENTIFIER PARAMETER":
 		message = "query parameters typed Identifier are refused"
+	case "COLUMN TRANSFORMER":
+		message = "the APPLY column transformer and bare words named apply are refused"
+	case "EXPLAIN":
+		message = "EXPLAIN and bare words named explain are refused"
 	}
 	return cherr.New(cherr.CodeQueryInvalid, clause, message)
 }
@@ -140,6 +144,16 @@ func (g *guard) scan() string {
 			// A bound Identifier value can name any table, including
 			// system.query_log, after the guard has passed the text.
 			return "IDENTIFIER PARAMETER"
+		}
+		if tk.Kind == chsql.Word && (tk.Upper == "APPLY" || tk.Upper == "EXPLAIN") {
+			// APPLY calls a function by bare name, with or without brackets,
+			// so * APPLY(file) reaches file(). A subquery EXPLAIN becomes the
+			// viewExplain table function. Both are refused as bare words in
+			// any position, so a column named apply or explain fails closed.
+			if tk.Upper == "APPLY" {
+				return "COLUMN TRANSFORMER"
+			}
+			return "EXPLAIN"
 		}
 		if isNameToken(tk) && !isDot(g.at(i-1)) && isDot(g.at(i+1)) && isNameToken(g.at(i+2)) &&
 			refusedDatabases[strings.Trim(tk.Text, "`\"\u201c\u201d")] {

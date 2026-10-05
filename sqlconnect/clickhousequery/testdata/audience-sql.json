@@ -404,6 +404,84 @@
       "clause": "FORMAT"
     },
     {
+      "name": "refuse_column_transformer_apply_after_columns",
+      "sql": "SELECT COLUMNS('p') APPLY(file) FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_bare_name",
+      "sql": "SELECT * APPLY file FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_call",
+      "sql": "SELECT * APPLY(file) FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_lower_case",
+      "sql": "SELECT * apply(file) FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_mixed_case",
+      "sql": "SELECT * Apply(file) FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_qualified_star",
+      "sql": "SELECT t.* APPLY(file) FROM (SELECT 'x.csv' AS path) AS t",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_quoted_name",
+      "sql": "SELECT * APPLY(`file`) FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_column_named_apply_conservative",
+      "sql": "SELECT apply FROM db.t",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_explain_ast",
+      "sql": "SELECT * FROM (EXPLAIN AST SELECT 1)",
+      "verdict": "refuse",
+      "clause": "EXPLAIN"
+    },
+    {
+      "name": "refuse_explain_column_named_explain_conservative",
+      "sql": "SELECT explain FROM db.t",
+      "verdict": "refuse",
+      "clause": "EXPLAIN"
+    },
+    {
+      "name": "refuse_explain_lower_case",
+      "sql": "SELECT * FROM (explain ast select 1)",
+      "verdict": "refuse",
+      "clause": "EXPLAIN"
+    },
+    {
+      "name": "refuse_explain_mixed_case",
+      "sql": "SELECT * FROM (Explain SELECT 1)",
+      "verdict": "refuse",
+      "clause": "EXPLAIN"
+    },
+    {
+      "name": "refuse_explain_subquery",
+      "sql": "SELECT * FROM (EXPLAIN SELECT 1)",
+      "verdict": "refuse",
+      "clause": "EXPLAIN"
+    },
+    {
       "name": "refuse_file_function_in_select",
       "sql": "SELECT file('x') AS f FROM db.users",
       "verdict": "refuse",
