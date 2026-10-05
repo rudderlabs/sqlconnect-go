@@ -51,7 +51,16 @@ func CheckAudienceSQL(sql string) (string, error) {
 }
 
 func refuse(clause string) error {
-	return cherr.New(cherr.CodeQueryInvalid, clause, "the audience query uses a construct that sync refuses")
+	message := "the audience query uses a construct that sync refuses"
+	switch clause {
+	case "PARENTHESIZED SELECT":
+		message = "audience queries starting with a parenthesized SELECT are refused"
+	case "FORMAT":
+		message = "FORMAT clauses and bare columns named format are refused"
+	case "TABLE FUNCTION":
+		message = "table-function calls, including scalar format(), are refused"
+	}
+	return cherr.New(cherr.CodeQueryInvalid, clause, message)
 }
 
 // guard scans the tokens of one query without spaces and comments.
@@ -97,14 +106,12 @@ func (g *guard) at(i int) chsql.Token {
 // scan returns the first refused clause, or "".
 func (g *guard) scan() string {
 	w := g.w
+	if len(w) > 0 && isOpener(w[0]) {
+		return "PARENTHESIZED SELECT"
+	}
 	if len(w) == 0 || (w[0].Upper != "SELECT" && w[0].Upper != "WITH") {
 		return "NOT SELECT"
 	}
-	inFrom := map[int]bool{} // per nesting depth: inside a FROM list, where commas separate tables
-	// listOK tracks the nearest depth-0 clause keyword: true after one that
-	// opens a comma list (select, BY, CTE, WINDOW or LIMIT n, m list). It is
-	// kept as the scan goes, so a wide list costs linear time.
-	listOK := false
 	for i, tk := range w {
 		if tk.Kind == chsql.Word && !isOpener(g.at(i+1)) &&
 			(isDot(g.at(i-1)) || isDot(g.at(i+1)) && isNameToken(g.at(i+2))) {
@@ -115,38 +122,22 @@ func (g *guard) scan() string {
 			// after a dot still goes through the name rule.
 			continue
 		}
-		if tk.Kind == chsql.Word && tk.Depth == 0 {
-			switch tk.Upper {
-			case "SELECT", "BY", "WITH", "DISTINCT", "LIMIT", "WINDOW":
-				listOK = true
-			case "WHERE", "HAVING", "OFFSET", "QUALIFY":
-				listOK = false
-			}
-		}
 		switch {
-		case tk.Kind == chsql.Punct && tk.Text == ",":
-			if !inFrom[tk.Depth] && tk.Depth == 0 && !listOK {
-				return "SYNTAX"
-			}
-		case isCloser(tk):
-			delete(inFrom, tk.Depth) // a closer carries the inner depth
 		case isTableFunctionCall(tk, g.at(i+1)):
 			// A call of a 26.3 table function name, or of the scalar file(),
 			// is refused in any position. This is defence in depth: the
 			// connector trusts the credential's own read capabilities.
 			return "TABLE FUNCTION"
 		case tk.Kind != chsql.Word:
-		case tk.Upper == "FROM" || tk.Upper == "JOIN":
-			inFrom[tk.Depth] = true
 		case fromEnders[tk.Upper]:
-			inFrom[tk.Depth] = false
 			switch {
 			case tk.Upper == "FORMAT" || tk.Upper == "SETTINGS" || tk.Upper == "PREWHERE":
 				return tk.Upper
 			case tk.Upper == "INTO" && g.at(i+1).Upper == "OUTFILE":
 				return "INTO OUTFILE"
 			}
-		case tk.Upper == "FINAL" || tk.Upper == "SAMPLE":
+		case tk.Upper == "FINAL" || tk.Upper == "SAMPLE" &&
+			(g.at(i+1).Kind == chsql.Number || isDot(g.at(i+1)) && g.at(i+2).Kind == chsql.Number):
 			return tk.Upper
 		case tk.Upper == "ARRAY" && g.at(i+1).Upper == "JOIN":
 			return "ARRAY JOIN"

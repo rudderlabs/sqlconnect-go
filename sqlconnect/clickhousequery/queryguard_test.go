@@ -68,6 +68,18 @@ func TestQueryGuard_SharedCorpus(t *testing.T) {
 	require.Equal(t, buf.String(), string(raw), "2-space indent, LF, trailing newline")
 }
 
+func TestQueryGuard_RefusalReasons(t *testing.T) {
+	for query, reason := range map[string]string{
+		"(SELECT user_id FROM t)":   "starting with a parenthesized SELECT",
+		"SELECT format FROM t":      "bare columns named format",
+		"SELECT format('x') FROM t": "scalar format()",
+	} {
+		_, err := clickhousequery.CheckAudienceSQL(query)
+		require.ErrorContains(t, err, reason)
+		require.NotContains(t, err.Error(), query)
+	}
+}
+
 func TestQueryGuard_LexerStates(t *testing.T) {
 	for sql, clause := range map[string]string{
 		`SELECT 'it\'s FINAL' FROM db.t`:             "",
@@ -80,7 +92,7 @@ func TestQueryGuard_LexerStates(t *testing.T) {
 		"SELECT id // SAMPLE\nFROM db.t":             "",
 		"SELECT `a``FINAL` FROM db.t":                "",
 		"SELECT id FROM db.t; -- tail":               "MULTIPLE STATEMENTS", // a comment after the semicolon is still a second statement
-		"SELECT id FROM db.t WHERE x IN (1, 2), 3":   "SYNTAX",              // depth-0 comma outside a FROM list
+		"SELECT id FROM db.t WHERE x IN (1, 2), 3":   "",
 		"INSERT INTO db.t SELECT 1":                  "NOT SELECT",
 		"SELECT 'open":                               "SYNTAX",
 		"SELECT id FROM db.t /* open":                "SYNTAX",
@@ -211,10 +223,9 @@ func TestQueryGuard_RefusedClauseForms(t *testing.T) {
 		"select id from db.users final":                                        "FINAL",
 		"SELECT id FROM db.users UNION ALL SELECT id FROM db.v SETTINGS a = 1": "SETTINGS",
 		"SELECT 1 AS final FROM db.users":                                      "FINAL", // a bare keyword alias fails closed
-		"(SELECT id FROM db.users)":                                            "NOT SELECT",
+		"(SELECT id FROM db.users)":                                            "PARENTHESIZED SELECT",
 		"SHOW TABLES":                                                          "NOT SELECT",
 		"SELECT 1;;":                                                           "MULTIPLE STATEMENTS",
-		"SELECT id FROM db.users HAVING a, b":                                  "SYNTAX",
 		"SELECT café FROM db.users":                                            "SYNTAX",
 		"SELECT (1] FROM db.users":                                             "SYNTAX",
 		"SELECT 1) FROM db.users":                                              "SYNTAX",

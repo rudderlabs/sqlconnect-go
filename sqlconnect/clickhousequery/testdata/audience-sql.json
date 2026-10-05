@@ -20,6 +20,42 @@
       "normalized": "SELECT id FROM db.users WHERE tags = ['a', 'b']"
     },
     {
+      "name": "accept_bare_column_having",
+      "sql": "SELECT having, user_id FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT having, user_id FROM t"
+    },
+    {
+      "name": "accept_bare_column_offset",
+      "sql": "SELECT offset, user_id FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT offset, user_id FROM t"
+    },
+    {
+      "name": "accept_bare_column_qualify",
+      "sql": "SELECT qualify, user_id FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT qualify, user_id FROM t"
+    },
+    {
+      "name": "accept_bare_column_sample",
+      "sql": "SELECT sample, user_id FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT sample, user_id FROM t"
+    },
+    {
+      "name": "accept_bare_column_sample_single",
+      "sql": "SELECT sample FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT sample FROM t"
+    },
+    {
+      "name": "accept_bare_column_where",
+      "sql": "SELECT where, user_id FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT where, user_id FROM t"
+    },
+    {
       "name": "accept_column_named_url",
       "sql": "SELECT url FROM db.users",
       "verdict": "accept",
@@ -302,6 +338,12 @@
       "clause": "ARRAY JOIN"
     },
     {
+      "name": "refuse_bare_column_format",
+      "sql": "SELECT format, user_id FROM t",
+      "verdict": "refuse",
+      "clause": "FORMAT"
+    },
+    {
       "name": "refuse_file_function_in_select",
       "sql": "SELECT file('x') AS f FROM db.users",
       "verdict": "refuse",
@@ -470,6 +512,12 @@
       "clause": "TABLE FUNCTION"
     },
     {
+      "name": "refuse_parenthesized_select",
+      "sql": "(SELECT user_id FROM t)",
+      "verdict": "refuse",
+      "clause": "PARENTHESIZED SELECT"
+    },
+    {
       "name": "refuse_prewhere",
       "sql": "SELECT id FROM db.users PREWHERE id > 1",
       "verdict": "refuse",
@@ -478,6 +526,24 @@
     {
       "name": "refuse_sample",
       "sql": "SELECT id FROM db.users SAMPLE 0.1",
+      "verdict": "refuse",
+      "clause": "SAMPLE"
+    },
+    {
+      "name": "refuse_sample_commented_number",
+      "sql": "SELECT user_id FROM t SAMPLE /* fraction */ 0.5",
+      "verdict": "refuse",
+      "clause": "SAMPLE"
+    },
+    {
+      "name": "refuse_sample_fraction",
+      "sql": "SELECT user_id FROM t SAMPLE .5",
+      "verdict": "refuse",
+      "clause": "SAMPLE"
+    },
+    {
+      "name": "refuse_sample_integer",
+      "sql": "SELECT user_id FROM t SAMPLE 1",
       "verdict": "refuse",
       "clause": "SAMPLE"
     },
