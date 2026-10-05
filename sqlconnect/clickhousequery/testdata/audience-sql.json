@@ -74,10 +74,46 @@
       "normalized": "SELECT cutURLParameter(url, 'a') AS u FROM db.users"
     },
     {
+      "name": "accept_database_mixed_information_schema",
+      "sql": "SELECT id FROM Information_Schema.users",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM Information_Schema.users"
+    },
+    {
+      "name": "accept_database_mysystem",
+      "sql": "SELECT id FROM mysystem.users",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM mysystem.users"
+    },
+    {
+      "name": "accept_database_system2",
+      "sql": "SELECT id FROM SYSTEM2.users",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM SYSTEM2.users"
+    },
+    {
+      "name": "accept_database_uppercase_system",
+      "sql": "SELECT id FROM SYSTEM.users",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM SYSTEM.users"
+    },
+    {
       "name": "accept_ends_in_line_comment",
       "sql": "SELECT id FROM db.users -- members",
       "verdict": "accept",
       "normalized": "SELECT id FROM db.users -- members"
+    },
+    {
+      "name": "accept_escaped_backtick_alias",
+      "sql": "SELECT 1 AS `a\\tb`",
+      "verdict": "accept",
+      "normalized": "SELECT 1 AS `a\\tb`"
+    },
+    {
+      "name": "accept_escaped_quoted_alias",
+      "sql": "SELECT 1 AS \"a\\tb\"",
+      "verdict": "accept",
+      "normalized": "SELECT 1 AS \"a\\tb\""
     },
     {
       "name": "accept_extract_from_in_function",
@@ -224,6 +260,12 @@
       "normalized": "SELECT u.id FROM db.sample u"
     },
     {
+      "name": "accept_map_literal_braces",
+      "sql": "SELECT {'a': 1} AS m FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT {'a': 1} AS m FROM db.users"
+    },
+    {
       "name": "accept_not_in_one_cast",
       "sql": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String))",
       "verdict": "accept",
@@ -290,6 +332,12 @@
       "normalized": "SELECT \"file\" FROM db.users"
     },
     {
+      "name": "accept_string_parameter",
+      "sql": "SELECT id FROM db.users WHERE email = {e:String}",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE email = {e:String}"
+    },
+    {
       "name": "accept_subquery_in_from",
       "sql": "SELECT s.id FROM (SELECT id FROM db.users) AS s, db.orders AS o",
       "verdict": "accept",
@@ -300,6 +348,18 @@
       "sql": "SELECT substring(email FROM 2) AS s FROM db.users",
       "verdict": "accept",
       "normalized": "SELECT substring(email FROM 2) AS s FROM db.users"
+    },
+    {
+      "name": "accept_system_string_literal",
+      "sql": "SELECT 'system.query_log' AS value",
+      "verdict": "accept",
+      "normalized": "SELECT 'system.query_log' AS value"
+    },
+    {
+      "name": "accept_system_table_name",
+      "sql": "SELECT id FROM db.system",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.system"
     },
     {
       "name": "accept_trailing_semicolon",
@@ -378,6 +438,24 @@
       "sql": "SELECT id FROM db.users FORMAT JSON",
       "verdict": "refuse",
       "clause": "FORMAT"
+    },
+    {
+      "name": "refuse_identifier_parameter",
+      "sql": "SELECT * FROM {tbl:Identifier}",
+      "verdict": "refuse",
+      "clause": "IDENTIFIER PARAMETER"
+    },
+    {
+      "name": "refuse_identifier_parameter_array",
+      "sql": "SELECT id FROM db.users WHERE email IN {cols:Array(Identifier)}",
+      "verdict": "refuse",
+      "clause": "IDENTIFIER PARAMETER"
+    },
+    {
+      "name": "refuse_identifier_parameter_qualified",
+      "sql": "SELECT id FROM {db:Identifier}.users",
+      "verdict": "refuse",
+      "clause": "IDENTIFIER PARAMETER"
     },
     {
       "name": "refuse_into_outfile",
@@ -576,6 +654,222 @@
       "sql": "SELECT * FROM (SELECT id FROM db.users SETTINGS max_threads = 1) s",
       "verdict": "refuse",
       "clause": "SETTINGS"
+    },
+    {
+      "name": "refuse_system_table_backtick",
+      "sql": "SELECT query FROM `system`.`processes`",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_column_qualified",
+      "sql": "SELECT system.query_log.query FROM db.users",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_comma",
+      "sql": "SELECT query FROM db.users, system.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_comment_gap",
+      "sql": "SELECT query FROM system /* gap */ . query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_cte",
+      "sql": "WITH logs AS (SELECT query FROM system.query_log) SELECT * FROM logs",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_column",
+      "sql": "SELECT u.\"i\\td\" FROM db.users AS u",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_comment_gap",
+      "sql": "SELECT id FROM \"d\\tb\" /* gap */ . users",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_database_hex",
+      "sql": "SELECT query FROM `sys\\x74em`.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_database_null",
+      "sql": "SELECT query FROM \"sys\\Ntem\".\"query_log\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_database_zero",
+      "sql": "SELECT query FROM \"sys\\0tem\".query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_ordinary_database",
+      "sql": "SELECT id FROM \"d\\tb\".users",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_ordinary_table",
+      "sql": "SELECT id FROM db.`u\\tsers`",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_processes_nonhex",
+      "sql": "SELECT query FROM system.`pr\\x7zcesses`",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_processes_null",
+      "sql": "SELECT query FROM \"system\".\"process\\Nes\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_table_nonhex",
+      "sql": "SELECT query FROM system.\"query\\x6zlog\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_table_null",
+      "sql": "SELECT query FROM system.`query\\N_log`",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_exists",
+      "sql": "SELECT id FROM db.users WHERE EXISTS (SELECT 1 FROM system.processes)",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_fails_closed_on_system_column_alias",
+      "sql": "SELECT system.id FROM db.users AS system",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_fails_closed_on_system_column_in_expression",
+      "sql": "SELECT id IN (system.id) FROM db.users AS system",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_fails_closed_on_system_quoted_column_alias",
+      "sql": "SELECT \"system\".id FROM db.users AS \"system\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_global_in",
+      "sql": "SELECT query FROM db.users WHERE query GLOBAL IN system.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_in",
+      "sql": "SELECT query FROM db.users WHERE query IN system.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_in_function",
+      "sql": "SELECT id FROM db.users WHERE in(email, system.query_log)",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_information_schema",
+      "sql": "SELECT name FROM information_schema.tables",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_information_schema_quoted",
+      "sql": "SELECT name FROM \"information_schema\".\"tables\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_information_schema_upper",
+      "sql": "SELECT name FROM INFORMATION_SCHEMA.tables",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_information_schema_upper_backtick",
+      "sql": "SELECT name FROM `INFORMATION_SCHEMA`.`TABLES`",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_join",
+      "sql": "SELECT u.id FROM db.users AS u JOIN system.processes AS p ON u.id = p.query_id",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_nested_comma",
+      "sql": "SELECT query FROM (db.users AS u, (system.query_log AS q))",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_parenthesized_join",
+      "sql": "SELECT query FROM (db.users AS u JOIN system.processes AS p ON 1)",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_processes",
+      "sql": "SELECT query FROM system.processes",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_query_log",
+      "sql": "SELECT query FROM system.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_quoted",
+      "sql": "SELECT query FROM \"system\".\"query_log\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_scalar_subquery",
+      "sql": "SELECT (SELECT any(query) FROM system.query_log) AS q FROM db.users",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_subquery",
+      "sql": "SELECT * FROM (SELECT query FROM system.query_log)",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_union",
+      "sql": "SELECT query FROM db.users UNION ALL SELECT query FROM system.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
     },
     {
       "name": "refuse_table_function_backtick_name_in_select",
@@ -1240,6 +1534,60 @@
     {
       "name": "refuse_table_function_quoted_name",
       "sql": "SELECT * FROM `remote`('h', db.t)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_cluster",
+      "sql": "SELECT query FROM cluster('cluster', system.query_log)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_clusterallreplicas",
+      "sql": "SELECT query FROM clusterAllReplicas('cluster', system.processes)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_dictionary",
+      "sql": "SELECT * FROM dictionary('system.query_log')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_loop",
+      "sql": "SELECT query FROM loop(system.processes)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_merge",
+      "sql": "SELECT query FROM merge('system', 'query_log|processes')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_merge_regexp",
+      "sql": "SELECT query FROM merge(REGEXP('system'), 'query_log|processes')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_remote",
+      "sql": "SELECT query FROM remote('host', system.query_log)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_remotesecure",
+      "sql": "SELECT query FROM remoteSecure('host', system.processes)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_view",
+      "sql": "SELECT query FROM view(SELECT query FROM system.query_log)",
       "verdict": "refuse",
       "clause": "TABLE FUNCTION"
     },

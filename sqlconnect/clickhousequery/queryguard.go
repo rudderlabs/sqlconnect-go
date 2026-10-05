@@ -19,12 +19,17 @@ var fromEnders = map[string]bool{
 	"WINDOW": true, "QUALIFY": true, "INTO": true, "SELECT": true,
 }
 
+// refusedDatabases are matched case-sensitively, as ClickHouse matches
+// database names: SYSTEM.users names an ordinary database.
+var refusedDatabases = map[string]bool{"system": true, "information_schema": true, "INFORMATION_SCHEMA": true}
+
 // CheckAudienceSQL returns the normalised query text, or CH_QUERY_INVALID
 // naming the first refused construct. The normalised text is the input less
 // one terminal semicolon and the trailing whitespace; nothing else changes.
 // The error never contains query text.
-// The guard allows system and information_schema databases on purpose; the
-// credential's grants decide access to them.
+// The guard refuses system, information_schema and INFORMATION_SCHEMA table
+// references: the sync credential's grant script permits system.query_log and
+// system.processes, which can expose other database users' query text.
 func CheckAudienceSQL(sql string) (string, error) {
 	if len(sql) > MaxAudienceSQLBytes {
 		return "", refuse("SIZE")
@@ -61,6 +66,10 @@ func refuse(clause string) error {
 		message = "FORMAT clauses and bare columns named format are refused"
 	case "TABLE FUNCTION":
 		message = "table-function calls, including scalar format(), are refused"
+	case "SYSTEM TABLE":
+		message = "system and information_schema tables, and escapes in qualified quoted names, are refused"
+	case "IDENTIFIER PARAMETER":
+		message = "query parameters typed Identifier are refused"
 	}
 	return cherr.New(cherr.CodeQueryInvalid, clause, message)
 }
@@ -114,7 +123,29 @@ func (g *guard) scan() string {
 	if len(w) == 0 || (w[0].Upper != "SELECT" && w[0].Upper != "WITH") {
 		return "NOT SELECT"
 	}
+	// systemSeen defers the refusal to the end of the scan, so a clause that
+	// the shared corpus names (TABLE FUNCTION, SETTINGS) wins, as in Lookout.
+	systemSeen := false
 	for i, tk := range w {
+		if tk.Kind == chsql.QuotedIdent && (tk.Text[0] == '`' || tk.Text[0] == '"') &&
+			strings.Contains(tk.Text, "\\") && (isDot(g.at(i-1)) || isDot(g.at(i+1))) {
+			// ClickHouse decodes some escapes in its own way (\x7z reads as
+			// 'o', \N is dropped), so a decoder here could disagree with the
+			// server and miss system.query_log. A qualified name fails closed.
+			return "SYSTEM TABLE"
+		}
+		if tk.Kind == chsql.Punct && tk.Text == "{" && g.identifierParameter(i) {
+			// A bound Identifier value can name any table, including
+			// system.query_log, after the guard has passed the text.
+			return "IDENTIFIER PARAMETER"
+		}
+		if isNameToken(tk) && !isDot(g.at(i-1)) && isDot(g.at(i+1)) && isNameToken(g.at(i+2)) &&
+			refusedDatabases[strings.Trim(tk.Text, "`\"\u201c\u201d")] {
+			// Refused wherever the qualifier appears: FROM, JOIN, IN, the
+			// in() function, a column. A table alias named system fails
+			// closed too.
+			systemSeen = true
+		}
 		if tk.Kind == chsql.Word && !isOpener(g.at(i+1)) &&
 			(isDot(g.at(i-1)) || isDot(g.at(i+1)) && isNameToken(g.at(i+2))) {
 			// A word next to a dot names a database, table or column, as in
@@ -150,6 +181,9 @@ func (g *guard) scan() string {
 				return "LIMIT BY"
 			}
 		}
+	}
+	if systemSeen {
+		return "SYSTEM TABLE"
 	}
 	return ""
 }
@@ -194,6 +228,17 @@ func isTableFunctionCall(tk, next chsql.Token) bool {
 	case chsql.QuotedIdent:
 		name := strings.Trim(tk.Text, "`\"\u201c\u201d")
 		return tableFunctionNames[strings.ToLower(name)] || strings.Contains(name, "\\")
+	}
+	return false
+}
+
+// identifierParameter reports a query parameter placeholder at w[i] whose
+// type names Identifier, as in {p:Identifier} or {p:Array(Identifier)}.
+func (g *guard) identifierParameter(i int) bool {
+	for j := i + 1; j < len(g.w) && j <= i+8 && g.w[j].Text != "}"; j++ {
+		if g.w[j].Kind == chsql.Word && g.w[j].Upper == "IDENTIFIER" {
+			return true
+		}
 	}
 	return false
 }

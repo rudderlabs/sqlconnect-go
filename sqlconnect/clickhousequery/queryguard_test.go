@@ -37,24 +37,28 @@ func TestQueryGuard_SharedCorpus(t *testing.T) {
 	clauses := map[string]bool{}
 	accepts := 0
 	for _, c := range f.Cases {
-		out, err := clickhousequery.CheckAudienceSQL(c.SQL)
-		if c.Verdict == "accept" {
-			require.NoError(t, err, c.Name)
-			require.Equal(t, c.Normalized, out, c.Name)
-			require.Empty(t, c.Clause, c.Name)
-			accepts++
-			continue
-		}
-		require.Equal(t, "refuse", c.Verdict, c.Name)
-		require.Empty(t, c.Normalized, c.Name)
-		d, ok := clickhousequery.Describe(err)
-		require.True(t, ok, c.Name)
-		require.Equal(t, "CH_QUERY_INVALID", d.Code, c.Name)
-		require.Equal(t, c.Clause, d.Field, c.Name)
-		clauses[c.Clause] = true
+		t.Run(c.Name, func(t *testing.T) {
+			out, err := clickhousequery.CheckAudienceSQL(c.SQL)
+			if c.Verdict == "accept" {
+				require.NoError(t, err, c.Name)
+				require.Equal(t, c.Normalized, out, c.Name)
+				require.Empty(t, c.Clause, c.Name)
+				accepts++
+				return
+			}
+			require.Equal(t, "refuse", c.Verdict, c.Name)
+			require.Empty(t, c.Normalized, c.Name)
+			d, ok := clickhousequery.Describe(err)
+			require.True(t, ok, c.Name)
+			require.Empty(t, out, c.Name)
+			require.Equal(t, "CH_QUERY_INVALID", d.Code, c.Name)
+			require.Equal(t, c.Clause, d.Field, c.Name)
+			require.NotContains(t, err.Error(), c.SQL, c.Name)
+			clauses[c.Clause] = true
+		})
 	}
 	require.Positive(t, accepts)
-	for _, want := range []string{"SETTINGS", "PREWHERE", "FINAL", "SAMPLE", "LIMIT BY", "ARRAY JOIN", "TABLE FUNCTION", "INTO OUTFILE", "FORMAT", "MULTIPLE STATEMENTS"} {
+	for _, want := range []string{"SETTINGS", "PREWHERE", "FINAL", "SAMPLE", "LIMIT BY", "ARRAY JOIN", "TABLE FUNCTION", "INTO OUTFILE", "FORMAT", "MULTIPLE STATEMENTS", "SYSTEM TABLE", "IDENTIFIER PARAMETER"} {
 		require.True(t, clauses[want], "the corpus refuses %s at least once", want)
 	}
 	for c := range clauses {
