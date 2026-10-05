@@ -102,19 +102,16 @@ func classify(err error) sqlconnect.ErrorInfo {
 	case errors.Is(err, context.DeadlineExceeded):
 		return info(cherr.CodeTimeout, 0)
 	}
-	var own *cherr.Error
-	if errors.As(err, &own) {
+	if own, ok := errors.AsType[*cherr.Error](err); ok {
 		return info(own.Code, own.ServerCode)
 	}
-	var ex *ch.Exception
-	if errors.As(err, &ex) {
+	if ex, ok := errors.AsType[*ch.Exception](err); ok {
 		if code, ok := serverCodes[ex.Code]; ok {
 			return info(code, ex.Code)
 		}
 		return info(cherr.CodeUnknown, ex.Code)
 	}
-	var he *ch.HTTPError
-	if errors.As(err, &he) {
+	if he, ok := errors.AsType[*ch.HTTPError](err); ok {
 		switch he.StatusCode {
 		case 502, 503, 504:
 			return info(cherr.CodeUnavailable, 0)
@@ -199,8 +196,7 @@ func redact(err error) error {
 			parts = append(parts, keep)
 		}
 	}
-	var own *cherr.Error
-	if errors.As(err, &own) {
+	if own, ok := errors.AsType[*cherr.Error](err); ok {
 		parts = append(parts, own)
 	}
 	var ex *ch.Exception

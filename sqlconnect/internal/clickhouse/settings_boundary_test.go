@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"context"
 	"io"
+	"maps"
 	"reflect"
 	"testing"
 
@@ -50,9 +51,7 @@ func TestDriverConnectionReceivesSettings(t *testing.T) {
 	for _, input := range []map[string]any{nil, {}, {"readonly": 2, "limit": 7}} {
 		ctx := clickhousequery.WithStatement(context.Background(), input, "retl-p12")
 		want := map[string]any{}
-		for k, v := range input {
-			want[k] = v
-		}
+		maps.Copy(want, input)
 		_, err = g.ExecContext(ctx, "SELECT 1", nil)
 		require.NoError(t, err)
 		require.Equal(t, want, p12SettingsAt(t, stub.lastCtx), "explicit maps replace all driver defaults")
