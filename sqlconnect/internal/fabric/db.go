@@ -123,8 +123,6 @@ func catalogMetadataQuery(catalog base.UnquotedIdentifier, stmt string, columns 
 	)
 }
 
-func quoteFabricIdentifier(value string) string { return "[" + escapeBracketIdentifier(value) + "]" }
-
 func escapeBracketIdentifier(value string) string { return strings.ReplaceAll(value, "]", "]]") }
 
 func unquoteBracketIdentifier(value string) string {
