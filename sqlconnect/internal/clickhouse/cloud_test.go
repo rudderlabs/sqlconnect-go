@@ -48,7 +48,7 @@ func TestSQ24_CloudSmoke(t *testing.T) {
 	a := scratchTable(t, db, scratch, "smoke_a_")
 	b := scratchTable(t, db, scratch, "smoke_b_")
 	require.NoError(t, db.CreateTableFromQuery(ctx, a, "SELECT toUInt64(number) AS id, toJSONString(map('k', number)) AS j FROM numbers(3)"))
-	require.Regexp(t, `SharedMergeTree(.|\n)*ORDER BY id`, showCreate(t, db, a))
+	require.Regexp(t, `SharedMergeTree(.|\n)*ORDER BY \(?id\)?`, showCreate(t, db, a))
 	rows := jsonRows(t, db, a)
 	require.Len(t, rows, 3, "the JSON mapper reads the published rows")
 	for i, r := range rows {
@@ -102,7 +102,7 @@ func TestCP26_CloudReplicatedDefault(t *testing.T) {
 		ours := scratchTable(t, db, scratch, "cp26_ours_")
 		_, err = db.CreateTableForQueryWithOptions(ctx, ex, ours, "SELECT toUInt64(1) AS id", sqlconnect.MaterializationOptions{SortingKey: []string{"id"}})
 		require.NoError(t, err, "%s: the explicit ENGINE decides the engine", name)
-		require.Regexp(t, `SharedMergeTree(.|\n)*ORDER BY id`, showCreate(t, db, ours), name)
+		require.Regexp(t, `SharedMergeTree(.|\n)*ORDER BY \(?id\)?`, showCreate(t, db, ours), name)
 	}
 }
 
