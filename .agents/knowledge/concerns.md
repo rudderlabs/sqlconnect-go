@@ -36,6 +36,10 @@
 - Cleanup binary also comments out Trino cleanup path, reinforcing potential maintenance skew for Trino environments (`sqlconnect/cmd/cleanup/cleanup.go`).
 - Release workflow uses `package-name: rudder-server`, which appears mismatched for `sqlconnect-go` and may cause release metadata confusion if unintentional (`.github/workflows/release-please.yaml`).
 
-## INT-7271 — Fabric live-test coverage gap
+## INT-7271 — Fabric live-test credential dependency
 
-- Fabric integration tests run locally when `FABRIC_TEST_ENVIRONMENT_CREDENTIALS` is supplied, but the package is excluded from forced-integration CI because the workflow has no Fabric credential wiring. Add a dedicated matrix entry only after the required secret is provisioned; ordinary unit tests remain covered by `go test ./...` (`sqlconnect/internal/fabric/integration_test.go`, `.github/workflows/test.yaml`).
+- Fabric integration tests require `FABRIC_TEST_ENVIRONMENT_CREDENTIALS`; when
+  `FORCE_RUN_INTEGRATION_TESTS=true`, absence of that secret is a hard failure.
+  Both `.github/workflows/test.yaml` and
+  `.github/workflows/cleanup-test-schemas.yaml` wire the credential, so repository
+  environments must keep it provisioned for integration tests and cleanup.

@@ -45,3 +45,18 @@
   map to `float`, `datetime`, and `string`. `REAL` value `1.1` is returned by
   go-mssqldb as `1.100000023841858`, so JSON mapping expectations must preserve
   that value.
+- `sqlconnect/internal/fabric/db.go::fabricSQLCommands.DropSchema` must remove
+  views before tables and then drop the schema because Fabric T-SQL has no
+  `CASCADE`; live integration coverage must exercise a non-empty schema.
+- Fabric integration jobs must fail when `FORCE_RUN_INTEGRATION_TESTS=true` and
+  `FABRIC_TEST_ENVIRONMENT_CREDENTIALS` is absent. Wire that secret into both
+  `.github/workflows/test.yaml` and `.github/workflows/cleanup-test-schemas.yaml`,
+  and register Fabric in `sqlconnect/cmd/cleanup/cleanup.go` so `tsqlcon_*`
+  schemas do not accumulate.
+- Optional Fabric REST bootstrap in `sqlconnect/internal/fabric/db.go::NewDB`
+  must have a finite default context deadline, and the default client created by
+  `newBootstrapper` must set its own HTTP timeout so construction cannot block
+  indefinitely.
+- `sqlconnect/internal/fabric/dialect.go::FormatTableName` deliberately preserves
+  identifier case for Fabric; document that exception in `sqlconnect.Dialect`
+  and the README because the other dialects fold case.
