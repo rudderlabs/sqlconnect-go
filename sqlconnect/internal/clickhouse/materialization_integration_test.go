@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -259,4 +260,88 @@ func TestSQ7_CatalogOnMaterialization(t *testing.T) {
 		requireCode(t, err, "CH_CATALOG_UNSUPPORTED")
 		require.ErrorIs(t, err, sqlconnect.ErrNotSupported)
 	}
+}
+
+// TestSQ_PublishAsCustomerUser runs the publish path as a user that holds
+// exactly the grants of the customer setup script. The docs promise that this
+// grant set is enough for a whole sync, so a refusal here is a product or docs
+// bug, not a fixture gap. EXCHANGE and the sync_log prune have no driver
+// method: rudder-sources sends them as raw statements (materialization.go
+// publish, sync_logger.go Cleanup), so the test sends the same text.
+func TestSQ_PublishAsCustomerUser(t *testing.T) {
+	for _, tag := range []string{"26.3"} {
+		t.Run(tag, func(t *testing.T) { publishAsCustomer(t, tag) })
+	}
+}
+
+func publishAsCustomer(t *testing.T, tag string) {
+	srv := chtest.Start(t, chtest.Options{Tag: tag})
+	srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
+	srv.AdminExec(t, "CREATE TABLE customer_db.src (id UInt64, v String) ENGINE = MergeTree ORDER BY id")
+	srv.AdminExec(t, "INSERT INTO customer_db.src VALUES (1, 'a'), (2, 'b'), (3, 'c')")
+	var grants []string
+	for _, row := range srv.AdminQuery(t, "SHOW GRANTS FOR rudder_retl") {
+		grants = append(grants, row[0])
+	}
+	require.ElementsMatch(t, []string{
+		"GRANT SELECT ON customer_db.* TO rudder_retl",
+		"GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON _rudderstack.* TO rudder_retl",
+		"GRANT ALTER DELETE ON _rudderstack.sync_log TO rudder_retl",
+		"GRANT SELECT ON system.processes TO rudder_retl",
+		"GRANT SELECT ON system.query_log TO rudder_retl",
+	}, grants, "the user holds the customer grant set and nothing more")
+
+	db := openScoped(t, srv, "rudder_retl", "pw_Retl_123")
+	ex := scopedExec(t, db)
+	ctx := context.Background()
+	ref := func(n string) sqlconnect.RelationRef {
+		return sqlconnect.NewRelationRef(n, sqlconnect.WithSchema("_rudderstack"))
+	}
+	count := func(r sqlconnect.RelationRef) int {
+		t.Helper()
+		n, err := db.CountTableRows(ctx, r)
+		require.NoError(t, err)
+		return n
+	}
+	opts := sqlconnect.MaterializationOptions{SortingKey: []string{"id"}}
+
+	// First sync: no logical table yet, so the candidate is renamed.
+	_, err := db.CreateTableFromQueryWithOptions(ctx, ex, ref("cand_1"), "SELECT id, v FROM customer_db.src", opts)
+	require.NoError(t, err, "CREATE TABLE and INSERT")
+	require.NoError(t, db.RenameTable(ctx, ref("cand_1"), ref("logical")), "RENAME TABLE")
+	require.Equal(t, 3, count(ref("logical")))
+
+	// Second sync: the logical table exists, so the candidate is exchanged.
+	candUUID, err := db.CreateTableFromQueryWithOptions(ctx, ex, ref("cand_2"), "SELECT id, v FROM customer_db.src WHERE id > 1", opts)
+	require.NoError(t, err)
+	oldUUID, err := db.AwaitTable(ctx, ex, ref("logical"), "", sqlconnect.VisibilityPolicy{})
+	require.NoError(t, err)
+	_, err = ex.ExecContext(ctx, "EXCHANGE TABLES `_rudderstack`.`cand_2` AND `_rudderstack`.`logical`")
+	require.NoError(t, err, "EXCHANGE TABLES")
+	_, err = db.AwaitTable(ctx, ex, ref("logical"), candUUID, sqlconnect.VisibilityPolicy{})
+	require.NoError(t, err)
+	_, err = db.AwaitTable(ctx, ex, ref("cand_2"), oldUUID, sqlconnect.VisibilityPolicy{})
+	require.NoError(t, err)
+	require.Equal(t, 2, count(ref("logical")))
+	require.NoError(t, db.DropTable(ctx, ref("cand_2")), "DROP TABLE of the previous target")
+	require.NoError(t, db.AwaitTableAbsent(ctx, ex, ref("cand_2"), sqlconnect.VisibilityPolicy{}))
+
+	// MoveTable copies, counts and drops in the working database.
+	require.NoError(t, db.MoveTable(ctx, ref("logical"), ref("moved")))
+	require.Equal(t, 2, count(ref("moved")))
+
+	// The sync log: created and filled by the user, then pruned as rudder-sources does.
+	for _, q := range []string{
+		"CREATE TABLE IF NOT EXISTS `_rudderstack`.`sync_log` (connection_id String, sync_finished_at DateTime64(9, 'UTC')) ENGINE = MergeTree ORDER BY (connection_id, sync_finished_at)",
+		"INSERT INTO `_rudderstack`.`sync_log` VALUES ('conn', '2000-01-01 00:00:00'), ('conn', now64(9)), ('other', '2000-01-01 00:00:00')",
+		"ALTER TABLE `_rudderstack`.`sync_log` DELETE WHERE sync_finished_at < fromUnixTimestamp64Nano(" +
+			fmt.Sprint(time.Now().UTC().AddDate(0, 0, -30).UnixNano()) + ", 'UTC') AND connection_id = 'conn' SETTINGS mutations_sync = 0",
+	} {
+		_, err := ex.ExecContext(ctx, q)
+		require.NoError(t, err, q)
+	}
+	require.Eventually(t, func() bool {
+		return srv.AdminQuery(t, "SELECT count() FROM system.mutations WHERE database = '_rudderstack' AND table = 'sync_log' AND is_done = 1 AND latest_fail_reason = ''")[0][0] == "1"
+	}, time.Minute, 200*time.Millisecond, "the prune mutation finishes without a failure")
+	require.Equal(t, 2, count(ref("sync_log")), "only the old row of conn is pruned")
 }
