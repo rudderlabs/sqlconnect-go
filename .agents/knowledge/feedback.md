@@ -60,3 +60,8 @@
 - `sqlconnect/internal/fabric/dialect.go::FormatTableName` deliberately preserves
   identifier case for Fabric; document that exception in `sqlconnect.Dialect`
   and the README because the other dialects fold case.
+- Adding a driver to `sqlconnect/config/config.go` also requires adding it to
+  every applicable table and warehouse list in `sqlconnect/dialects_test.go`.
+  Package-local tests do not prove public `sqlconnect.NewDialect` registration
+  or parity for normalization, parsing, quoting, table formatting, conditions,
+  and expressions.
