@@ -28,7 +28,8 @@
 - `sqlconnect/internal/fabric/db.go::fabricSQLCommands` must spell
   `INFORMATION_SCHEMA` views and their column names in uppercase because Fabric
   warehouses default to the case-sensitive `Latin1_General_100_BIN2_UTF8`
-  collation; `catalogMetadataQuery` must qualify the same uppercase spelling.
+  collation; `catalogMetadataQuery` must qualify the same uppercase spelling,
+  and `ListCatalogs` must exclude the system `master` database.
 - `sqlconnect/internal/fabric/dialect.go::newDialect` must use the shared
   `base.NewGoquDialect` with `QuoteIdentifiers=false`. `QueryCondition` callers
   supply identifiers and expressions already formatted for the warehouse, so a
