@@ -621,6 +621,53 @@ func TestValidation_ReadsCarryTheRemainingBudget(t *testing.T) {
 	}
 }
 
+// The probe writes carry the remaining budget as max_execution_time, as the
+// reads do. Without a caller deadline, clickhouse-go sends no time limit.
+func TestValidation_ProbeCarriesTheRemainingBudget(t *testing.T) {
+	for name, c := range map[string]struct {
+		callerDeadline time.Duration // 0 sets none
+		limit          int
+	}{
+		"no caller deadline":  {0, int(validationBudget.Seconds())},
+		"run deadline":        {2 * time.Hour, int(validationBudget.Seconds())},
+		"short call deadline": {30 * time.Second, 30},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := workingCtx(context.Background())
+			if c.callerDeadline > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, c.callerDeadline)
+				defer cancel()
+			}
+			s := &validationStub{}
+			_, err := s.db(t, map[string]any{currentRolesSQL: "r"}, nil).ValidateContext(ctx)
+			require.NoError(t, err)
+			var probe []stubRead
+			for _, w := range s.writes {
+				if strings.HasPrefix(w.q, "CREATE TABLE ") || strings.HasPrefix(w.q, "INSERT INTO ") {
+					probe = append(probe, w)
+				}
+			}
+			require.Len(t, probe, 2, "CREATE and INSERT")
+			readBacks := 0
+			for _, r := range s.reads {
+				if strings.HasPrefix(r.q, "SELECT probe FROM ") {
+					readBacks++
+					require.True(t, r.deadline, "the visibility poll bounds the read back: %s", r.q)
+				}
+			}
+			require.Positive(t, readBacks)
+			for _, r := range probe {
+				require.NoError(t, r.err, r.q)
+				require.False(t, r.deadline, "the fork replaces max_execution_time from a deadline: %s", r.q)
+				limit, ok := r.settings["max_execution_time"].(int)
+				require.True(t, ok, "no time limit: %s", r.q)
+				require.True(t, limit >= c.limit-2 && limit <= c.limit, "%s: max_execution_time %d, want about %d", r.q, limit, c.limit)
+			}
+		})
+	}
+}
+
 func TestValidation_SnapshotIgnoresItsOwnTimeLimit(t *testing.T) {
 	snapshot := func(rows [][]driver.Value) []sqlconnect.ValidationWarning {
 		ex := answerDB(t, func(q string, _ []any) ([]string, [][]driver.Value, error) {
@@ -664,13 +711,17 @@ type answerFunc func(q string, args []any) ([]string, [][]driver.Value, error)
 // answerDB is a pool on the stub driver. Queries go to answer, execs to exec.
 func answerDB(t *testing.T, answer answerFunc, exec func(q string) error) *sql.DB {
 	t.Helper()
+	var execCtx func(context.Context, string) error
+	if exec != nil {
+		execCtx = func(_ context.Context, q string) error { return exec(q) }
+	}
 	return answerDBCtx(t, func(_ context.Context, q string, args []any) ([]string, [][]driver.Value, error) {
 		return answer(q, args)
-	}, exec)
+	}, execCtx)
 }
 
 // answerDBCtx is answerDB with the statement context passed to answer.
-func answerDBCtx(t *testing.T, answer func(ctx context.Context, q string, args []any) ([]string, [][]driver.Value, error), exec func(q string) error) *sql.DB {
+func answerDBCtx(t *testing.T, answer func(ctx context.Context, q string, args []any) ([]string, [][]driver.Value, error), exec func(ctx context.Context, q string) error) *sql.DB {
 	t.Helper()
 	pool := sql.OpenDB(stubConnector{
 		query: func(ctx context.Context, q string, nv []driver.NamedValue) (driver.Rows, error) {
@@ -684,11 +735,11 @@ func answerDBCtx(t *testing.T, answer func(ctx context.Context, q string, args [
 			}
 			return &tableRows{cols: cols, rows: rows}, nil
 		},
-		exec: func(_ context.Context, q string, _ []driver.NamedValue) (driver.Result, error) {
+		exec: func(ctx context.Context, q string, _ []driver.NamedValue) (driver.Result, error) {
 			if exec == nil {
 				return driver.RowsAffected(0), nil
 			}
-			if err := exec(q); err != nil {
+			if err := exec(ctx, q); err != nil {
 				return nil, err
 			}
 			return driver.RowsAffected(0), nil
@@ -750,6 +801,7 @@ type validationStub struct {
 	statement    []string
 	reads        []stubRead
 	execs        []string
+	writes       []stubRead // execs with their settings and deadline
 	created      bool
 	hostReads    int
 	rudderSchema string
@@ -814,11 +866,14 @@ func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail fun
 		default:
 			return []string{"v"}, nil, nil
 		}
-	}, func(q string) error {
+	}, func(ctx context.Context, q string) error {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		s.statement = append(s.statement, q)
 		s.execs = append(s.execs, q)
+		settings, err := p12SettingsAtErr(ctx)
+		_, deadline := ctx.Deadline()
+		s.writes = append(s.writes, stubRead{q: q, settings: settings, err: err, deadline: deadline})
 		if execFail != nil {
 			if err := execFail(q); err != nil {
 				return err

@@ -132,7 +132,6 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 		return res, openFailure(err, refused)
 	}
 	defer func() { _ = conn.Close() }()
-	ex := driverExec{conn: conn, settings: driverScratchSettings}
 
 	// Stage 1: connect and version. It carries the control map, as the hello
 	// does, so a refused driver setting is named by stage 2.
@@ -183,8 +182,9 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 		return res, err
 	}
 
-	// Stage 4: probe.
-	if err := db.probe(ctx, ex); err != nil {
+	// Stage 4: probe. It runs under the read budget, because clickhouse-go
+	// sends max_execution_time only from a context deadline.
+	if err := db.probe(readCtx, reads); err != nil {
 		return res, err
 	}
 
@@ -195,7 +195,7 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 	return res, nil
 }
 
-// readBudget is the time limit of the validation reads. The fork replaces
+// readBudget is the time limit of the validation reads and the probe. The fork replaces
 // max_execution_time with the remaining time of a context deadline plus 5 s,
 // so a read runs on a context without a deadline and sends the remaining
 // budget itself, as stage 2 does. A timer ends that context at the limit.
