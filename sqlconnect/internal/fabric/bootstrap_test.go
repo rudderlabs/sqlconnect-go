@@ -82,26 +82,6 @@ func TestBootstrapCacheIsWorkspaceScoped(t *testing.T) {
 	}, paths)
 }
 
-func TestBootstrapRejectsUnsafeWorkspaceIDs(t *testing.T) {
-	for _, workspaceID := range []string{"../../admin/foo", "workspace/child", "11111111-1111-1111-1111-111111111111%2Fitems", "11111111-1111-1111-1111-111111111111?expand=true"} {
-		t.Run(workspaceID, func(t *testing.T) {
-			var requests atomic.Int32
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				requests.Add(1)
-				w.WriteHeader(http.StatusOK)
-			}))
-			defer server.Close()
-			bootstrap := newBootstrapper(server.Client())
-			bootstrap.apiHost = server.URL
-			bootstrap.credentialFactory = func(Config) (azcore.TokenCredential, error) { return staticCredential{token: "token"}, nil }
-
-			err := bootstrap.bootstrap(context.Background(), Config{TenantID: "tenant", ClientID: "client", FabricWorkspaceID: workspaceID})
-			require.ErrorContains(t, err, "spn_token_bootstrap: fabricWorkspaceId must be a valid UUID")
-			require.Zero(t, requests.Load())
-		})
-	}
-}
-
 func TestBootstrapNonSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)

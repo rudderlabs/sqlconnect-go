@@ -72,7 +72,7 @@ func TestDialectNormaliseIdentifier(t *testing.T) {
 
 		// Fabric: case-sensitive (no transformation)
 		{warehouseType: "fabric", identifier: "Users", expected: "Users"},
-		{warehouseType: "fabric", identifier: "[MixedCase].Tbl", expected: "[MixedCase].Tbl"},
+		{warehouseType: "fabric", identifier: `"MixedCase".Tbl`, expected: `"MixedCase".Tbl`},
 
 		// Trino: lowercase
 		{warehouseType: "trino", identifier: "USERS", expected: "users"},
@@ -120,9 +120,9 @@ func TestDialectQuoteIdentifier(t *testing.T) {
 		{warehouseType: "databricks", identifier: "users", expected: "`users`"},
 		{warehouseType: "databricks", identifier: "user_id", expected: "`user_id`"},
 
-		// Fabric: brackets
-		{warehouseType: "fabric", identifier: "users", expected: "[users]"},
-		{warehouseType: "fabric", identifier: "na]me", expected: "[na]]me]"},
+		// Fabric: double quotes
+		{warehouseType: "fabric", identifier: "users", expected: `"users"`},
+		{warehouseType: "fabric", identifier: `na"me`, expected: `"na""me"`},
 
 		// Trino: double quotes
 		{warehouseType: "trino", identifier: "users", expected: `"users"`},
@@ -176,9 +176,9 @@ func TestDialectQuoteTable(t *testing.T) {
 		{warehouseType: "databricks", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("default"), sqlconnect.WithCatalog("catalog")), expected: "`catalog`.`default`.`users`"},
 
 		// Fabric
-		{warehouseType: "fabric", table: sqlconnect.NewRelationRef("users"), expected: "[users]"},
-		{warehouseType: "fabric", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public")), expected: "[public].[users]"},
-		{warehouseType: "fabric", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public"), sqlconnect.WithCatalog("mydb")), expected: "[mydb].[public].[users]"},
+		{warehouseType: "fabric", table: sqlconnect.NewRelationRef("users"), expected: `"users"`},
+		{warehouseType: "fabric", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public")), expected: `"public"."users"`},
+		{warehouseType: "fabric", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public"), sqlconnect.WithCatalog("mydb")), expected: `"mydb"."public"."users"`},
 
 		// Trino
 		{warehouseType: "trino", table: sqlconnect.NewRelationRef("users"), expected: `"users"`},
@@ -226,9 +226,9 @@ func TestDialectParseRelationRef(t *testing.T) {
 		{warehouseType: "databricks", identifier: "USERS", expected: sqlconnect.RelationRef{Name: "users"}},
 		{warehouseType: "databricks", identifier: "DEFAULT.USERS", expected: sqlconnect.RelationRef{Schema: "default", Name: "users"}},
 
-		// Fabric: preserve case and strip bracket delimiters
+		// Fabric: preserve case and strip double-quote delimiters
 		{warehouseType: "fabric", identifier: "Users", expected: sqlconnect.RelationRef{Name: "Users"}},
-		{warehouseType: "fabric", identifier: "[MixedCase].Tbl", expected: sqlconnect.RelationRef{Schema: "MixedCase", Name: "Tbl"}},
+		{warehouseType: "fabric", identifier: `"MixedCase".Tbl`, expected: sqlconnect.RelationRef{Schema: "MixedCase", Name: "Tbl"}},
 	}
 
 	for _, tt := range tests {

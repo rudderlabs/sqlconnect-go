@@ -12,12 +12,11 @@ import (
 
 func TestFabricAliasRegistersFactory(t *testing.T) {
 	configJSON, err := json.Marshal(sqlconnectconfig.Fabric{
-		Host:               "localhost",
-		Database:           "warehouse",
-		TenantID:           "tenant",
-		ClientID:           "client",
-		ClientSecret:       "secret",
-		SkipHostValidation: true,
+		Host:         "8.8.8.8",
+		Database:     "warehouse",
+		TenantID:     "tenant",
+		ClientID:     "client",
+		ClientSecret: "secret",
 	})
 	require.NoError(t, err)
 

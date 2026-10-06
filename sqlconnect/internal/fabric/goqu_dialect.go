@@ -17,8 +17,8 @@ func init() {
 
 func GoquDialectOptions() *sqlgen.SQLDialectOptions {
 	opts := sqlserver.DialectOptions()
-	// Brackets are applied by Fabric's public dialect. Keeping generated column
-	// references unquoted avoids goqu's single-rune quote model mishandling ']'.
+	// Identifier quoting is applied by callers. Keeping generated column references
+	// unquoted preserves the established QueryCondition contract.
 	opts.QuoteIdentifiers = false
 	// SQL Server/Fabric string literals escape apostrophes by doubling them;
 	// backslash escapes inherited from goqu's SQL Server dialect are not valid T-SQL.

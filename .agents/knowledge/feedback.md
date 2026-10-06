@@ -65,3 +65,16 @@
   Package-local tests do not prove public `sqlconnect.NewDialect` registration
   or parity for normalization, parsing, quoting, table formatting, conditions,
   and expressions.
+- `fabricWorkspaceId` is an opaque Fabric API path value, not a client-validated
+  UUID. `sqlconnect/internal/fabric/bootstrap.go` must keep the host fixed to
+  `api.fabric.microsoft.com`, escape the workspace path segment, and allow the
+  Fabric API to return the existing `spn_token_bootstrap:`-classified error.
+- `sqlconnect/internal/fabric.Config` must not expose `SkipHostValidation` because
+  Fabric has no local/container endpoint that requires loopback access. Its
+  `Parse` method must always use `util.ValidateHost`, while lazy-construction
+  tests can use a public IP literal without dialing it.
+- Fabric identifiers use the shared `base.Dialect` ISO double-quote behavior;
+  `sqlconnect/internal/fabric/dialect.go` overrides only case normalization.
+  Quote-aware dot parsing or bracket-delimiter extensions to
+  `sqlconnect/internal/base/dialect.go` are separate changes and must not be
+  bundled into the Fabric driver PR.

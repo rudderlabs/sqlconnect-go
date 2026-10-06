@@ -70,7 +70,7 @@ func fabricSQLCommands(cmds base.SQLCommands) base.SQLCommands {
 	cmds.ListCatalogs = func() (string, string) { return "SELECT name FROM sys.databases WHERE name <> 'master'", "name" }
 	cmds.CreateSchema = func(schema base.QuotedIdentifier) string {
 		quoted := base.EscapeSqlString(base.UnquotedIdentifier(schema))
-		return fmt.Sprintf("IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'%[1]s') EXEC(N'CREATE SCHEMA %[2]s')", base.EscapeSqlString(base.UnquotedIdentifier(unquoteBracketIdentifier(string(schema)))), quoted)
+		return fmt.Sprintf("IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'%[1]s') EXEC(N'CREATE SCHEMA %[2]s')", base.EscapeSqlString(base.UnquotedIdentifier(unquoteFabricIdentifier(string(schema)))), quoted)
 	}
 	cmds.ListSchemas = func(catalog base.UnquotedIdentifier) (string, string) {
 		stmt := "SELECT SCHEMA_NAME AS schema_name FROM INFORMATION_SCHEMA.SCHEMATA"
@@ -81,7 +81,7 @@ func fabricSQLCommands(cmds base.SQLCommands) base.SQLCommands {
 		return catalogMetadataQuery(catalog, stmt, "schema_name")
 	}
 	cmds.DropSchema = func(schema base.QuotedIdentifier) string {
-		schemaName := base.EscapeSqlString(base.UnquotedIdentifier(unquoteBracketIdentifier(string(schema))))
+		schemaName := base.EscapeSqlString(base.UnquotedIdentifier(unquoteFabricIdentifier(string(schema))))
 		return fmt.Sprintf(
 			"DECLARE @dropStatements NVARCHAR(MAX) = N''; "+
 				"SELECT @dropStatements += N'DROP VIEW '+QUOTENAME(TABLE_SCHEMA)+N'.'+QUOTENAME(TABLE_NAME)+N';' FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = N'%[1]s' AND TABLE_TYPE = N'VIEW'; "+
@@ -112,7 +112,7 @@ func fabricSQLCommands(cmds base.SQLCommands) base.SQLCommands {
 	}
 	cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {
 		oldTable := base.EscapeSqlString(base.UnquotedIdentifier(string(schema) + "." + string(oldName)))
-		newTable := base.EscapeSqlString(base.UnquotedIdentifier(unquoteBracketIdentifier(string(newName))))
+		newTable := base.EscapeSqlString(base.UnquotedIdentifier(unquoteFabricIdentifier(string(newName))))
 		return fmt.Sprintf("EXEC sp_rename N'%s', N'%s', N'OBJECT'", oldTable, newTable)
 	}
 	return cmds
@@ -123,7 +123,7 @@ func catalogMetadataQuery(catalog base.UnquotedIdentifier, stmt string, columns 
 		return stmt
 	}
 
-	quotedCatalog := quoteFabricIdentifier(string(catalog))
+	quotedCatalog := (base.Dialect{}).QuoteIdentifier(string(catalog))
 	qualifiedStmt := strings.Replace(stmt, "INFORMATION_SCHEMA.", quotedCatalog+".INFORMATION_SCHEMA.", 1)
 	emptyColumns := make([]string, 0, len(columns))
 	for _, column := range columns {
@@ -137,13 +137,10 @@ func catalogMetadataQuery(catalog base.UnquotedIdentifier, stmt string, columns 
 	)
 }
 
-func quoteFabricIdentifier(value string) string {
-	return "[" + strings.ReplaceAll(value, "]", "]]") + "]"
-}
-
-func unquoteBracketIdentifier(value string) string {
-	if len(value) >= 2 && value[0] == '[' && value[len(value)-1] == ']' {
-		return strings.ReplaceAll(value[1:len(value)-1], "]]", "]")
+func unquoteFabricIdentifier(value string) string {
+	relation, err := base.ParseRelationRef(value, '"', identity)
+	if err != nil {
+		return value
 	}
-	return value
+	return relation.Name
 }

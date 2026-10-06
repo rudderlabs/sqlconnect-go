@@ -93,9 +93,6 @@ func (b *bootstrapper) bootstrap(ctx context.Context, config Config) error {
 }
 
 func (b *bootstrapper) request(ctx context.Context, config Config) error {
-	if err := validateFabricWorkspaceID(config.FabricWorkspaceID); err != nil {
-		return fmt.Errorf("spn_token_bootstrap: %w", err)
-	}
 	credential, err := b.credentialFactory(config)
 	if err != nil {
 		return fmt.Errorf("spn_token_bootstrap: creating credential: %w", err)

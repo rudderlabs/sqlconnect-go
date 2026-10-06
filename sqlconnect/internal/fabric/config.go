@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/microsoft/go-mssqldb/azuread"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
@@ -28,10 +27,6 @@ type Config struct {
 	// Timeout bounds SQL connection dialing and the optional Fabric REST
 	// bootstrap. It does not impose a timeout on SQL query execution.
 	Timeout time.Duration `json:"timeout"`
-
-	// SkipHostValidation permits loopback hosts for local SQL Server tests. Other
-	// unsafe address classes remain rejected.
-	SkipHostValidation bool `json:"skipHostValidation"`
 }
 
 // Parse decodes and validates a Fabric configuration.
@@ -50,12 +45,7 @@ func (c *Config) Parse(input json.RawMessage) error {
 			return errors.New(name + " is required")
 		}
 	}
-	if c.FabricWorkspaceID != "" {
-		if err := validateFabricWorkspaceID(c.FabricWorkspaceID); err != nil {
-			return err
-		}
-	}
-	return util.ValidateHost(c.Host, util.AllowLoopback(c.SkipHostValidation))
+	return util.ValidateHost(c.Host)
 }
 
 // ConnectionString returns the go-mssqldb Azure AD connection string. Fabric
@@ -78,12 +68,4 @@ func (c Config) ConnectionString() string {
 		Host:     net.JoinHostPort(c.Host, strconv.Itoa(sqlEndpointPort)),
 		RawQuery: query.Encode(),
 	}).String()
-}
-
-func validateFabricWorkspaceID(value string) error {
-	parsed, err := uuid.Parse(value)
-	if err != nil || !strings.EqualFold(value, parsed.String()) {
-		return errors.New("fabricWorkspaceId must be a valid UUID")
-	}
-	return nil
 }

@@ -12,18 +12,17 @@ import (
 
 func TestConfigParse(t *testing.T) {
 	configJSON := json.RawMessage(`{
-		"host":"localhost",
+		"host":"8.8.8.8",
 		"database":"warehouse",
 		"tenantId":"tenant",
 		"clientId":"client",
 		"clientSecret":"secret",
-		"fabricWorkspaceId":"11111111-1111-1111-1111-111111111111",
-		"timeout":1500000000,
-		"skipHostValidation":true
+		"fabricWorkspaceId":"workspace-name",
+		"timeout":1500000000
 	}`)
 	var config Config
 	require.NoError(t, config.Parse(configJSON))
-	require.Equal(t, "localhost", config.Host)
+	require.Equal(t, "8.8.8.8", config.Host)
 	require.Equal(t, 1500*time.Millisecond, config.Timeout)
 
 	for _, field := range []string{"host", "database", "tenantId", "clientId", "clientSecret"} {
@@ -38,14 +37,13 @@ func TestConfigParse(t *testing.T) {
 	}
 }
 
-func TestConfigParseRejectsInvalidWorkspaceID(t *testing.T) {
+func TestConfigParseRejectsLoopbackHost(t *testing.T) {
 	var config Config
 	err := config.Parse(json.RawMessage(`{
-		"host":"localhost", "database":"warehouse", "tenantId":"tenant",
-		"clientId":"client", "clientSecret":"secret", "fabricWorkspaceId":"../admin",
-		"skipHostValidation":true
+		"host":"127.0.0.1", "database":"warehouse", "tenantId":"tenant",
+		"clientId":"client", "clientSecret":"secret"
 	}`))
-	require.ErrorContains(t, err, "fabricWorkspaceId must be a valid UUID")
+	require.ErrorContains(t, err, "loopback")
 }
 
 func TestConnectionString(t *testing.T) {

@@ -33,10 +33,10 @@ func TestGoquDialectUsesCallerQuotedIdentifiersAndEscapesStrings(t *testing.T) {
 		value      any
 		want       string
 	}{
-		{name: "apostrophe literal", identifier: "[name]", value: "O'Reilly", want: "([name] = 'O''Reilly')"},
-		{name: "injection-shaped literal", identifier: "[name]", value: "x'; DROP TABLE dbo.events; --", want: "([name] = 'x''; DROP TABLE dbo.events; --')"},
-		{name: "space in identifier", identifier: "[first name]", value: "Ada", want: "([first name] = 'Ada')"},
-		{name: "closing bracket in identifier", identifier: "[na]]me]", value: 1, want: "([na]]me] = 1)"},
+		{name: "apostrophe literal", identifier: `"name"`, value: "O'Reilly", want: `("name" = 'O''Reilly')`},
+		{name: "injection-shaped literal", identifier: `"name"`, value: "x'; DROP TABLE dbo.events; --", want: `("name" = 'x''; DROP TABLE dbo.events; --')`},
+		{name: "space in identifier", identifier: `"first name"`, value: "Ada", want: `("first name" = 'Ada')`},
+		{name: "double quote in identifier", identifier: `"na""me"`, value: 1, want: `("na""me" = 1)`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -48,9 +48,9 @@ func TestGoquDialectUsesCallerQuotedIdentifiersAndEscapesStrings(t *testing.T) {
 }
 
 func TestGoquDialectInlastUsesFabricCurrentDate(t *testing.T) {
-	expression, err := newDialect().QueryCondition("CAST([created_at] AS DATE)", "inlast", 1, "day")
+	expression, err := newDialect().QueryCondition(`CAST("created_at" AS DATE)`, "inlast", 1, "day")
 	require.NoError(t, err)
-	require.Equal(t, "(CAST([created_at] AS DATE) >= DATEADD(DAY, -1, CAST(CAST(CURRENT_TIMESTAMP AS DATE) AS DATE)))", expression.String())
+	require.Equal(t, `(CAST("created_at" AS DATE) >= DATEADD(DAY, -1, CAST(CAST(CURRENT_TIMESTAMP AS DATE) AS DATE)))`, expression.String())
 }
 
 func toSQL(t *testing.T, expression any) string {

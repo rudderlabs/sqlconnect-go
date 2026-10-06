@@ -1,7 +1,6 @@
 package base
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -66,17 +65,5 @@ func TestDialect(t *testing.T) {
 		parsed, err = d.ParseRelationRef(`"CaTa""LoG".ScHeMA."TaBle"`)
 		require.NoError(t, err)
 		require.Equal(t, sqlconnect.RelationRef{Catalog: "CaTa\"LoG", Schema: "schema", Name: "TaBle"}, parsed)
-	})
-
-	t.Run("bracket-delimited identifiers", func(t *testing.T) {
-		normalised := NormaliseIdentifierWithDelimiters(`[Ca.Ta]]Log].ScHeMa.[Ta.Ble]`, '[', ']', strings.ToLower)
-		require.Equal(t, `[Ca.Ta]]Log].schema.[Ta.Ble]`, normalised)
-
-		parsed, err := ParseRelationRefWithDelimiters(`[Ca.Ta]]Log].ScHeMa.[Ta.Ble]`, '[', ']', strings.ToLower)
-		require.NoError(t, err)
-		require.Equal(t, sqlconnect.RelationRef{Catalog: "Ca.Ta]Log", Schema: "schema", Name: "Ta.Ble"}, parsed)
-
-		_, err = ParseRelationRefWithDelimiters(`one.two.three.four`, '[', ']', strings.ToLower)
-		require.ErrorContains(t, err, "invalid relation reference")
 	})
 }

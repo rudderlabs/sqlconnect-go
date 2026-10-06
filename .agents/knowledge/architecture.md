@@ -50,6 +50,6 @@
 
 ## INT-7271 — Microsoft Fabric connection architecture
 
-- Fabric is a dedicated `internal/fabric` dialect built directly on the shared base layer; an `internal/mssql` abstraction was deferred until MSSQL or Synapse provides a second consumer with proven shared boundaries. Reusable bracket-aware identifier parsing belongs in `internal/base` (`sqlconnect/internal/fabric`, `sqlconnect/internal/base/dialect.go`).
+- Fabric is a dedicated `internal/fabric` dialect built directly on the shared base layer; an `internal/mssql` abstraction was deferred until MSSQL or Synapse provides a second consumer with proven shared boundaries. Fabric uses shared ISO double-quoted identifier behavior and overrides only case folding because its default collation is case-sensitive (`sqlconnect/internal/fabric/dialect.go`).
 - Fabric initially uses client-secret authentication through `go-mssqldb`'s `azuread.NewConnector`. Caller-supplied Azure credentials were deliberately deferred because that connector constructs credentials from the DSN and supporting injection would require a lower-level connector path plus a broader public `DBOption` API (`sqlconnect/internal/fabric/db.go`, `sqlconnect/internal/fabric/config.go`).
 - The Fabric REST bootstrap is optional and runs only when `fabricWorkspaceId` is configured. When enabled, it retains principal-scoped caching and singleflight keyed by tenant ID plus client ID—not workspace ID—because the operation establishes principal-level API access (`sqlconnect/internal/fabric`).
