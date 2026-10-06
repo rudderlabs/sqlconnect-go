@@ -110,6 +110,27 @@ func TestSQ2_CredentialContract(t *testing.T) {
 	requireConfigInvalid(t, err, "secure")
 }
 
+// The account database is the session default, so a catalog database would let
+// unqualified names such as query_log reach the tables the query guard refuses.
+func TestConfig_RefusesBuiltInDatabase(t *testing.T) {
+	for _, name := range []string{"system", "SYSTEM", "System", "information_schema", "INFORMATION_SCHEMA", "Information_Schema"} {
+		t.Run(name, func(t *testing.T) {
+			_, err := clickhouse.ParseConfigForTest(validJSON(func(m map[string]any) { m["database"] = name }), false)
+			requireConfigInvalid(t, err, "database")
+		})
+	}
+	for _, name := range []string{"analytics", "default", "mysystem", "system_logs", "_information_schema"} {
+		t.Run(name, func(t *testing.T) {
+			cfg, err := clickhouse.ParseConfigForTest(validJSON(func(m map[string]any) { m["database"] = name }), false)
+			require.NoError(t, err)
+			require.Equal(t, name, cfg.Database)
+		})
+	}
+	cfg, err := clickhouse.ParseConfigForTest(validJSON(func(m map[string]any) { m["user"] = "system" }), false)
+	require.NoError(t, err, "the rule covers the database, not the user")
+	require.Equal(t, "system", cfg.User)
+}
+
 func TestSQ2_MalformedDocuments(t *testing.T) {
 	valid := string(validJSON(nil))
 	for name, raw := range map[string]string{

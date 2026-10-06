@@ -8,6 +8,7 @@ import (
 	"io"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
@@ -35,6 +36,7 @@ const (
 	passwordErr = "The password cannot contain control characters or start or end with whitespace."
 	portErr     = "Enter a port from 1 to 65535."
 	documentErr = "the account configuration is not valid"
+	builtInErr  = "The database cannot be system or information_schema. Choose the database that holds your data."
 )
 
 const redactedPassword = "[REDACTED]"
@@ -51,6 +53,18 @@ var (
 	// every character, because RE2 and JavaScript disagree on \s and \p{...}.
 	passwordPattern = regexp.MustCompile("^[^\\x00-\\x20\\x7F-\\xA0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]([^\\x00-\\x1F\\x7F-\\x9F]*[^\\x00-\\x20\\x7F-\\xA0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff])?$")
 )
+
+// isBuiltInDatabase reports a ClickHouse catalog database, matched without case.
+// The account database is the session default, so an unqualified name such as
+// query_log would read system.query_log, which the query guard refuses only
+// by its qualified name.
+func isBuiltInDatabase(name string) bool {
+	switch strings.ToLower(name) {
+	case "system", "information_schema":
+		return true
+	}
+	return false
+}
 
 func invalid(field, detail string) error { return cherr.New(cherr.CodeConfigInvalid, field, detail) }
 
@@ -81,6 +95,8 @@ func parseConfig(raw json.RawMessage, allowPlainHTTP bool) (Config, error) {
 		return Config{}, invalid("port", portErr)
 	case !namePattern.MatchString(c.Database):
 		return Config{}, invalid("database", nameErr)
+	case isBuiltInDatabase(c.Database):
+		return Config{}, invalid("database", builtInErr)
 	case !namePattern.MatchString(c.User):
 		return Config{}, invalid("user", nameErr)
 	case !passwordPattern.MatchString(c.Password):

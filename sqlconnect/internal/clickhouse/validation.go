@@ -113,8 +113,7 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 	if !namePattern.MatchString(working) {
 		return res, stageErr(3, "engine", invalid("workingDatabase", nameErr))
 	}
-	switch strings.ToLower(working) {
-	case strings.ToLower(db.cfg.Database), "default", "system", "information_schema":
+	if isBuiltInDatabase(working) || strings.EqualFold(working, db.cfg.Database) || strings.EqualFold(working, "default") {
 		return res, stageErr(3, "engine", invalid("workingDatabase",
 			"the working database must differ from the customer database, default, system and information_schema."))
 	}
