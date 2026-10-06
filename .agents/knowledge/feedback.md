@@ -39,5 +39,9 @@
   `integration_test.Options.DateOf` lets its shared scenarios use
   `CAST(column AS DATE)` instead of unsupported `DATE(column)`.
 - Fabric mapping fixtures must not create `TINYINT` columns because Fabric
-  Warehouse rejects that type. `REAL` value `1.1` is returned by go-mssqldb as
-  `1.100000023841858`, so JSON mapping expectations must preserve that value.
+  Warehouse rejects that type for stored columns. Query expressions can still
+  return `TINYINT`, so `sqlconnect/internal/fabric/mappings.go` must map it to
+  `int`; likewise query-only `SMALLMONEY`, `SMALLDATETIME`, and `BINARY` results
+  map to `float`, `datetime`, and `string`. `REAL` value `1.1` is returned by
+  go-mssqldb as `1.100000023841858`, so JSON mapping expectations must preserve
+  that value.

@@ -10,3 +10,14 @@
 
 - CI's golangci-lint/staticcheck S1016 rejected a field-by-field copy from the internal DB options struct to the structurally identical exported factory options struct. Use direct conversion (`DBFactoryOptions(factoryOptions)`) while their layouts match; it preserves every field and satisfies the repository lint configuration (`sqlconnect/db_factory.go`).
 - Factory callbacks in tests must not return `(nil, nil)`, even after `t.Fatal`, because the enabled `nilnil` linter analyzes the callback signature. Return a local sentinel error on the unreachable path while retaining the defensive test failure (`sqlconnect/db_factory_test.go`).
+
+## INT-7271 — Fabric stored types differ from query-result types
+
+<!-- session: 2026-10-06 -->
+
+- Removing `TINYINT` from `sqlconnect/internal/fabric/mappings.go` because Fabric
+  Warehouse cannot create a `TINYINT` table column was incorrect: user SQL can
+  still return it from `CAST` expressions. Keep unsupported stored types out of
+  `testdata/column-mapping-test-seed.sql`, while mapping query-result `TINYINT`,
+  `SMALLMONEY`, `SMALLDATETIME`, and `BINARY` to `int`, `float`, `datetime`, and
+  `string` for `ListColumnsForSqlQuery` and `QueryJSON`.
