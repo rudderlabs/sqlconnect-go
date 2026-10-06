@@ -86,9 +86,6 @@ func NewDB(db *sql.DB, tunnelCloser func() error, opts ...Option) *DB {
 			MoveTable: func(schema, oldName, newName QuotedIdentifier) string {
 				return fmt.Sprintf("CREATE TABLE %[1]s.%[3]s AS SELECT * FROM %[1]s.%[2]s", schema, oldName, newName)
 			},
-			CreateTableFromQuery: func(table QuotedIdentifier, query string) string {
-				return fmt.Sprintf("CREATE TABLE %[1]s as (%[2]s)", table, query)
-			},
 		},
 	}
 	for _, opt := range opts {
@@ -171,7 +168,5 @@ type (
 		RenameTable func(schema, oldName, newName QuotedIdentifier) string
 		// Provides the SQL command to move a table
 		MoveTable func(schema, oldName, newName QuotedIdentifier) string
-		// Provides the SQL command to create a table from a query
-		CreateTableFromQuery func(table QuotedIdentifier, query string) string
 	}
 )

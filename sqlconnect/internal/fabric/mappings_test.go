@@ -15,7 +15,7 @@ func (m mockColumnType) DecimalSize() (precision, scale int64, ok bool) { return
 func TestColumnTypeMapper(t *testing.T) {
 	tests := map[string]string{
 		"bigint": "int", "decimal(28,10)": "float", "BIT": "boolean",
-		"nvarchar(255)": "string", "datetime2(6)": "datetime", "geography": "GEOGRAPHY",
+		"nvarchar(255)": "string", "datetime2(6)": "datetime", "tinyint": "TINYINT", "geography": "GEOGRAPHY",
 	}
 	for raw, expected := range tests {
 		require.Equal(t, expected, columnTypeMapper(mockColumnType{raw}), raw)

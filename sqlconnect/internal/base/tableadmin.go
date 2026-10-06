@@ -229,7 +229,7 @@ func (db *DB) MoveTable(ctx context.Context, oldRef, newRef sqlconnect.RelationR
 
 // CreateTableFromQuery creates a table from the results of a query
 func (db *DB) CreateTableFromQuery(ctx context.Context, table sqlconnect.RelationRef, query string) error {
-	_, err := db.ExecContext(ctx, db.sqlCommands.CreateTableFromQuery(QuotedIdentifier(db.QuoteTable(table)), query))
+	_, err := db.ExecContext(ctx, fmt.Sprintf(`CREATE TABLE %[1]s as (%[2]s)`, db.QuoteTable(table), query))
 	return err
 }
 

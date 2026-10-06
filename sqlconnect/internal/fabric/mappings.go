@@ -12,7 +12,6 @@ import (
 
 var columnTypeMappings = map[string]string{
 	"BIT":              "boolean",
-	"TINYINT":          "int",
 	"SMALLINT":         "int",
 	"INT":              "int",
 	"INTEGER":          "int",

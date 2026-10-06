@@ -1,6 +1,5 @@
 {
     "_order": "int",
-    "_tinyint": "int",
     "_smallint": "int",
     "_int": "int",
     "_bigint": "int",

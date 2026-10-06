@@ -31,6 +31,11 @@ func TestFabricDB(t *testing.T) {
 		fabric.DatabaseType,
 		configJSONWithoutBootstrap,
 		func(identifier string) string { return identifier },
-		integrationtest.Options{SpecialCharactersInQuotedTable: " _A-"},
+		integrationtest.Options{
+			SpecialCharactersInQuotedTable: " _A-",
+			DateOf: func(column string) string {
+				return "CAST(" + column + " AS DATE)"
+			},
+		},
 	)
 }

@@ -63,17 +63,17 @@ type DB struct {
 
 func fabricSQLCommands(cmds base.SQLCommands) base.SQLCommands {
 	cmds.CurrentCatalog = func() string { return "SELECT DB_NAME()" }
-	cmds.ListCatalogs = func() (string, string) { return "SELECT name FROM sys.databases", "name" }
+	cmds.ListCatalogs = func() (string, string) { return "SELECT name FROM sys.databases WHERE name <> 'master'", "name" }
 	cmds.CreateSchema = func(schema base.QuotedIdentifier) string {
 		quoted := base.EscapeSqlString(base.UnquotedIdentifier(schema))
 		return fmt.Sprintf("IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'%[1]s') EXEC(N'CREATE SCHEMA %[2]s')", base.EscapeSqlString(base.UnquotedIdentifier(unquoteBracketIdentifier(string(schema)))), quoted)
 	}
 	cmds.ListSchemas = func(catalog base.UnquotedIdentifier) (string, string) {
-		stmt := "SELECT schema_name FROM information_schema.schemata"
+		stmt := "SELECT SCHEMA_NAME AS schema_name FROM INFORMATION_SCHEMA.SCHEMATA"
 		return catalogMetadataQuery(catalog, stmt, "schema_name"), "schema_name"
 	}
 	cmds.SchemaExists = func(catalog, schema base.UnquotedIdentifier) string {
-		stmt := fmt.Sprintf("SELECT schema_name FROM information_schema.schemata WHERE schema_name = '%s'", base.EscapeSqlString(schema))
+		stmt := fmt.Sprintf("SELECT SCHEMA_NAME AS schema_name FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '%s'", base.EscapeSqlString(schema))
 		return catalogMetadataQuery(catalog, stmt, "schema_name")
 	}
 	cmds.DropSchema = func(schema base.QuotedIdentifier) string { return fmt.Sprintf("DROP SCHEMA %s", schema) }
@@ -82,30 +82,24 @@ func fabricSQLCommands(cmds base.SQLCommands) base.SQLCommands {
 		return fmt.Sprintf("IF OBJECT_ID(N'%[1]s', N'U') IS NULL CREATE TABLE %[2]s (c1 INT, c2 VARCHAR(255))", literal, table)
 	}
 	cmds.ListTables = func(catalog, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
-		stmt := fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema = '%s'", base.EscapeSqlString(schema))
+		stmt := fmt.Sprintf("SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s'", base.EscapeSqlString(schema))
 		if prefix != "" {
-			stmt += fmt.Sprintf(" AND table_name LIKE '%s'", base.EscapeSqlString(base.UnquotedIdentifier(prefix+"%")))
+			stmt += fmt.Sprintf(" AND TABLE_NAME LIKE '%s'", base.EscapeSqlString(base.UnquotedIdentifier(prefix+"%")))
 		}
 		return []lo.Tuple2[string, string]{{A: catalogMetadataQuery(catalog, stmt, "table_name"), B: "table_name"}}
 	}
 	cmds.TableExists = func(catalog, schema, table base.UnquotedIdentifier) string {
-		stmt := fmt.Sprintf("SELECT table_name FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
+		stmt := fmt.Sprintf("SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s'", base.EscapeSqlString(schema), base.EscapeSqlString(table))
 		return catalogMetadataQuery(catalog, stmt, "table_name")
 	}
 	cmds.ListColumns = func(catalog, schema, table base.UnquotedIdentifier) (string, string, string) {
-		stmt := fmt.Sprintf("SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = '%s' AND table_name = '%s' ORDER BY ordinal_position ASC", base.EscapeSqlString(schema), base.EscapeSqlString(table))
+		stmt := fmt.Sprintf("SELECT COLUMN_NAME AS column_name, DATA_TYPE AS data_type FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME = '%s' ORDER BY ORDINAL_POSITION ASC", base.EscapeSqlString(schema), base.EscapeSqlString(table))
 		return catalogMetadataQuery(catalog, stmt, "column_name", "data_type"), "column_name", "data_type"
 	}
 	cmds.RenameTable = func(schema, oldName, newName base.QuotedIdentifier) string {
 		oldTable := base.EscapeSqlString(base.UnquotedIdentifier(string(schema) + "." + string(oldName)))
 		newTable := base.EscapeSqlString(base.UnquotedIdentifier(unquoteBracketIdentifier(string(newName))))
 		return fmt.Sprintf("EXEC sp_rename N'%s', N'%s', N'OBJECT'", oldTable, newTable)
-	}
-	cmds.MoveTable = func(schema, oldName, newName base.QuotedIdentifier) string {
-		return fmt.Sprintf("CREATE TABLE %[1]s.%[3]s AS SELECT * FROM %[1]s.%[2]s", schema, oldName, newName)
-	}
-	cmds.CreateTableFromQuery = func(table base.QuotedIdentifier, query string) string {
-		return fmt.Sprintf("CREATE TABLE %s AS %s", table, query)
 	}
 	return cmds
 }
@@ -116,7 +110,7 @@ func catalogMetadataQuery(catalog base.UnquotedIdentifier, stmt string, columns 
 	}
 
 	quotedCatalog := "[" + escapeBracketIdentifier(string(catalog)) + "]"
-	qualifiedStmt := strings.Replace(stmt, "information_schema.", quotedCatalog+".information_schema.", 1)
+	qualifiedStmt := strings.Replace(stmt, "INFORMATION_SCHEMA.", quotedCatalog+".INFORMATION_SCHEMA.", 1)
 	emptyColumns := make([]string, 0, len(columns))
 	for _, column := range columns {
 		emptyColumns = append(emptyColumns, fmt.Sprintf("CAST(NULL AS NVARCHAR(128)) AS %s", column))
