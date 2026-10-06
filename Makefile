@@ -4,7 +4,7 @@ GO=go
 LDFLAGS?=-s -w
 
 # go tools versions
-GOLANGCI=github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0
+GOLANGCI=github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 gotestsum=gotest.tools/gotestsum@v1.13.0
 gci=github.com/daixiang0/gci@v0.13.7
 gofumpt=mvdan.cc/gofumpt@latest
