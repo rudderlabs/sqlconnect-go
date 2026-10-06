@@ -21,6 +21,11 @@ type staticCredential struct {
 	scope chan string
 }
 
+func TestNewBootstrapperUsesBoundedHTTPClient(t *testing.T) {
+	bootstrap := newBootstrapper(nil)
+	require.Equal(t, bootstrapHTTPClientTimeout, bootstrap.client.Timeout)
+}
+
 func (c staticCredential) GetToken(_ context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
 	if c.scope != nil {
 		c.scope <- opts.Scopes[0]

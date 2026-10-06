@@ -19,13 +19,15 @@ const sqlEndpointPort = 1433
 
 // Config contains the credentials required to connect to a Microsoft Fabric SQL endpoint.
 type Config struct {
-	Host              string        `json:"host"`
-	Database          string        `json:"database"`
-	TenantID          string        `json:"tenantId"`
-	ClientID          string        `json:"clientId"`
-	ClientSecret      string        `json:"clientSecret"`
-	FabricWorkspaceID string        `json:"fabricWorkspaceId,omitempty"`
-	Timeout           time.Duration `json:"timeout"`
+	Host              string `json:"host"`
+	Database          string `json:"database"`
+	TenantID          string `json:"tenantId"`
+	ClientID          string `json:"clientId"`
+	ClientSecret      string `json:"clientSecret"`
+	FabricWorkspaceID string `json:"fabricWorkspaceId,omitempty"`
+	// Timeout bounds SQL connection dialing and the optional Fabric REST
+	// bootstrap. It does not impose a timeout on SQL query execution.
+	Timeout time.Duration `json:"timeout"`
 
 	// SkipHostValidation permits loopback hosts for local SQL Server tests. Other
 	// unsafe address classes remain rejected.

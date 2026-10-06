@@ -3,6 +3,7 @@ package fabric
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -27,8 +28,21 @@ func TestFabricSQLCommands(t *testing.T) {
 	require.Equal(t, "name", catalogColumn)
 	require.Equal(t, "IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'sch''ema') EXEC(N'CREATE SCHEMA [sch''ema]')", commands.CreateSchema("[sch'ema]"))
 	require.Equal(t, "IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'sch'']ema]x') EXEC(N'CREATE SCHEMA [sch'']ema]]x]')", commands.CreateSchema("[sch']ema]]x]"))
+	require.Equal(t,
+		"DECLARE @dropStatements NVARCHAR(MAX) = N''; "+
+			"SELECT @dropStatements += N'DROP VIEW '+QUOTENAME(TABLE_SCHEMA)+N'.'+QUOTENAME(TABLE_NAME)+N';' FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = N'sch'']ema]x' AND TABLE_TYPE = N'VIEW'; "+
+			"SELECT @dropStatements += N'DROP TABLE '+QUOTENAME(TABLE_SCHEMA)+N'.'+QUOTENAME(TABLE_NAME)+N';' FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = N'sch'']ema]x' AND TABLE_TYPE = N'BASE TABLE'; "+
+			"EXEC sp_executesql @dropStatements; DROP SCHEMA [sch']ema]]x]",
+		commands.DropSchema("[sch']ema]]x]"),
+	)
 	require.Equal(t, "IF OBJECT_ID(N'[schema].[table]', N'U') IS NULL CREATE TABLE [schema].[table] (c1 INT, c2 VARCHAR(255))", commands.CreateTestTable("[schema].[table]"))
 	require.Equal(t, "EXEC sp_rename N'[schema].[old]', N'new', N'OBJECT'", commands.RenameTable("[schema]", "[old]", "[new]"))
+}
+
+func TestEffectiveBootstrapTimeout(t *testing.T) {
+	require.Equal(t, defaultBootstrapTimeout, effectiveBootstrapTimeout(0))
+	require.Equal(t, defaultBootstrapTimeout, effectiveBootstrapTimeout(-time.Second))
+	require.Equal(t, 45*time.Second, effectiveBootstrapTimeout(45*time.Second))
 }
 
 func TestFabricCatalogMetadataCommandsGuardMissingCatalogs(t *testing.T) {

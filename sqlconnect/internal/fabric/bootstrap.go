@@ -21,6 +21,9 @@ const (
 	fabricAPIHost  = "https://api.fabric.microsoft.com"
 	bootstrapTTL   = 24 * time.Hour
 	maxErrorBody   = 64 << 10
+
+	defaultBootstrapTimeout    = 10 * time.Second
+	bootstrapHTTPClientTimeout = 30 * time.Second
 )
 
 type bootstrapCall struct {
@@ -41,7 +44,7 @@ type bootstrapper struct {
 
 func newBootstrapper(client *http.Client) *bootstrapper {
 	if client == nil {
-		client = http.DefaultClient
+		client = &http.Client{Timeout: bootstrapHTTPClientTimeout}
 	}
 	return &bootstrapper{
 		successes: make(map[string]time.Time),

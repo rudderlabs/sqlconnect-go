@@ -1,12 +1,14 @@
 package fabric_test
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/fabric"
 	integrationtest "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/integration_test"
 )
@@ -14,6 +16,9 @@ import (
 func TestFabricDB(t *testing.T) {
 	configJSON, ok := os.LookupEnv("FABRIC_TEST_ENVIRONMENT_CREDENTIALS")
 	if !ok {
+		if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
+			t.Fatal("FABRIC_TEST_ENVIRONMENT_CREDENTIALS environment variable not set")
+		}
 		t.Skip("skipping Fabric integration test due to lack of a test environment")
 	}
 
@@ -36,6 +41,24 @@ func TestFabricDB(t *testing.T) {
 			DateOf: func(column string) string {
 				return "CAST(" + column + " AS DATE)"
 			},
+			ExtraTests: testDropNonEmptySchema,
 		},
 	)
+}
+
+func testDropNonEmptySchema(t *testing.T, db sqlconnect.DB) {
+	ctx := context.Background()
+	schema := sqlconnect.SchemaRef{
+		Name: integrationtest.GenerateTestSchema(func(identifier string) string { return identifier }),
+	}
+	require.NoError(t, db.CreateSchema(ctx, schema))
+	t.Cleanup(func() { _ = db.DropSchema(ctx, schema) })
+
+	table := sqlconnect.NewRelationRef("drop_schema_test", sqlconnect.WithSchema(schema.Name))
+	require.NoError(t, db.CreateTestTable(ctx, table))
+	require.NoError(t, db.DropSchema(ctx, schema))
+
+	exists, err := db.SchemaExists(ctx, schema)
+	require.NoError(t, err)
+	require.False(t, exists)
 }

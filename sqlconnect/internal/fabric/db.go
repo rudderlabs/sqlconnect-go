@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/microsoft/go-mssqldb/azuread"
 	"github.com/samber/lo"
@@ -24,12 +25,8 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		return nil, err
 	}
 	if config.FabricWorkspaceID != "" {
-		ctx := context.Background()
-		if config.Timeout > 0 {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(ctx, config.Timeout)
-			defer cancel()
-		}
+		ctx, cancel := context.WithTimeout(context.Background(), effectiveBootstrapTimeout(config.Timeout))
+		defer cancel()
 		if err := defaultBootstrapper.bootstrap(ctx, config); err != nil {
 			return nil, err
 		}
@@ -61,6 +58,13 @@ type DB struct {
 	*base.DB
 }
 
+func effectiveBootstrapTimeout(configured time.Duration) time.Duration {
+	if configured > 0 {
+		return configured
+	}
+	return defaultBootstrapTimeout
+}
+
 func fabricSQLCommands(cmds base.SQLCommands) base.SQLCommands {
 	cmds.CurrentCatalog = func() string { return "SELECT DB_NAME()" }
 	cmds.ListCatalogs = func() (string, string) { return "SELECT name FROM sys.databases WHERE name <> 'master'", "name" }
@@ -76,7 +80,17 @@ func fabricSQLCommands(cmds base.SQLCommands) base.SQLCommands {
 		stmt := fmt.Sprintf("SELECT SCHEMA_NAME AS schema_name FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '%s'", base.EscapeSqlString(schema))
 		return catalogMetadataQuery(catalog, stmt, "schema_name")
 	}
-	cmds.DropSchema = func(schema base.QuotedIdentifier) string { return fmt.Sprintf("DROP SCHEMA %s", schema) }
+	cmds.DropSchema = func(schema base.QuotedIdentifier) string {
+		schemaName := base.EscapeSqlString(base.UnquotedIdentifier(unquoteBracketIdentifier(string(schema))))
+		return fmt.Sprintf(
+			"DECLARE @dropStatements NVARCHAR(MAX) = N''; "+
+				"SELECT @dropStatements += N'DROP VIEW '+QUOTENAME(TABLE_SCHEMA)+N'.'+QUOTENAME(TABLE_NAME)+N';' FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = N'%[1]s' AND TABLE_TYPE = N'VIEW'; "+
+				"SELECT @dropStatements += N'DROP TABLE '+QUOTENAME(TABLE_SCHEMA)+N'.'+QUOTENAME(TABLE_NAME)+N';' FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = N'%[1]s' AND TABLE_TYPE = N'BASE TABLE'; "+
+				"EXEC sp_executesql @dropStatements; DROP SCHEMA %[2]s",
+			schemaName,
+			schema,
+		)
+	}
 	cmds.CreateTestTable = func(table base.QuotedIdentifier) string {
 		literal := base.EscapeSqlString(base.UnquotedIdentifier(table))
 		return fmt.Sprintf("IF OBJECT_ID(N'%[1]s', N'U') IS NULL CREATE TABLE %[2]s (c1 INT, c2 VARCHAR(255))", literal, table)
