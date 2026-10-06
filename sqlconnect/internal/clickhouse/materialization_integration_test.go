@@ -269,7 +269,7 @@ func TestSQ7_CatalogOnMaterialization(t *testing.T) {
 // method: rudder-sources sends them as raw statements (materialization.go
 // publish, sync_logger.go Cleanup), so the test sends the same text.
 func TestSQ_PublishAsCustomerUser(t *testing.T) {
-	for _, tag := range []string{"26.3"} {
+	for _, tag := range []string{"26.3", "26.9"} {
 		t.Run(tag, func(t *testing.T) { publishAsCustomer(t, tag) })
 	}
 }

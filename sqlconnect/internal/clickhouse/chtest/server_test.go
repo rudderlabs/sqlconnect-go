@@ -22,7 +22,7 @@ import (
 
 func TestFixture_Image(t *testing.T) {
 	require.Equal(t, "clickhouse/clickhouse-server@sha256:810861a2e2d0188744f5f23b2d3ec9ff95812bcb9ddbb8fed13a377a7f305893", chtest.Image("26.3"))
-	for _, tag := range []string{"25.8", "24.8"} {
+	for _, tag := range []string{"26.9", "25.8", "24.8"} {
 		require.Regexp(t, `^clickhouse/clickhouse-server@sha256:[0-9a-f]{64}$`, chtest.Image(tag))
 	}
 	require.Panics(t, func() { chtest.Image("latest") }, "an unpinned tag has no image")

@@ -24,14 +24,14 @@ import (
 )
 
 func TestSQ4_FloorMatrix(t *testing.T) {
-	for tag, ok := range map[string]bool{"26.3": true, "25.8": false, "24.8": false} {
+	for tag, ok := range map[string]bool{"26.9": true, "26.3": true, "25.8": false, "24.8": false} {
 		t.Run(tag, func(t *testing.T) {
 			srv := chtest.Start(t, chtest.Options{Tag: tag})
 			srv.CreateScopedUser(t, "rudder_retl", "pw_Retl_123", "customer_db", "_rudderstack", false)
 			res, err := openScoped(t, srv, "rudder_retl", "pw_Retl_123").ValidateContext(withWorkingDB(context.Background()))
 			if ok {
 				require.NoError(t, err)
-				require.True(t, strings.HasPrefix(res.ServerVersion, "26.3."))
+				require.True(t, strings.HasPrefix(res.ServerVersion, tag+"."))
 				return
 			}
 			requireCode(t, err, "CH_VERSION_BELOW_FLOOR")
