@@ -1,0 +1,1715 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "accept_array_join_function_known_limit",
+      "sql": "SELECT arrayJoin(tags) AS t FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT arrayJoin(tags) AS t FROM db.users"
+    },
+    {
+      "name": "accept_array_join_function_name_in_literal",
+      "sql": "SELECT 'ARRAY JOIN' AS s FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT 'ARRAY JOIN' AS s FROM db.users"
+    },
+    {
+      "name": "accept_array_literal_predicate",
+      "sql": "SELECT id FROM db.users WHERE tags = ['a', 'b']",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE tags = ['a', 'b']"
+    },
+    {
+      "name": "accept_bare_column_having",
+      "sql": "SELECT having, user_id FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT having, user_id FROM t"
+    },
+    {
+      "name": "accept_bare_column_offset",
+      "sql": "SELECT offset, user_id FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT offset, user_id FROM t"
+    },
+    {
+      "name": "accept_bare_column_qualify",
+      "sql": "SELECT qualify, user_id FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT qualify, user_id FROM t"
+    },
+    {
+      "name": "accept_bare_column_sample",
+      "sql": "SELECT sample, user_id FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT sample, user_id FROM t"
+    },
+    {
+      "name": "accept_bare_column_sample_single",
+      "sql": "SELECT sample FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT sample FROM t"
+    },
+    {
+      "name": "accept_bare_column_where",
+      "sql": "SELECT where, user_id FROM t",
+      "verdict": "accept",
+      "normalized": "SELECT where, user_id FROM t"
+    },
+    {
+      "name": "accept_column_named_url",
+      "sql": "SELECT url FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT url FROM db.users"
+    },
+    {
+      "name": "accept_columns_named_s3_and_url",
+      "sql": "SELECT s3, url FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT s3, url FROM db.users"
+    },
+    {
+      "name": "accept_cut_url_parameter_function",
+      "sql": "SELECT cutURLParameter(url, 'a') AS u FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT cutURLParameter(url, 'a') AS u FROM db.users"
+    },
+    {
+      "name": "accept_database_mixed_information_schema",
+      "sql": "SELECT id FROM Information_Schema.users",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM Information_Schema.users"
+    },
+    {
+      "name": "accept_database_mysystem",
+      "sql": "SELECT id FROM mysystem.users",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM mysystem.users"
+    },
+    {
+      "name": "accept_database_system2",
+      "sql": "SELECT id FROM SYSTEM2.users",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM SYSTEM2.users"
+    },
+    {
+      "name": "accept_database_uppercase_system",
+      "sql": "SELECT id FROM SYSTEM.users",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM SYSTEM.users"
+    },
+    {
+      "name": "accept_ends_in_line_comment",
+      "sql": "SELECT id FROM db.users -- members",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users -- members"
+    },
+    {
+      "name": "accept_escaped_backtick_alias",
+      "sql": "SELECT 1 AS `a\\tb`",
+      "verdict": "accept",
+      "normalized": "SELECT 1 AS `a\\tb`"
+    },
+    {
+      "name": "accept_escaped_quoted_alias",
+      "sql": "SELECT 1 AS \"a\\tb\"",
+      "verdict": "accept",
+      "normalized": "SELECT 1 AS \"a\\tb\""
+    },
+    {
+      "name": "accept_extract_from_in_function",
+      "sql": "SELECT EXTRACT(YEAR FROM now()) AS y FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT EXTRACT(YEAR FROM now()) AS y FROM db.users"
+    },
+    {
+      "name": "accept_file_and_url_as_aliases",
+      "sql": "SELECT id AS file, email AS url FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT id AS file, email AS url FROM db.users"
+    },
+    {
+      "name": "accept_final_quoted_column",
+      "sql": "SELECT `FINAL` FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT `FINAL` FROM db.users"
+    },
+    {
+      "name": "accept_format_in_literal",
+      "sql": "SELECT 'FORMAT JSON' AS f FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT 'FORMAT JSON' AS f FROM db.users"
+    },
+    {
+      "name": "accept_function_in_select",
+      "sql": "SELECT lower(email) FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT lower(email) FROM db.users"
+    },
+    {
+      "name": "accept_group_order_partition_by",
+      "sql": "SELECT id, row_number() OVER (PARTITION BY c ORDER BY id) FROM db.users GROUP BY id, c ORDER BY id",
+      "verdict": "accept",
+      "normalized": "SELECT id, row_number() OVER (PARTITION BY c ORDER BY id) FROM db.users GROUP BY id, c ORDER BY id"
+    },
+    {
+      "name": "accept_has_array_function",
+      "sql": "SELECT id FROM db.users WHERE has(tags, 'x')",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE has(tags, 'x')"
+    },
+    {
+      "name": "accept_in_list",
+      "sql": "SELECT id FROM db.users WHERE id IN (1, 2, 3)",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE id IN (1, 2, 3)"
+    },
+    {
+      "name": "accept_in_lone_call_nested_parens",
+      "sql": "SELECT id FROM db.users WHERE id NOT IN ((anything(1)))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE id NOT IN ((anything(1)))"
+    },
+    {
+      "name": "accept_in_lone_unknown_call",
+      "sql": "SELECT id FROM db.users WHERE id GLOBAL IN customFunction(1)",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE id GLOBAL IN customFunction(1)"
+    },
+    {
+      "name": "accept_in_one_cast",
+      "sql": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String))"
+    },
+    {
+      "name": "accept_in_subquery",
+      "sql": "SELECT id FROM db.users WHERE id IN (SELECT id FROM db.vip)",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE id IN (SELECT id FROM db.vip)"
+    },
+    {
+      "name": "accept_in_table_name",
+      "sql": "SELECT id FROM db.users WHERE id IN db.vip",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE id IN db.vip"
+    },
+    {
+      "name": "accept_in_three_casts",
+      "sql": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String), CAST('silver' AS String), CAST('bronze' AS String))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String), CAST('silver' AS String), CAST('bronze' AS String))"
+    },
+    {
+      "name": "accept_in_two_casts",
+      "sql": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String), CAST('gold' AS String))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan IN (CAST('gold' AS String), CAST('gold' AS String))"
+    },
+    {
+      "name": "accept_keyword_column_by",
+      "sql": "SELECT u.by FROM db.users AS u",
+      "verdict": "accept",
+      "normalized": "SELECT u.by FROM db.users AS u"
+    },
+    {
+      "name": "accept_keyword_column_final",
+      "sql": "SELECT t.final FROM db.t AS t",
+      "verdict": "accept",
+      "normalized": "SELECT t.final FROM db.t AS t"
+    },
+    {
+      "name": "accept_keyword_column_format",
+      "sql": "SELECT u.id FROM db.users AS u WHERE u.format = 'csv'",
+      "verdict": "accept",
+      "normalized": "SELECT u.id FROM db.users AS u WHERE u.format = 'csv'"
+    },
+    {
+      "name": "accept_keyword_column_settings",
+      "sql": "SELECT t.settings FROM db.t AS t",
+      "verdict": "accept",
+      "normalized": "SELECT t.settings FROM db.t AS t"
+    },
+    {
+      "name": "accept_keyword_database_by",
+      "sql": "SELECT u.id FROM by.users u",
+      "verdict": "accept",
+      "normalized": "SELECT u.id FROM by.users u"
+    },
+    {
+      "name": "accept_keyword_database_final",
+      "sql": "SELECT t.id FROM final.t AS t",
+      "verdict": "accept",
+      "normalized": "SELECT t.id FROM final.t AS t"
+    },
+    {
+      "name": "accept_keyword_database_sample",
+      "sql": "SELECT u.id FROM sample.users u",
+      "verdict": "accept",
+      "normalized": "SELECT u.id FROM sample.users u"
+    },
+    {
+      "name": "accept_keyword_database_sample_mixed_case",
+      "sql": "SELECT u.id FROM Sample.users u",
+      "verdict": "accept",
+      "normalized": "SELECT u.id FROM Sample.users u"
+    },
+    {
+      "name": "accept_keyword_table_sample",
+      "sql": "SELECT u.id FROM db.sample u",
+      "verdict": "accept",
+      "normalized": "SELECT u.id FROM db.sample u"
+    },
+    {
+      "name": "accept_map_literal_braces",
+      "sql": "SELECT {'a': 1} AS m FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT {'a': 1} AS m FROM db.users"
+    },
+    {
+      "name": "accept_not_in_one_cast",
+      "sql": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String))"
+    },
+    {
+      "name": "accept_not_in_one_value",
+      "sql": "SELECT id FROM db.users WHERE plan NOT IN ('gold')",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan NOT IN ('gold')"
+    },
+    {
+      "name": "accept_not_in_two_casts",
+      "sql": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String), CAST('silver' AS String))",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE plan NOT IN (CAST('gold' AS String), CAST('silver' AS String))"
+    },
+    {
+      "name": "accept_paren_list_after_subquery_uncatalogued",
+      "sql": "SELECT count() FROM ((SELECT 1 AS id) AS a, someTableFn(1) AS b)",
+      "verdict": "accept",
+      "normalized": "SELECT count() FROM ((SELECT 1 AS id) AS a, someTableFn(1) AS b)"
+    },
+    {
+      "name": "accept_paren_list_first_uncatalogued",
+      "sql": "SELECT count() FROM (someTableFn(1) AS a, db.users AS b)",
+      "verdict": "accept",
+      "normalized": "SELECT count() FROM (someTableFn(1) AS a, db.users AS b)"
+    },
+    {
+      "name": "accept_paren_list_join_uncatalogued",
+      "sql": "SELECT count() FROM (someTableFn(1) AS a CROSS JOIN db.users AS b)",
+      "verdict": "accept",
+      "normalized": "SELECT count() FROM (someTableFn(1) AS a CROSS JOIN db.users AS b)"
+    },
+    {
+      "name": "accept_paren_list_second_uncatalogued",
+      "sql": "SELECT count() FROM (db.users AS b, someTableFn(1) AS a)",
+      "verdict": "accept",
+      "normalized": "SELECT count() FROM (db.users AS b, someTableFn(1) AS a)"
+    },
+    {
+      "name": "accept_paren_list_subquery_then_table",
+      "sql": "SELECT a.id FROM ((SELECT id FROM db.users) AS a, db.orders AS b)",
+      "verdict": "accept",
+      "normalized": "SELECT a.id FROM ((SELECT id FROM db.users) AS a, db.orders AS b)"
+    },
+    {
+      "name": "accept_paren_list_tables",
+      "sql": "SELECT a.id FROM (db.users AS a, db.orders AS b)",
+      "verdict": "accept",
+      "normalized": "SELECT a.id FROM (db.users AS a, db.orders AS b)"
+    },
+    {
+      "name": "accept_plain_limit",
+      "sql": "SELECT id FROM db.users LIMIT 10",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users LIMIT 10"
+    },
+    {
+      "name": "accept_quoted_identifier_file",
+      "sql": "SELECT \"file\" FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT \"file\" FROM db.users"
+    },
+    {
+      "name": "accept_string_parameter",
+      "sql": "SELECT id FROM db.users WHERE email = {e:String}",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.users WHERE email = {e:String}"
+    },
+    {
+      "name": "accept_subquery_in_from",
+      "sql": "SELECT s.id FROM (SELECT id FROM db.users) AS s, db.orders AS o",
+      "verdict": "accept",
+      "normalized": "SELECT s.id FROM (SELECT id FROM db.users) AS s, db.orders AS o"
+    },
+    {
+      "name": "accept_substring_from_in_function",
+      "sql": "SELECT substring(email FROM 2) AS s FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT substring(email FROM 2) AS s FROM db.users"
+    },
+    {
+      "name": "accept_system_string_literal",
+      "sql": "SELECT 'system.query_log' AS value",
+      "verdict": "accept",
+      "normalized": "SELECT 'system.query_log' AS value"
+    },
+    {
+      "name": "accept_system_table_name",
+      "sql": "SELECT id FROM db.system",
+      "verdict": "accept",
+      "normalized": "SELECT id FROM db.system"
+    },
+    {
+      "name": "accept_trailing_semicolon",
+      "sql": "SELECT id AS member_id FROM db.users;\n",
+      "verdict": "accept",
+      "normalized": "SELECT id AS member_id FROM db.users"
+    },
+    {
+      "name": "accept_url_encoding_function",
+      "sql": "SELECT encodeURLComponent(url) AS u FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT encodeURLComponent(url) AS u FROM db.users"
+    },
+    {
+      "name": "accept_url_hash_function",
+      "sql": "SELECT URLHash(url) AS h FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT URLHash(url) AS h FROM db.users"
+    },
+    {
+      "name": "accept_url_hierarchy_function",
+      "sql": "SELECT URLHierarchy(url) AS h FROM db.users",
+      "verdict": "accept",
+      "normalized": "SELECT URLHierarchy(url) AS h FROM db.users"
+    },
+    {
+      "name": "refuse_array_join_left_in_cte",
+      "sql": "WITH a AS (SELECT id FROM db.users LEFT ARRAY JOIN tags) SELECT id FROM a",
+      "verdict": "refuse",
+      "clause": "ARRAY JOIN"
+    },
+    {
+      "name": "refuse_array_join_top",
+      "sql": "SELECT id FROM db.users ARRAY JOIN tags",
+      "verdict": "refuse",
+      "clause": "ARRAY JOIN"
+    },
+    {
+      "name": "refuse_bare_column_format",
+      "sql": "SELECT format, user_id FROM t",
+      "verdict": "refuse",
+      "clause": "FORMAT"
+    },
+    {
+      "name": "refuse_column_transformer_apply_after_columns",
+      "sql": "SELECT COLUMNS('p') APPLY(file) FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_bare_name",
+      "sql": "SELECT * APPLY file FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_call",
+      "sql": "SELECT * APPLY(file) FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_lower_case",
+      "sql": "SELECT * apply(file) FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_mixed_case",
+      "sql": "SELECT * Apply(file) FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_qualified_star",
+      "sql": "SELECT t.* APPLY(file) FROM (SELECT 'x.csv' AS path) AS t",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_apply_quoted_name",
+      "sql": "SELECT * APPLY(`file`) FROM (SELECT 'x.csv' AS path)",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_column_transformer_column_named_apply_conservative",
+      "sql": "SELECT apply FROM db.t",
+      "verdict": "refuse",
+      "clause": "COLUMN TRANSFORMER"
+    },
+    {
+      "name": "refuse_explain_ast",
+      "sql": "SELECT * FROM (EXPLAIN AST SELECT 1)",
+      "verdict": "refuse",
+      "clause": "EXPLAIN"
+    },
+    {
+      "name": "refuse_explain_column_named_explain_conservative",
+      "sql": "SELECT explain FROM db.t",
+      "verdict": "refuse",
+      "clause": "EXPLAIN"
+    },
+    {
+      "name": "refuse_explain_lower_case",
+      "sql": "SELECT * FROM (explain ast select 1)",
+      "verdict": "refuse",
+      "clause": "EXPLAIN"
+    },
+    {
+      "name": "refuse_explain_mixed_case",
+      "sql": "SELECT * FROM (Explain SELECT 1)",
+      "verdict": "refuse",
+      "clause": "EXPLAIN"
+    },
+    {
+      "name": "refuse_explain_subquery",
+      "sql": "SELECT * FROM (EXPLAIN SELECT 1)",
+      "verdict": "refuse",
+      "clause": "EXPLAIN"
+    },
+    {
+      "name": "refuse_file_function_in_select",
+      "sql": "SELECT file('x') AS f FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_file_function_in_where",
+      "sql": "SELECT id FROM db.users WHERE c = file('x')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_final_in_subquery",
+      "sql": "SELECT id FROM (SELECT id FROM db.users FINAL)",
+      "verdict": "refuse",
+      "clause": "FINAL"
+    },
+    {
+      "name": "refuse_final_top",
+      "sql": "SELECT id FROM db.users FINAL",
+      "verdict": "refuse",
+      "clause": "FINAL"
+    },
+    {
+      "name": "refuse_format_in_subquery",
+      "sql": "SELECT id FROM (SELECT id FROM db.users FORMAT JSON)",
+      "verdict": "refuse",
+      "clause": "FORMAT"
+    },
+    {
+      "name": "refuse_format_top",
+      "sql": "SELECT id FROM db.users FORMAT JSON",
+      "verdict": "refuse",
+      "clause": "FORMAT"
+    },
+    {
+      "name": "refuse_identifier_parameter",
+      "sql": "SELECT * FROM {tbl:Identifier}",
+      "verdict": "refuse",
+      "clause": "IDENTIFIER PARAMETER"
+    },
+    {
+      "name": "refuse_identifier_parameter_array",
+      "sql": "SELECT id FROM db.users WHERE email IN {cols:Array(Identifier)}",
+      "verdict": "refuse",
+      "clause": "IDENTIFIER PARAMETER"
+    },
+    {
+      "name": "refuse_identifier_parameter_qualified",
+      "sql": "SELECT id FROM {db:Identifier}.users",
+      "verdict": "refuse",
+      "clause": "IDENTIFIER PARAMETER"
+    },
+    {
+      "name": "refuse_into_outfile",
+      "sql": "SELECT id FROM db.users INTO OUTFILE 'x.csv'",
+      "verdict": "refuse",
+      "clause": "INTO OUTFILE"
+    },
+    {
+      "name": "refuse_limit_by_offset_in_subquery",
+      "sql": "SELECT * FROM (SELECT id FROM db.users LIMIT 1 OFFSET 0 BY id)",
+      "verdict": "refuse",
+      "clause": "LIMIT BY"
+    },
+    {
+      "name": "refuse_limit_by_parenthesised_count",
+      "sql": "SELECT id FROM db.users LIMIT (1) BY id",
+      "verdict": "refuse",
+      "clause": "LIMIT BY"
+    },
+    {
+      "name": "refuse_limit_by_top",
+      "sql": "SELECT id FROM db.users LIMIT 1 BY id",
+      "verdict": "refuse",
+      "clause": "LIMIT BY"
+    },
+    {
+      "name": "refuse_multiple_statements",
+      "sql": "SELECT 1; SELECT 2",
+      "verdict": "refuse",
+      "clause": "MULTIPLE STATEMENTS"
+    },
+    {
+      "name": "refuse_network_function_has_column_in_table_credentials",
+      "sql": "SELECT hasColumnInTable('127.0.0.1:9000', 'default', '', 'system', 'one', 'dummy') AS h",
+      "verdict": "refuse",
+      "clause": "NETWORK FUNCTION"
+    },
+    {
+      "name": "refuse_network_function_has_column_in_table_local",
+      "sql": "SELECT HASCOLUMNINTABLE('db', 'users', 'id') AS h",
+      "verdict": "refuse",
+      "clause": "NETWORK FUNCTION"
+    },
+    {
+      "name": "refuse_network_function_has_column_in_table_remote",
+      "sql": "SELECT hasColumnInTable('10.255.255.1:9000', 'system', 'one', 'dummy') AS h",
+      "verdict": "refuse",
+      "clause": "NETWORK FUNCTION"
+    },
+    {
+      "name": "refuse_network_function_has_column_in_table_user",
+      "sql": "SELECT `hasColumnInTable`('10.0.0.1:9000', 'default', 'db', 'users', 'id') AS h",
+      "verdict": "refuse",
+      "clause": "NETWORK FUNCTION"
+    },
+    {
+      "name": "refuse_network_function_has_column_in_table_where",
+      "sql": "SELECT id FROM db.users WHERE hasColumnInTable('10.0.0.1:9000', 'db', 'users', 'id')",
+      "verdict": "refuse",
+      "clause": "NETWORK FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_after_subquery_url",
+      "sql": "SELECT count() FROM ((SELECT 1 AS id) AS a, url('https://attacker.example/x', 'LineAsString') AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_executable",
+      "sql": "SELECT a.id FROM (executable('x.sh', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_file",
+      "sql": "SELECT a.id FROM (file('x.csv', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_hdfs",
+      "sql": "SELECT a.id FROM (hdfs('hdfs://internal-host:9000/x', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_mysql",
+      "sql": "SELECT a.id FROM (mysql('internal-host:3306', 'db', 't', 'u', 'p') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_numbers",
+      "sql": "SELECT a.id FROM (numbers(2) AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_postgresql",
+      "sql": "SELECT a.id FROM (postgresql('internal-host:5432', 'db', 't', 'u', 'p') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_remote",
+      "sql": "SELECT a.id FROM (remote('internal-host:9000', db.users) AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_remote_secure",
+      "sql": "SELECT a.id FROM (remoteSecure('internal-host:9440', db.users) AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_s3",
+      "sql": "SELECT a.id FROM (s3('https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_s3_cluster",
+      "sql": "SELECT a.id FROM (s3Cluster('default', 'https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_url",
+      "sql": "SELECT a.id FROM (url('https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_first_url_cluster",
+      "sql": "SELECT a.id FROM (urlCluster('default', 'https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_in_cte_url",
+      "sql": "WITH s AS (SELECT a.id FROM (url('https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b)) SELECT id FROM s",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_in_subquery_url",
+      "sql": "SELECT id FROM db.users WHERE id IN (SELECT a.id FROM (url('https://attacker.example/x', CSV, 'id UInt64') AS a, db.users AS b))",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_numbers_pair",
+      "sql": "SELECT * FROM (numbers(2) AS a, numbers(2) AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_paren_list_second_url",
+      "sql": "SELECT a.id FROM (db.users AS b, url('https://attacker.example/x', CSV, 'id UInt64') AS a)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_parenthesized_select",
+      "sql": "(SELECT user_id FROM t)",
+      "verdict": "refuse",
+      "clause": "PARENTHESIZED SELECT"
+    },
+    {
+      "name": "refuse_parenthesized_select_nested",
+      "sql": "((SELECT id FROM db.t))",
+      "verdict": "refuse",
+      "clause": "PARENTHESIZED SELECT"
+    },
+    {
+      "name": "refuse_parenthesized_select_nested_spaced",
+      "sql": "( (SELECT id FROM db.t))",
+      "verdict": "refuse",
+      "clause": "PARENTHESIZED SELECT"
+    },
+    {
+      "name": "refuse_parenthesized_select_with",
+      "sql": "(WITH x AS (SELECT 1) SELECT id FROM x)",
+      "verdict": "refuse",
+      "clause": "PARENTHESIZED SELECT"
+    },
+    {
+      "name": "refuse_prewhere",
+      "sql": "SELECT id FROM db.users PREWHERE id > 1",
+      "verdict": "refuse",
+      "clause": "PREWHERE"
+    },
+    {
+      "name": "refuse_sample",
+      "sql": "SELECT id FROM db.users SAMPLE 0.1",
+      "verdict": "refuse",
+      "clause": "SAMPLE"
+    },
+    {
+      "name": "refuse_sample_commented_number",
+      "sql": "SELECT user_id FROM t SAMPLE /* fraction */ 0.5",
+      "verdict": "refuse",
+      "clause": "SAMPLE"
+    },
+    {
+      "name": "refuse_sample_fraction",
+      "sql": "SELECT user_id FROM t SAMPLE .5",
+      "verdict": "refuse",
+      "clause": "SAMPLE"
+    },
+    {
+      "name": "refuse_sample_integer",
+      "sql": "SELECT user_id FROM t SAMPLE 1",
+      "verdict": "refuse",
+      "clause": "SAMPLE"
+    },
+    {
+      "name": "refuse_settings_in_cte",
+      "sql": "WITH a AS (SELECT id FROM db.users SETTINGS final = 0) SELECT id FROM a",
+      "verdict": "refuse",
+      "clause": "SETTINGS"
+    },
+    {
+      "name": "refuse_settings_in_subquery",
+      "sql": "SELECT * FROM (SELECT id FROM db.users SETTINGS max_threads = 1) s",
+      "verdict": "refuse",
+      "clause": "SETTINGS"
+    },
+    {
+      "name": "refuse_system_table_backtick",
+      "sql": "SELECT query FROM `system`.`processes`",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_column_qualified",
+      "sql": "SELECT system.query_log.query FROM db.users",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_comma",
+      "sql": "SELECT query FROM db.users, system.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_comment_gap",
+      "sql": "SELECT query FROM system /* gap */ . query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_cte",
+      "sql": "WITH logs AS (SELECT query FROM system.query_log) SELECT * FROM logs",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_column",
+      "sql": "SELECT u.\"i\\td\" FROM db.users AS u",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_comment_gap",
+      "sql": "SELECT id FROM \"d\\tb\" /* gap */ . users",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_database_hex",
+      "sql": "SELECT query FROM `sys\\x74em`.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_database_null",
+      "sql": "SELECT query FROM \"sys\\Ntem\".\"query_log\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_database_zero",
+      "sql": "SELECT query FROM \"sys\\0tem\".query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_ordinary_database",
+      "sql": "SELECT id FROM \"d\\tb\".users",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_ordinary_table",
+      "sql": "SELECT id FROM db.`u\\tsers`",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_processes_nonhex",
+      "sql": "SELECT query FROM system.`pr\\x7zcesses`",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_processes_null",
+      "sql": "SELECT query FROM \"system\".\"process\\Nes\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_table_nonhex",
+      "sql": "SELECT query FROM system.\"query\\x6zlog\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_escape_table_null",
+      "sql": "SELECT query FROM system.`query\\N_log`",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_exists",
+      "sql": "SELECT id FROM db.users WHERE EXISTS (SELECT 1 FROM system.processes)",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_fails_closed_on_system_column_alias",
+      "sql": "SELECT system.id FROM db.users AS system",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_fails_closed_on_system_column_in_expression",
+      "sql": "SELECT id IN (system.id) FROM db.users AS system",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_fails_closed_on_system_quoted_column_alias",
+      "sql": "SELECT \"system\".id FROM db.users AS \"system\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_global_in",
+      "sql": "SELECT query FROM db.users WHERE query GLOBAL IN system.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_in",
+      "sql": "SELECT query FROM db.users WHERE query IN system.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_in_function",
+      "sql": "SELECT id FROM db.users WHERE in(email, system.query_log)",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_information_schema",
+      "sql": "SELECT name FROM information_schema.tables",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_information_schema_quoted",
+      "sql": "SELECT name FROM \"information_schema\".\"tables\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_information_schema_upper",
+      "sql": "SELECT name FROM INFORMATION_SCHEMA.tables",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_information_schema_upper_backtick",
+      "sql": "SELECT name FROM `INFORMATION_SCHEMA`.`TABLES`",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_join",
+      "sql": "SELECT u.id FROM db.users AS u JOIN system.processes AS p ON u.id = p.query_id",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_nested_comma",
+      "sql": "SELECT query FROM (db.users AS u, (system.query_log AS q))",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_parenthesized_join",
+      "sql": "SELECT query FROM (db.users AS u JOIN system.processes AS p ON 1)",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_processes",
+      "sql": "SELECT query FROM system.processes",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_query_log",
+      "sql": "SELECT query FROM system.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_quoted",
+      "sql": "SELECT query FROM \"system\".\"query_log\"",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_scalar_subquery",
+      "sql": "SELECT (SELECT any(query) FROM system.query_log) AS q FROM db.users",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_subquery",
+      "sql": "SELECT * FROM (SELECT query FROM system.query_log)",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_system_table_union",
+      "sql": "SELECT query FROM db.users UNION ALL SELECT query FROM system.query_log",
+      "verdict": "refuse",
+      "clause": "SYSTEM TABLE"
+    },
+    {
+      "name": "refuse_table_function_backtick_name_in_select",
+      "sql": "SELECT `url`('https://example.test/x', 'LineAsString') AS u FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_comma_cte",
+      "sql": "WITH a AS (SELECT u.id FROM db.users AS u, url('https://example.test/x', CSV, 'id UInt64') AS b) SELECT id FROM a",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_comma_in_paren",
+      "sql": "SELECT count() FROM (system.one AS a, numbers(2) AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_comma_subquery",
+      "sql": "SELECT id FROM (SELECT u.id FROM db.users u, s3('https://example.test/x')) s",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_comma_top",
+      "sql": "SELECT a.id FROM db.users AS a, url('https://example.test/', CSV, 'id UInt64') AS b",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_first_in_paren_cross_join",
+      "sql": "SELECT count() FROM (url('http://169.254.169.254/latest/meta-data/', 'LineAsString') AS a CROSS JOIN system.one AS b)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_first_in_paren_join",
+      "sql": "SELECT * FROM (remote('internal-host:9000', system.users) AS r JOIN system.one AS o ON 1)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_after_param",
+      "sql": "SELECT 1 WHERE {p1:String} IN (remote('host.example', db.t))",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_after_param_nested",
+      "sql": "SELECT 1 WHERE {p1:String} IN ((remote('host.example', db.t)))",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_any_name",
+      "sql": "SELECT id FROM db.users WHERE id IN numbers_mt(10)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_file",
+      "sql": "SELECT id FROM db.users WHERE id IN file('/etc/passwd', CSV, 'id UInt64')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_input",
+      "sql": "SELECT id FROM db.users WHERE id IN input('id UInt64')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_merge",
+      "sql": "SELECT id FROM db.users WHERE id IN merge('db', 'users.*')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_remote",
+      "sql": "SELECT id FROM db.users WHERE id IN remote('h', db.t)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_s3",
+      "sql": "SELECT id FROM db.users WHERE id IN s3('https://attacker.example/x')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_in_subquery_predicate",
+      "sql": "SELECT id FROM (SELECT id FROM db.users WHERE id IN file('x', CSV, 'id UInt64'))",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_join",
+      "sql": "SELECT a.id FROM db.users a JOIN s3('x') b ON a.id = b.id",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_merge_in_select",
+      "sql": "SELECT (SELECT count() FROM db.users) + length(merge('db', 'users.*')) AS n FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_mixed_case_name",
+      "sql": "SELECT Url('https://example.test/x', 'LineAsString') AS u FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_arrowflight",
+      "sql": "SELECT arrowFlight('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_azureblobstorage",
+      "sql": "SELECT azureBlobStorage('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_azureblobstoragecluster",
+      "sql": "SELECT azureBlobStorageCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_cluster",
+      "sql": "SELECT cluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_clusterallreplicas",
+      "sql": "SELECT clusterAllReplicas('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_cosn",
+      "sql": "SELECT cosn('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalake",
+      "sql": "SELECT deltaLake('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakeazure",
+      "sql": "SELECT deltaLakeAzure('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakeazurecluster",
+      "sql": "SELECT deltaLakeAzureCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakecluster",
+      "sql": "SELECT deltaLakeCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakelocal",
+      "sql": "SELECT deltaLakeLocal('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakes3",
+      "sql": "SELECT deltaLakeS3('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_deltalakes3cluster",
+      "sql": "SELECT deltaLakeS3Cluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_dictionary",
+      "sql": "SELECT dictionary('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_executable",
+      "sql": "SELECT executable('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_file",
+      "sql": "SELECT file('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_filecluster",
+      "sql": "SELECT fileCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_format",
+      "sql": "SELECT format('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_fuzzjson",
+      "sql": "SELECT fuzzJSON('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_fuzzquery",
+      "sql": "SELECT fuzzQuery('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_gcs",
+      "sql": "SELECT gcs('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_generate_series",
+      "sql": "SELECT generate_series('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_generaterandom",
+      "sql": "SELECT generateRandom('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_generateseries",
+      "sql": "SELECT generateSeries('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_hdfs",
+      "sql": "SELECT hdfs('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_hdfscluster",
+      "sql": "SELECT hdfsCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_hive",
+      "sql": "SELECT hive('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_hudi",
+      "sql": "SELECT hudi('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_hudicluster",
+      "sql": "SELECT hudiCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_iceberg",
+      "sql": "SELECT iceberg('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_icebergazure",
+      "sql": "SELECT icebergAzure('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_icebergazurecluster",
+      "sql": "SELECT icebergAzureCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_icebergcluster",
+      "sql": "SELECT icebergCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_iceberghdfs",
+      "sql": "SELECT icebergHDFS('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_iceberghdfscluster",
+      "sql": "SELECT icebergHDFSCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_iceberglocal",
+      "sql": "SELECT icebergLocal('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_iceberglocalcluster",
+      "sql": "SELECT icebergLocalCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_icebergs3",
+      "sql": "SELECT icebergS3('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_icebergs3cluster",
+      "sql": "SELECT icebergS3Cluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_input",
+      "sql": "SELECT input('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_jdbc",
+      "sql": "SELECT jdbc('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_loop",
+      "sql": "SELECT loop('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_merge",
+      "sql": "SELECT merge('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mergetreeanalyzeindexes",
+      "sql": "SELECT mergeTreeAnalyzeIndexes('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mergetreeanalyzeindexesuuid",
+      "sql": "SELECT mergeTreeAnalyzeIndexesUUID('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mergetreeindex",
+      "sql": "SELECT mergeTreeIndex('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mergetreeprojection",
+      "sql": "SELECT mergeTreeProjection('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mergetreetextindex",
+      "sql": "SELECT mergeTreeTextIndex('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mongodb",
+      "sql": "SELECT mongodb('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_mysql",
+      "sql": "SELECT mysql('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_null",
+      "sql": "SELECT null('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_numbers",
+      "sql": "SELECT numbers('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_numbers_mt",
+      "sql": "SELECT numbers_mt('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_odbc",
+      "sql": "SELECT odbc('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_oss",
+      "sql": "SELECT oss('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimon",
+      "sql": "SELECT paimon('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimonazure",
+      "sql": "SELECT paimonAzure('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimonazurecluster",
+      "sql": "SELECT paimonAzureCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimoncluster",
+      "sql": "SELECT paimonCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimonhdfs",
+      "sql": "SELECT paimonHDFS('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimonhdfscluster",
+      "sql": "SELECT paimonHDFSCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimonlocal",
+      "sql": "SELECT paimonLocal('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimons3",
+      "sql": "SELECT paimonS3('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_paimons3cluster",
+      "sql": "SELECT paimonS3Cluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_postgresql",
+      "sql": "SELECT postgresql('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_primes",
+      "sql": "SELECT primes('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_prometheusquery",
+      "sql": "SELECT prometheusQuery('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_prometheusqueryrange",
+      "sql": "SELECT prometheusQueryRange('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_redis",
+      "sql": "SELECT redis('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_remote",
+      "sql": "SELECT remote('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_remotesecure",
+      "sql": "SELECT remoteSecure('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_s3",
+      "sql": "SELECT s3('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_s3cluster",
+      "sql": "SELECT s3Cluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_sqlite",
+      "sql": "SELECT sqlite('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_timeseriesdata",
+      "sql": "SELECT timeSeriesData('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_timeseriesmetrics",
+      "sql": "SELECT timeSeriesMetrics('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_timeseriesselector",
+      "sql": "SELECT timeSeriesSelector('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_timeseriestags",
+      "sql": "SELECT timeSeriesTags('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_url",
+      "sql": "SELECT url('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_urlcluster",
+      "sql": "SELECT urlCluster('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_values",
+      "sql": "SELECT values('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_view",
+      "sql": "SELECT view('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_viewexplain",
+      "sql": "SELECT viewExplain('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_viewifpermitted",
+      "sql": "SELECT viewIfPermitted('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_ytsaurus",
+      "sql": "SELECT ytsaurus('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_zeros",
+      "sql": "SELECT zeros('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_name_zeros_mt",
+      "sql": "SELECT zeros_mt('x') AS v FROM db.users",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_not_in_after_param",
+      "sql": "SELECT 1 WHERE {p1:String} NOT IN (remote('host.example', db.t))",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_not_in_url",
+      "sql": "SELECT id FROM db.users WHERE id GLOBAL NOT IN url('https://example.test/x', CSV, 'id UInt64')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_numbers_in_paren_join",
+      "sql": "SELECT count() FROM (numbers(3) AS a JOIN system.one AS b ON 1)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_quoted_in_function",
+      "sql": "SELECT id FROM db.users WHERE `in`(id, url('https://example.test/ids.csv', 'CSV', 'id UInt64'))",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_quoted_name",
+      "sql": "SELECT * FROM `remote`('h', db.t)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_cluster",
+      "sql": "SELECT query FROM cluster('cluster', system.query_log)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_clusterallreplicas",
+      "sql": "SELECT query FROM clusterAllReplicas('cluster', system.processes)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_dictionary",
+      "sql": "SELECT * FROM dictionary('system.query_log')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_loop",
+      "sql": "SELECT query FROM loop(system.processes)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_merge",
+      "sql": "SELECT query FROM merge('system', 'query_log|processes')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_merge_regexp",
+      "sql": "SELECT query FROM merge(REGEXP('system'), 'query_log|processes')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_remote",
+      "sql": "SELECT query FROM remote('host', system.query_log)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_remotesecure",
+      "sql": "SELECT query FROM remoteSecure('host', system.processes)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_system_view",
+      "sql": "SELECT query FROM view(SELECT query FROM system.query_log)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_upper_case_name",
+      "sql": "SELECT id FROM db.users WHERE id = URL('https://example.test/x', 'LineAsString')",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    },
+    {
+      "name": "refuse_table_function_url",
+      "sql": "SELECT * FROM url('https://example.test/x', CSV)",
+      "verdict": "refuse",
+      "clause": "TABLE FUNCTION"
+    }
+  ]
+}

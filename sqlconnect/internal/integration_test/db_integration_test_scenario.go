@@ -32,11 +32,34 @@ type Options struct {
 	SpecialCharactersInQuotedTable string // special characters to test in quoted table identifiers (default: <space>,",',``)
 
 	ExtraTests func(t *testing.T, db sqlconnect.DB)
+
+	// CreateTableSuffix is appended to the raw CREATE TABLE statements, for engines that require a clause.
+	CreateTableSuffix string
+
+	// QuotedConditionIdentifiers makes the date add subtest pass the bare column: the dialect quotes the operand.
+	QuotedConditionIdentifiers bool
+
+	// NewDB builds the database under test. Nil means sqlconnect.NewDB.
+	NewDB func(json.RawMessage) (sqlconnect.DB, error)
+
+	// NoLegacyMappings skips the legacy column and json mapper subtest.
+	NoLegacyMappings bool
+
+	// OpaqueExpressionErrors skips the check that an expression error names the refused operator: the driver
+	// bounds its error text and never echoes caller input.
+	OpaqueExpressionErrors bool
+
+	// ReportsViews expects ListTables to report a view with the view relation type.
+	ReportsViews bool
 }
 
 func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMessage, formatfn func(string) string, opts Options) {
 	schema := sqlconnect.SchemaRef{Name: GenerateTestSchema(formatfn)}
-	db, err := sqlconnect.NewDB(warehouse, configJSON)
+	newDB := func(cfg json.RawMessage) (sqlconnect.DB, error) { return sqlconnect.NewDB(warehouse, cfg) }
+	if opts.NewDB != nil {
+		newDB = opts.NewDB
+	}
+	db, err := newDB(configJSON)
 	require.NoError(t, err, "it should be able to create a new DB")
 	defer func() { _ = db.Close() }()
 
@@ -462,13 +485,19 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		t.Run("invalid operator", func(t *testing.T) {
 			_, err = db.QueryCondition("column", "someop")
 			require.Error(t, err, "it should return an error for an invalid operator")
-			require.ErrorContains(t, err, "unsupported operator: someop", "it should return an error for an invalid operator")
+			if !opts.OpaqueExpressionErrors {
+				require.ErrorContains(t, err, "unsupported operator: someop", "it should return an error for an invalid operator")
+			}
 		})
 
 		t.Run(string(op.Inlast)+" operator", func(t *testing.T) {
 			op := string(op.Inlast)
 			rowCount := 0
-			validateCondition(t, getQueryCondition(t, "DATE("+timeCol+")", op, 1, "day"), rowCount)
+			inlastCol := "DATE(" + timeCol + ")"
+			if opts.QuotedConditionIdentifiers {
+				inlastCol = timeCol
+			}
+			validateCondition(t, getQueryCondition(t, inlastCol, op, 1, "day"), rowCount)
 
 			t.Run("with invalid arguments", func(t *testing.T) {
 				_, err := db.QueryCondition("col", op)
@@ -497,15 +526,19 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			op := string(op.Lt)
 			rowCount := 1
 
-			validateCondition(t, getQueryCondition(t, "DATE("+timeCol+")", op, getDateAddExpression(t, timestampVal, 1, "day")), rowCount)
-			validateCondition(t, getQueryCondition(t, "DATE("+timeCol+")", op, getDateAddExpression(t, "CURRENT_TIMESTAMP", -1, "day")), rowCount)
+			dateCol := "DATE(" + timeCol + ")"
+			if opts.QuotedConditionIdentifiers {
+				dateCol = timeCol // the dialect quotes the operand; ClickHouse compares DateTime64 with Date
+			}
+			validateCondition(t, getQueryCondition(t, dateCol, op, getDateAddExpression(t, timestampVal, 1, "day")), rowCount)
+			validateCondition(t, getQueryCondition(t, dateCol, op, getDateAddExpression(t, "CURRENT_TIMESTAMP", -1, "day")), rowCount)
 		})
 	})
 
 	t.Run("dialect", func(t *testing.T) {
 		t.Run("with unquoted table", func(t *testing.T) {
 			identifier := db.QuoteIdentifier(schema.Name) + "." + "UnQuoted_TablE"
-			_, err := db.Exec("CREATE TABLE " + identifier + " (c1 int)")
+			_, err := db.Exec("CREATE TABLE " + identifier + " (c1 int)" + opts.CreateTableSuffix)
 			require.NoError(t, err, "it should be able to create an unquoted table")
 
 			table, err := db.ParseRelationRef(identifier)
@@ -521,7 +554,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 
 		t.Run("with quoted table", func(t *testing.T) {
 			identifier := db.QuoteIdentifier(schema.Name) + "." + db.QuoteIdentifier("Quoted_TablE")
-			_, err := db.Exec("CREATE TABLE " + identifier + " (c1 int)")
+			_, err := db.Exec("CREATE TABLE " + identifier + " (c1 int)" + opts.CreateTableSuffix)
 			require.NoErrorf(t, err, "it should be able to create a quoted table: %s", identifier)
 
 			table, err := db.ParseRelationRef(identifier)
@@ -542,7 +575,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			}
 
 			identifier := db.QuoteIdentifier(schema.Name) + "." + db.QuoteIdentifier("Quoted_TablE"+specialCharacters)
-			_, err := db.Exec("CREATE TABLE " + identifier + " (c1 int)")
+			_, err := db.Exec("CREATE TABLE " + identifier + " (c1 int)" + opts.CreateTableSuffix)
 			require.NoErrorf(t, err, "it should be able to create a quoted table: %s", identifier)
 
 			table, err := db.ParseRelationRef(identifier)
@@ -558,6 +591,12 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 	})
 
 	t.Run("table admin", func(t *testing.T) {
+		expectedView := func(v sqlconnect.RelationRef) sqlconnect.RelationRef {
+			if opts.ReportsViews {
+				v.Type = sqlconnect.ViewRelation
+			}
+			return v
+		}
 		table := sqlconnect.NewRelationRef(formatfn("test_table"), sqlconnect.WithSchema(schema.Name))
 		view := sqlconnect.NewRelationRef(formatfn("test_view"), sqlconnect.WithSchema(schema.Name))
 
@@ -623,7 +662,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		t.Run("list tables with views", func(t *testing.T) {
 			tables, err := db.ListTables(ctx, schema)
 			require.NoError(t, err, "it should be able to list tables")
-			require.Contains(t, tables, view, "it should contain the created view")
+			require.Contains(t, tables, expectedView(view), "it should contain the created view")
 			require.Contains(t, tables, table, "it should contain the table as well")
 		})
 
@@ -638,7 +677,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			viewWithCatalog := view
 			viewWithCatalog.Catalog = currentCatalog.Name
 			require.Contains(t, tables, tableWithCatalog, "it should contain the created table")
-			require.Contains(t, tables, viewWithCatalog, "it should contain the created view")
+			require.Contains(t, tables, expectedView(viewWithCatalog), "it should contain the created view")
 		})
 
 		t.Run("list tables with nonexistent catalog", func(t *testing.T) {
@@ -741,7 +780,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 				normalizedQuotedColumnWithoutQuotes := parsedRel.Name
 
 				tableIdentifier := db.QuoteIdentifier(schema.Name) + "." + db.QuoteIdentifier("table_mixed_case")
-				_, err = db.Exec(fmt.Sprintf("CREATE TABLE %[1]s (%[2]s int, %[3]s int)", tableIdentifier, unquotedColumn, quotedColumn))
+				_, err = db.Exec(fmt.Sprintf("CREATE TABLE %[1]s (%[2]s int, %[3]s int)", tableIdentifier, unquotedColumn, quotedColumn) + opts.CreateTableSuffix)
 				require.NoErrorf(t, err, "it should be able to create a quoted table: %s", tableIdentifier)
 
 				table, err := db.ParseRelationRef(tableIdentifier)
@@ -1075,89 +1114,91 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			}
 		})
 
-		t.Run("legacy column and json mapper", func(t *testing.T) {
-			if !opts.LegacySupport {
-				t.Skip("legacy column and json mapper test skipped for warehouse " + warehouse)
-			}
-			altConfigJSON, err := sjson.SetBytes(configJSON, "useLegacyMappings", true)
-			require.NoError(t, err, "it should be able to set useLegacyMappings")
-			legacyDB, err := sqlconnect.NewDB(warehouse, altConfigJSON)
-			require.NoError(t, err, "it should be able to create a new DB")
-			defer func() { _ = legacyDB.Close() }()
-
-			t.Run("list columns", func(t *testing.T) {
-				expectedColsJSON, err := os.ReadFile("testdata/legacy-column-mapping-test-columns-table.json")
-				require.NoErrorf(t, err, "it should be able to read the legacy column mappings json file")
-				var expectedColsMap map[string]string
-				err = json.Unmarshal(expectedColsJSON, &expectedColsMap)
-				require.NoErrorf(t, err, "it should be able to unmarshal the legacy column mappings json file")
-				expectedCols := lo.MapToSlice(expectedColsMap, func(k, v string) sqlconnect.ColumnRef {
-					return sqlconnect.ColumnRef{Name: k, Type: v}
-				})
-				t.Run("without catalog", func(t *testing.T) {
-					actualCols, err := legacyDB.ListColumns(ctx, table)
-					require.NoError(t, err, "it should be able to list columns")
-					actualCols = lo.Map(actualCols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
-						require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
-						col.RawType = ""
-						return col
-					})
-					require.ElementsMatch(t, actualCols, expectedCols, "it should return the correct columns")
-				})
-				t.Run("with catalog", func(t *testing.T) {
-					table := table
-					table.Catalog = currentCatalog.Name
-					actualCols, err := legacyDB.ListColumns(ctx, table)
-					require.NoError(t, err, "it should be able to list columns")
-					actualCols = lo.Map(actualCols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
-						require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
-						col.RawType = ""
-						return col
-					})
-					require.ElementsMatch(t, actualCols, expectedCols, "it should return the correct columns")
-				})
-			})
-
-			t.Run("list columns for sql query", func(t *testing.T) {
-				expectedColsJSON, err := os.ReadFile("testdata/legacy-column-mapping-test-columns-sql.json")
-				require.NoErrorf(t, err, "it should be able to read the legacy column mappings json file")
-				var expectedColsMap map[string]string
-				err = json.Unmarshal(expectedColsJSON, &expectedColsMap)
-				require.NoErrorf(t, err, "it should be able to unmarshal the legacy column mappings json file")
-				expectedCols := lo.MapToSlice(expectedColsMap, func(k, v string) sqlconnect.ColumnRef {
-					return sqlconnect.ColumnRef{Name: k, Type: v}
-				})
-
-				actualCols, err := legacyDB.ListColumnsForSqlQuery(ctx, selectSQL)
-				require.NoError(t, err, "it should be able to list columns")
-				actualCols = lo.Map(actualCols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
-					require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
-					col.RawType = ""
-					return col
-				})
-				require.ElementsMatch(t, actualCols, expectedCols, "it should return the correct columns")
-			})
-
-			t.Run("json mapper", func(t *testing.T) {
-				expectedRowsJSON, err := os.ReadFile("testdata/legacy-column-mapping-test-rows.json")
-				require.NoErrorf(t, err, "it should be able to read the legacy rows json file")
-
-				ch, leave := sqlconnect.QueryJSONAsync(ctx, legacyDB, selectSQL)
-				defer leave()
-				var rows []any
-				for row := range ch {
-					require.NoError(t, row.Err, "it should be able to scan a row")
-					var o any
-					err := json.Unmarshal(row.Value, &o)
-					require.NoError(t, err, "it should be able to unmarshal the row")
-					rows = append(rows, o)
+		if !opts.NoLegacyMappings {
+			t.Run("legacy column and json mapper", func(t *testing.T) {
+				if !opts.LegacySupport {
+					t.Skip("legacy column and json mapper test skipped for warehouse " + warehouse)
 				}
-				actualRowsJSON, err := json.Marshal(rows)
-				require.NoError(t, err, "it should be able to marshal the rows")
+				altConfigJSON, err := sjson.SetBytes(configJSON, "useLegacyMappings", true)
+				require.NoError(t, err, "it should be able to set useLegacyMappings")
+				legacyDB, err := sqlconnect.NewDB(warehouse, altConfigJSON)
+				require.NoError(t, err, "it should be able to create a new DB")
+				defer func() { _ = legacyDB.Close() }()
 
-				require.JSONEq(t, string(expectedRowsJSON), string(actualRowsJSON), "it should return the correct rows: "+string(actualRowsJSON))
+				t.Run("list columns", func(t *testing.T) {
+					expectedColsJSON, err := os.ReadFile("testdata/legacy-column-mapping-test-columns-table.json")
+					require.NoErrorf(t, err, "it should be able to read the legacy column mappings json file")
+					var expectedColsMap map[string]string
+					err = json.Unmarshal(expectedColsJSON, &expectedColsMap)
+					require.NoErrorf(t, err, "it should be able to unmarshal the legacy column mappings json file")
+					expectedCols := lo.MapToSlice(expectedColsMap, func(k, v string) sqlconnect.ColumnRef {
+						return sqlconnect.ColumnRef{Name: k, Type: v}
+					})
+					t.Run("without catalog", func(t *testing.T) {
+						actualCols, err := legacyDB.ListColumns(ctx, table)
+						require.NoError(t, err, "it should be able to list columns")
+						actualCols = lo.Map(actualCols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+							require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
+							col.RawType = ""
+							return col
+						})
+						require.ElementsMatch(t, actualCols, expectedCols, "it should return the correct columns")
+					})
+					t.Run("with catalog", func(t *testing.T) {
+						table := table
+						table.Catalog = currentCatalog.Name
+						actualCols, err := legacyDB.ListColumns(ctx, table)
+						require.NoError(t, err, "it should be able to list columns")
+						actualCols = lo.Map(actualCols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+							require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
+							col.RawType = ""
+							return col
+						})
+						require.ElementsMatch(t, actualCols, expectedCols, "it should return the correct columns")
+					})
+				})
+
+				t.Run("list columns for sql query", func(t *testing.T) {
+					expectedColsJSON, err := os.ReadFile("testdata/legacy-column-mapping-test-columns-sql.json")
+					require.NoErrorf(t, err, "it should be able to read the legacy column mappings json file")
+					var expectedColsMap map[string]string
+					err = json.Unmarshal(expectedColsJSON, &expectedColsMap)
+					require.NoErrorf(t, err, "it should be able to unmarshal the legacy column mappings json file")
+					expectedCols := lo.MapToSlice(expectedColsMap, func(k, v string) sqlconnect.ColumnRef {
+						return sqlconnect.ColumnRef{Name: k, Type: v}
+					})
+
+					actualCols, err := legacyDB.ListColumnsForSqlQuery(ctx, selectSQL)
+					require.NoError(t, err, "it should be able to list columns")
+					actualCols = lo.Map(actualCols, func(col sqlconnect.ColumnRef, _ int) sqlconnect.ColumnRef {
+						require.NotEmptyf(t, col.RawType, "it should return the raw type for column %q", col.Name)
+						col.RawType = ""
+						return col
+					})
+					require.ElementsMatch(t, actualCols, expectedCols, "it should return the correct columns")
+				})
+
+				t.Run("json mapper", func(t *testing.T) {
+					expectedRowsJSON, err := os.ReadFile("testdata/legacy-column-mapping-test-rows.json")
+					require.NoErrorf(t, err, "it should be able to read the legacy rows json file")
+
+					ch, leave := sqlconnect.QueryJSONAsync(ctx, legacyDB, selectSQL)
+					defer leave()
+					var rows []any
+					for row := range ch {
+						require.NoError(t, row.Err, "it should be able to scan a row")
+						var o any
+						err := json.Unmarshal(row.Value, &o)
+						require.NoError(t, err, "it should be able to unmarshal the row")
+						rows = append(rows, o)
+					}
+					actualRowsJSON, err := json.Marshal(rows)
+					require.NoError(t, err, "it should be able to marshal the rows")
+
+					require.JSONEq(t, string(expectedRowsJSON), string(actualRowsJSON), "it should return the correct rows: "+string(actualRowsJSON))
+				})
 			})
-		})
+		}
 
 		t.Run("async query", func(t *testing.T) {
 			t.Run("QueryJSONMapAsync without error", func(t *testing.T) {

@@ -1,10 +1,10 @@
-.PHONY: help default test test-run generate lint fmt
+.PHONY: help default test test-run test-clickhouse-cloud generate lint fmt
 
 GO=go
 LDFLAGS?=-s -w
 
 # go tools versions
-GOLANGCI=github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0
+GOLANGCI=github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 gotestsum=gotest.tools/gotestsum@v1.13.0
 gci=github.com/daixiang0/gci@v0.13.7
 gofumpt=mvdan.cc/gofumpt@latest
@@ -40,6 +40,9 @@ else
 	$(eval CMD = $(TEST_CMD) -count=1 $(TEST_OPTIONS) ${PACKAGES})
 endif
 	$(CMD)
+
+test-clickhouse-cloud: ## Before-GA ClickHouse Cloud arm (needs CLICKHOUSE_CLOUD_CONFIG)
+	$(GO) test -tags clickhouse_cloud -count=1 -v -timeout 30m -run 'Cloud|Native9440' ./sqlconnect/internal/clickhouse/
 
 help: ## Show the available commands
 	@grep -E '^[0-9a-zA-Z_-]+:.*?## .*$$' ./Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
