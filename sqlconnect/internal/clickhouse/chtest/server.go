@@ -1,5 +1,6 @@
-// Package chtest starts digest-pinned ClickHouse containers with a TLS fixture
-// and puts a fault-injecting proxy in front of them. It is for tests only.
+// Package chtest starts digest-pinned ClickHouse containers through the
+// rudder-go-kit ClickHouse resource and puts a fault-injecting proxy in front
+// of them. It is for tests only.
 package chtest
 
 import (
@@ -13,25 +14,24 @@ import (
 	_ "embed"
 	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"math/big"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
 	"github.com/stretchr/testify/require"
+
+	chresource "github.com/rudderlabs/rudder-go-kit/testhelper/docker/resource/clickhouse"
 )
 
 const (
@@ -39,8 +39,6 @@ const (
 	// memoryLimit caps every fixture container (host load limits).
 	memoryLimit = 1 << 30
 	adminUser   = "admin"
-	// containerLabel marks fixture containers so a stale one is easy to find and remove.
-	containerLabel = "sqlconnect-go.chtest"
 )
 
 //go:embed images.json
@@ -77,14 +75,22 @@ type Options struct {
 
 // Server is a running ClickHouse container.
 type Server struct {
-	Host          string // "localhost": the name the fixture certificate carries
-	HTTPSPort     int
-	HTTPPort      int
+	Host      string // "localhost": a name that both certificates carry
+	HTTPSPort int    // the server's own HTTPS port, with the go-kit certificate
+	// HTTPPort is a plain HTTP port on 127.0.0.1. The go-kit resource
+	// publishes only TLS ports in TLS mode, so a local bridge relays this port
+	// to HTTPSPort.
+	HTTPPort int
+	// CA trusts the server's own certificate and the front certificate that
+	// proxies and balancers present.
 	CA            *x509.CertPool
 	AdminUser     string
 	AdminPassword string
 
-	serverCert  tls.Certificate
+	// frontCert carries the SANs localhost and rebind.test and no IP SAN, so
+	// 127.0.0.1 through a proxy gives a hostname mismatch. go-kit does not
+	// expose its server key, so proxies and balancers present this one.
+	frontCert   tls.Certificate
 	pool        *dockertest.Pool
 	containerID string
 	httpClient  *http.Client
@@ -100,118 +106,83 @@ func Start(t *testing.T, o Options) *Server {
 		tz = "UTC"
 	}
 
-	caPool, serverCert, certPEM, keyPEM := newTLSFixture(t)
-	dir := t.TempDir()
-	certDir := filepath.Join(dir, "certs")
-	require.NoError(t, os.Mkdir(certDir, 0o755))
-	// The server runs as uid 101 inside the container and must read the
-	// mounted files. The key is a throwaway test key.
-	require.NoError(t, os.Chmod(certDir, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(certDir, "server.crt"), certPEM, 0o644))
-	require.NoError(t, os.WriteFile(filepath.Join(certDir, "server.key"), keyPEM, 0o644)) //nolint:gosec // throwaway test key
-	tlsXML := filepath.Join(dir, "tls.xml")
-	require.NoError(t, os.WriteFile(tlsXML, []byte(tlsConfigXML), 0o644))
-	// Mount single files into config.d: the image's own docker_related_config.xml
-	// there sets listen_host and must stay.
-	mounts := []string{
-		certDir + ":/etc/clickhouse-server/certs:ro",
-		tlsXML + ":/etc/clickhouse-server/config.d/tls.xml:ro",
-	}
-	if o.ConfigXML != "" {
-		extra := filepath.Join(dir, "extra.xml")
-		require.NoError(t, os.WriteFile(extra, []byte(o.ConfigXML), 0o644))
-		mounts = append(mounts, extra+":/etc/clickhouse-server/config.d/zz_extra.xml:ro")
-	}
-
 	pool, err := dockertest.NewPool("")
 	require.NoError(t, err)
 	pool.MaxWait = 5 * time.Minute
 
-	// dockertest builds the reference as repository + ":" + tag, so the digest
-	// is split across both fields.
-	pinned := repository + "@" + digest
-	if _, err := pool.Client.InspectImage(pinned); err != nil {
-		require.NoError(t, pool.Client.PullImage(docker.PullImageOptions{
-			Repository: repository, Tag: digest, // the Engine API accepts a digest as the tag
-		}, docker.AuthConfiguration{}))
-	}
-
 	password := randomString(t, 24)
-	loopback := func() []docker.PortBinding { return []docker.PortBinding{{HostIP: "127.0.0.1", HostPort: ""}} }
-	res, err := pool.RunWithOptions(&dockertest.RunOptions{
-		Repository: repository + "@sha256",
-		Tag:        strings.TrimPrefix(digest, "sha256:"),
-		Env: []string{
-			"CLICKHOUSE_USER=" + adminUser,
-			"CLICKHOUSE_PASSWORD=" + password,
-			"CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1",
-			"TZ=" + tz,
-		},
-		Mounts:       mounts,
-		ExposedPorts: []string{"8443/tcp", "8123/tcp"},
-		// Publish on loopback only: the admin password must not reach other hosts.
-		PortBindings: map[docker.Port][]docker.PortBinding{"8443/tcp": loopback(), "8123/tcp": loopback()},
-		Labels:       map[string]string{containerLabel: t.Name()},
-	}, func(hc *docker.HostConfig) {
-		hc.AutoRemove = true
-		hc.PublishAllPorts = false
-		hc.Memory = memoryLimit
-		hc.MemorySwap = memoryLimit
-		hc.RestartPolicy = docker.RestartPolicy{Name: "no"}
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		if err := pool.Purge(res); err != nil {
-			t.Logf("chtest: purge container %s: %v", res.Container.ID, err)
-		}
-	})
-
-	img, err := pool.Client.InspectImage(res.Container.Image)
-	require.NoError(t, err)
-	require.Contains(t, img.RepoDigests, pinned, "the container runs the pinned image")
-	require.EqualValues(t, memoryLimit, res.Container.HostConfig.Memory, "the container has the memory limit")
-
-	httpsPort, err := strconv.Atoi(res.GetPort("8443/tcp"))
-	require.NoError(t, err)
-	httpPort, err := strconv.Atoi(res.GetPort("8123/tcp"))
+	opts := []chresource.Opt{
+		// go-kit pulls by digest and refuses a container whose image has another digest.
+		chresource.WithImage(repository + ":" + o.Tag + "@" + digest),
+		chresource.WithTLS(),
+		chresource.WithUser(adminUser),
+		chresource.WithPassword(password),
+		chresource.WithDatabase("default"),
+		chresource.WithEnv("TZ=" + tz),
+		chresource.WithMemory(memoryLimit),
+		chresource.WithPrintLogsOnError(true),
+	}
+	if o.ConfigXML != "" {
+		opts = append(opts, chresource.WithConfig(o.ConfigXML))
+	}
+	res, err := chresource.Setup(pool, t, opts...)
 	require.NoError(t, err)
 
+	httpsPort, err := strconv.Atoi(res.HTTPPort)
+	require.NoError(t, err)
+	frontCA, frontCert := newFrontCert(t)
+	caPool := x509.NewCertPool()
+	require.True(t, caPool.AppendCertsFromPEM(res.CAPEM), "the go-kit CA parses")
+	caPool.AddCert(frontCA)
+
+	bridgeTLS := res.TLSConfig.Clone()
+	bridgeTLS.ServerName = "localhost"
 	s := &Server{
 		Host:          "localhost",
 		HTTPSPort:     httpsPort,
-		HTTPPort:      httpPort,
+		HTTPPort:      startPlainBridge(t, net.JoinHostPort("127.0.0.1", res.HTTPPort), bridgeTLS),
 		CA:            caPool,
 		AdminUser:     adminUser,
 		AdminPassword: password,
-		serverCert:    serverCert,
+		frontCert:     frontCert,
 		pool:          pool,
-		containerID:   res.Container.ID,
+		containerID:   res.ContainerID,
 		httpClient:    newLoopbackClient(),
 	}
 	t.Cleanup(s.httpClient.CloseIdleConnections)
-
-	require.NoError(t, pool.Retry(func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.plainURL("/ping", nil), nil)
-		if err != nil {
-			return err
-		}
-		resp, err := s.httpClient.Do(req)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = resp.Body.Close() }()
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("ping status %d", resp.StatusCode)
-		}
-		return nil
-	}), "the server answers /ping")
 
 	version := s.AdminQuery(t, "SELECT version()")[0][0]
 	require.True(t, strings.HasPrefix(version, o.Tag+"."), "server version %s for tag %s", version, o.Tag)
 	t.Logf("clickhouse image=%s version=%s", s.ImageDigest(t), version)
 	return s
+}
+
+// startPlainBridge listens on 127.0.0.1 and relays each plain connection to
+// upstream over TLS. It returns the port.
+func startPlainBridge(t *testing.T, upstream string, cfg *tls.Config) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			wg.Go(func() {
+				relay(c, func() (net.Conn, error) {
+					d := tls.Dialer{Config: cfg}
+					return d.Dial("tcp", upstream)
+				})
+			})
+		}
+	})
+	t.Cleanup(func() {
+		_ = ln.Close()
+		wg.Wait()
+	})
+	return ln.Addr().(*net.TCPAddr).Port
 }
 
 // ImageDigest returns the digest of the running container's image, read from
@@ -412,32 +383,16 @@ func (s *Server) plainURL(path string, q url.Values) string {
 	return u.String()
 }
 
-const tlsConfigXML = `<clickhouse>
-    <http_port>8123</http_port>
-    <https_port>8443</https_port>
-    <openSSL>
-        <server>
-            <certificateFile>/etc/clickhouse-server/certs/server.crt</certificateFile>
-            <privateKeyFile>/etc/clickhouse-server/certs/server.key</privateKeyFile>
-            <verificationMode>none</verificationMode>
-            <loadDefaultCAFile>false</loadDefaultCAFile>
-            <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1</disableProtocols>
-        </server>
-    </openSSL>
-</clickhouse>
-`
-
-// newTLSFixture creates a test CA and a server certificate with the SANs
-// DNS:localhost and DNS:rebind.test only. It has no IP SAN, so 127.0.0.1 gives
-// a hostname mismatch.
-func newTLSFixture(t *testing.T) (*x509.CertPool, tls.Certificate, []byte, []byte) {
+// newFrontCert creates a test CA and a front certificate with the SANs
+// DNS:localhost and DNS:rebind.test only.
+func newFrontCert(t *testing.T) (*x509.Certificate, tls.Certificate) {
 	t.Helper()
 	now := time.Now()
 	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	caTmpl := &x509.Certificate{
 		SerialNumber:          serial(t),
-		Subject:               pkix.Name{CommonName: "chtest CA"},
+		Subject:               pkix.Name{CommonName: "chtest front CA"},
 		NotBefore:             now.Add(-time.Minute),
 		NotAfter:              now.Add(24 * time.Hour),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
@@ -463,16 +418,7 @@ func newTLSFixture(t *testing.T) (*x509.CertPool, tls.Certificate, []byte, []byt
 	}
 	der, err := x509.CreateCertificate(rand.Reader, tmpl, caCert, &key.PublicKey, caKey)
 	require.NoError(t, err)
-	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
-	require.NoError(t, err)
-
-	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
-	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
-	pair, err := tls.X509KeyPair(certPEM, keyPEM)
-	require.NoError(t, err)
-	caPool := x509.NewCertPool()
-	caPool.AddCert(caCert)
-	return caPool, pair, certPEM, keyPEM
+	return caCert, tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
 }
 
 func serial(t *testing.T) *big.Int {

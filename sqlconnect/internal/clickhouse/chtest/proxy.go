@@ -22,7 +22,7 @@ import (
 // ProxyOptions configure NewProxy.
 type ProxyOptions struct {
 	IdleTimeout time.Duration // the proxy's server-side keep-alive timeout, 0 for the net/http default
-	PlainHTTP   bool          // serve plain HTTP instead of TLS with the fixture certificate
+	PlainHTTP   bool          // serve plain HTTP instead of TLS with the front certificate
 	// RewriteSQL, when set, replaces the statement text (body or "query"
 	// parameter) before the proxy forwards it.
 	RewriteSQL func(string) string
@@ -84,7 +84,7 @@ type Proxy struct {
 }
 
 // NewProxy starts a proxy on 127.0.0.1 that forwards to srv's plain HTTP port.
-// It serves TLS with the fixture certificate unless o.PlainHTTP is set.
+// It serves TLS with the front certificate unless o.PlainHTTP is set.
 func NewProxy(t *testing.T, srv *Server, o ProxyOptions) *Proxy {
 	t.Helper()
 	p := &Proxy{
@@ -101,7 +101,7 @@ func NewProxy(t *testing.T, srv *Server, o ProxyOptions) *Proxy {
 	if o.PlainHTTP {
 		p.srv.Start()
 	} else {
-		p.srv.TLS = &tls.Config{Certificates: []tls.Certificate{srv.serverCert}, MinVersion: tls.VersionTLS12}
+		p.srv.TLS = &tls.Config{Certificates: []tls.Certificate{srv.frontCert}, MinVersion: tls.VersionTLS12}
 		p.srv.StartTLS()
 	}
 	t.Cleanup(func() {

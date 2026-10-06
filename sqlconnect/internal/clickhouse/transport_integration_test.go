@@ -72,6 +72,8 @@ func TestSQ26_RebindOverBothTransports(t *testing.T) {
 func TestSQ5_TLSMatrix(t *testing.T) {
 	srv := server(t)
 	p := chtest.NewProxy(t, srv, chtest.ProxyOptions{PlainHTTP: true}) // counts plain-port requests
+	// The server's own certificate carries IP SANs, the front certificate does not.
+	front := chtest.NewProxy(t, srv, chtest.ProxyOptions{})
 	try := func(host string, port int, secure bool, roots *x509.CertPool) error {
 		cfg := withHostPort(srv.Config(srv.AdminUser, srv.AdminPassword, "default", secure), host, port)
 		db, err := clickhouse.NewDBForTest(cfg, testPolicy, roots)
@@ -81,9 +83,9 @@ func TestSQ5_TLSMatrix(t *testing.T) {
 		return db.QueryRowContext(context.Background(), "SELECT 1").Scan(&one)
 	}
 	require.NoError(t, try("localhost", srv.HTTPSPort, true, srv.CA), "HTTPS with a trusted certificate")
-	requireCode(t, try("localhost", srv.HTTPSPort, true, nil), "CH_TLS")    // unknown CA: system roots only
-	requireCode(t, try("127.0.0.1", srv.HTTPSPort, true, srv.CA), "CH_TLS") // hostname mismatch: no IP SAN
-	requireCode(t, try("localhost", p.Port(), true, srv.CA), "CH_TLS")      // secure=true against a plain listener
+	requireCode(t, try("localhost", srv.HTTPSPort, true, nil), "CH_TLS")   // unknown CA: system roots only
+	requireCode(t, try("127.0.0.1", front.Port(), true, srv.CA), "CH_TLS") // hostname mismatch: no IP SAN
+	requireCode(t, try("localhost", p.Port(), true, srv.CA), "CH_TLS")     // secure=true against a plain listener
 	require.Empty(t, p.Requests(), "no insecure retry follows a TLS failure")
 	require.NoError(t, try("localhost", srv.HTTPPort, false, nil), "plain arm under AllowPlainHTTP")
 }
