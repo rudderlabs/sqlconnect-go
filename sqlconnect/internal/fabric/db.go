@@ -109,7 +109,7 @@ func catalogMetadataQuery(catalog base.UnquotedIdentifier, stmt string, columns 
 		return stmt
 	}
 
-	quotedCatalog := "[" + escapeBracketIdentifier(string(catalog)) + "]"
+	quotedCatalog := quoteFabricIdentifier(string(catalog))
 	qualifiedStmt := strings.Replace(stmt, "INFORMATION_SCHEMA.", quotedCatalog+".INFORMATION_SCHEMA.", 1)
 	emptyColumns := make([]string, 0, len(columns))
 	for _, column := range columns {
@@ -123,7 +123,9 @@ func catalogMetadataQuery(catalog base.UnquotedIdentifier, stmt string, columns 
 	)
 }
 
-func escapeBracketIdentifier(value string) string { return strings.ReplaceAll(value, "]", "]]") }
+func quoteFabricIdentifier(value string) string {
+	return "[" + strings.ReplaceAll(value, "]", "]]") + "]"
+}
 
 func unquoteBracketIdentifier(value string) string {
 	if len(value) >= 2 && value[0] == '[' && value[len(value)-1] == ']' {

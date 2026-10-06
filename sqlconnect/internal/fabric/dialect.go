@@ -2,7 +2,6 @@ package fabric
 
 import (
 	"encoding/json"
-	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
@@ -27,7 +26,7 @@ func (d dialect) QuoteTable(table sqlconnect.RelationRef) string {
 }
 
 func (dialect) QuoteIdentifier(name string) string {
-	return "[" + strings.ReplaceAll(name, "]", "]]") + "]"
+	return quoteFabricIdentifier(name)
 }
 
 // Fabric identifiers retain their case because Fabric's default collation is case-sensitive.
