@@ -13,6 +13,8 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/rudder-go-kit/cachettl"
 )
 
 type staticCredential struct {
@@ -52,7 +54,7 @@ func TestBootstrapRequestAndCache(t *testing.T) {
 	require.EqualValues(t, 1, requests.Load())
 }
 
-func TestBootstrapCacheIsWorkspaceScoped(t *testing.T) {
+func TestBootstrapCacheIsPrincipalScoped(t *testing.T) {
 	var paths []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
@@ -68,9 +70,12 @@ func TestBootstrapCacheIsWorkspaceScoped(t *testing.T) {
 	firstWorkspace.FabricWorkspaceID = "11111111-1111-1111-1111-111111111111"
 	secondWorkspace := reusedPrincipal
 	secondWorkspace.FabricWorkspaceID = "22222222-2222-2222-2222-222222222222"
+	secondPrincipal := secondWorkspace
+	secondPrincipal.ClientID = "other-client"
 
 	require.NoError(t, bootstrap.bootstrap(context.Background(), firstWorkspace))
 	require.NoError(t, bootstrap.bootstrap(context.Background(), secondWorkspace))
+	require.NoError(t, bootstrap.bootstrap(context.Background(), secondPrincipal))
 	require.Equal(t, []string{
 		"/v1/workspaces/11111111-1111-1111-1111-111111111111/items",
 		"/v1/workspaces/22222222-2222-2222-2222-222222222222/items",
@@ -177,12 +182,11 @@ func TestBootstrapCacheExpires(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
-	bootstrap := newBootstrapper(server.Client())
+	now := time.Now()
+	bootstrap := newBootstrapper(server.Client(), cachettl.WithNow(func() time.Time { return now }))
 	bootstrap.apiHost = server.URL
 	bootstrap.credentialFactory = func(Config) (azcore.TokenCredential, error) { return staticCredential{token: "token"}, nil }
 	bootstrap.ttl = time.Hour
-	now := time.Now()
-	bootstrap.now = func() time.Time { return now }
 	config := Config{TenantID: "tenant", ClientID: "client", FabricWorkspaceID: "11111111-1111-1111-1111-111111111111"}
 
 	require.NoError(t, bootstrap.bootstrap(context.Background(), config))

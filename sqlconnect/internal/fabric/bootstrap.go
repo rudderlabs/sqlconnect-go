@@ -8,13 +8,14 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"golang.org/x/sync/singleflight"
+
+	"github.com/rudderlabs/rudder-go-kit/cachettl"
 )
 
 const (
@@ -27,26 +28,24 @@ const (
 )
 
 type bootstrapper struct {
-	mu                sync.Mutex
-	successes         map[string]time.Time
+	done              *cachettl.Cache[string, bool]
 	group             singleflight.Group
 	ttl               time.Duration
-	now               func() time.Time
 	client            *http.Client
 	apiHost           string
 	credentialFactory func(Config) (azcore.TokenCredential, error)
 }
 
-func newBootstrapper(client *http.Client) *bootstrapper {
+func newBootstrapper(client *http.Client, cacheOptions ...cachettl.Opt) *bootstrapper {
 	if client == nil {
 		client = &http.Client{}
 	}
+	cacheOptions = append([]cachettl.Opt{cachettl.WithNoRefreshTTL}, cacheOptions...)
 	return &bootstrapper{
-		successes: make(map[string]time.Time),
-		ttl:       bootstrapTTL,
-		now:       time.Now,
-		client:    client,
-		apiHost:   fabricAPIHost,
+		done:    cachettl.New[string, bool](cacheOptions...),
+		ttl:     bootstrapTTL,
+		client:  client,
+		apiHost: fabricAPIHost,
 		credentialFactory: func(config Config) (azcore.TokenCredential, error) {
 			return azidentity.NewClientSecretCredential(config.TenantID, config.ClientID, config.ClientSecret, nil)
 		},
@@ -56,27 +55,19 @@ func newBootstrapper(client *http.Client) *bootstrapper {
 var defaultBootstrapper = newBootstrapper(nil)
 
 func (b *bootstrapper) bootstrap(ctx context.Context, config Config) error {
-	key := config.TenantID + "\x00" + config.ClientID + "\x00" + config.FabricWorkspaceID
-	b.mu.Lock()
-	if at, ok := b.successes[key]; ok && b.now().Sub(at) < b.ttl {
-		b.mu.Unlock()
+	key := config.TenantID + "\x00" + config.ClientID
+	if b.done.Get(key) {
 		return nil
 	}
-	b.mu.Unlock()
 
 	result := b.group.DoChan(key, func() (any, error) {
-		b.mu.Lock()
-		if at, ok := b.successes[key]; ok && b.now().Sub(at) < b.ttl {
-			b.mu.Unlock()
+		if b.done.Get(key) {
 			return struct{}{}, nil
 		}
-		b.mu.Unlock()
 
 		err := b.request(ctx, config)
 		if err == nil {
-			b.mu.Lock()
-			b.successes[key] = b.now()
-			b.mu.Unlock()
+			b.done.Put(key, true, b.ttl)
 		}
 		return struct{}{}, err
 	})
