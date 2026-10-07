@@ -87,15 +87,15 @@
   directly. Calling `base.ParseRelationRef` incorrectly treats dots inside
   schema and table names as qualification separators.
 - Fabric's goqu dialect must retain six fractional-second digits for `datetime2`
-  comparisons. Its `ListTables` prefix query must escape T-SQL `LIKE`
-  metacharacters `%`, `_`, and `[`, plus the selected escape character, before
-  appending the prefix wildcard.
-- Later INT-7271 review superseded two preceding directions to preserve
-  repository-wide behavior: `sqlconnect/internal/fabric/db.go::ListTables` must
-  use the shared unescaped `LIKE '<prefix>%'` semantics until wildcard handling
-  changes in `internal/base`, and `sqlconnect/cmd/cleanup/cleanup.go` must fail
-  when any warehouse credential variable is missing rather than silently skip
-  that warehouse.
+  comparisons. Final live-review guidance requires
+  `sqlconnect/internal/fabric/db.go::ListTables` to treat `WithPrefix` literally:
+  escape `~`, `%`, `_`, and `[` with `~`, emit `ESCAPE '~'`, then append the
+  wildcard. This deliberately differs from the shared unescaped prefix behavior
+  because T-SQL's `[` wildcard could make cleanup over-match and drop unrelated
+  tables.
+- Later INT-7271 review superseded the earlier cleanup guidance:
+  `sqlconnect/cmd/cleanup/cleanup.go` must fail when any warehouse credential
+  variable is missing rather than silently skip that warehouse.
 - `sqlconnect/internal/fabric/bootstrap.go` must use
   `singleflight.Group.DoChan` for in-flight request deduplication while each
   caller selects the shared result against its own context. Keep the successful
