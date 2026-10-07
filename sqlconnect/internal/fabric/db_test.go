@@ -67,7 +67,11 @@ func TestFabricCatalogMetadataCommandsGuardMissingCatalogs(t *testing.T) {
 	tables := commands.ListTables("missing", "public", "ev")
 	require.Len(t, tables, 1)
 	require.Equal(t, "table_name", tables[0].B)
-	require.Equal(t, `IF DB_ID(N'missing') IS NULL SELECT CAST(NULL AS NVARCHAR(128)) AS table_name WHERE 1 = 0 ELSE EXEC(N'SELECT TABLE_NAME AS table_name FROM "missing".INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ''public'' AND TABLE_NAME LIKE ''ev%''')`, tables[0].A)
+	require.Equal(t, `IF DB_ID(N'missing') IS NULL SELECT CAST(NULL AS NVARCHAR(128)) AS table_name WHERE 1 = 0 ELSE EXEC(N'SELECT TABLE_NAME AS table_name FROM "missing".INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ''public'' AND TABLE_NAME LIKE ''ev%'' ESCAPE ''~''')`, tables[0].A)
+
+	tables = commands.ListTables("", "public", "a[1]_50%~'")
+	require.Len(t, tables, 1)
+	require.Equal(t, `SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'public' AND TABLE_NAME LIKE 'a~[1]~_50~%~~''%' ESCAPE '~'`, tables[0].A)
 
 	listColumns, nameColumn, typeColumn := commands.ListColumns("missing", "public", "events")
 	require.Equal(t, "column_name", nameColumn)
