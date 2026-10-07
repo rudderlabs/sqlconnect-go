@@ -24,7 +24,7 @@ require (
 	github.com/ory/dockertest/v3 v3.12.0
 	github.com/rudderlabs/clickhouse-go/v2 v2.48.0
 	github.com/rudderlabs/goqu/v10 v10.3.1
-	github.com/rudderlabs/rudder-go-kit v0.81.0
+	github.com/rudderlabs/rudder-go-kit v0.82.0
 	github.com/rudderlabs/sql-tunnels v0.1.7
 	github.com/samber/lo v1.53.0
 	github.com/sirupsen/logrus v1.9.4
