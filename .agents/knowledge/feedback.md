@@ -90,3 +90,20 @@
   comparisons. Its `ListTables` prefix query must escape T-SQL `LIKE`
   metacharacters `%`, `_`, and `[`, plus the selected escape character, before
   appending the prefix wildcard.
+- Later INT-7271 review superseded two preceding directions to preserve
+  repository-wide behavior: `sqlconnect/internal/fabric/db.go::ListTables` must
+  use the shared unescaped `LIKE '<prefix>%'` semantics until wildcard handling
+  changes in `internal/base`, and `sqlconnect/cmd/cleanup/cleanup.go` must fail
+  when any warehouse credential variable is missing rather than silently skip
+  that warehouse.
+- `sqlconnect/internal/fabric/bootstrap.go` must use
+  `singleflight.Group.DoChan` for in-flight request deduplication while each
+  caller selects the shared result against its own context. Keep the successful
+  TTL cache, and leave the default `http.Client` without a separate timeout
+  because `NewDB` supplies the configured or default 10-second deadline.
+- Fabric API non-2xx errors need only the `spn_token_bootstrap:` prefix, HTTP
+  status, and top-level `errorCode`/`requestId`. Do not parse nested test-only
+  error objects or append retryability and generic permission guidance.
+- Do not add a Fabric-only `sqlconnect/config/config_test.go`; public Fabric rows
+  in `sqlconnect/dialects_test.go` cover registration through the config import,
+  while the live integration test exercises `NewDB`.
