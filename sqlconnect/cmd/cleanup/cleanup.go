@@ -42,12 +42,10 @@ func main() {
 	g.SetLimit(4)
 	for _, c := range cleanupConfigs {
 		g.Go(func() error {
-			configJSON, ok := os.LookupEnv(c.Env)
+			configJSON, ok := cleanupConfigFromEnv(c)
 			if !ok {
-				log.Fatalf("%s environment variable not set", c.Env)
-			}
-			if c.Fn != nil {
-				configJSON = c.Fn(configJSON)
+				log.Printf("[%s] skipping cleanup: %s environment variable not set or empty", c.Type, c.Env)
+				return nil
 			}
 			db, err := sqlconnect.NewDB(c.Type, []byte(configJSON))
 			if err != nil {
@@ -80,4 +78,15 @@ type cleanupConfig struct {
 	Type string
 	Env  string
 	Fn   func(string) string
+}
+
+func cleanupConfigFromEnv(config cleanupConfig) (string, bool) {
+	configJSON := strings.TrimSpace(os.Getenv(config.Env))
+	if configJSON == "" {
+		return "", false
+	}
+	if config.Fn != nil {
+		configJSON = config.Fn(configJSON)
+	}
+	return configJSON, true
 }

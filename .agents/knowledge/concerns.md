@@ -42,4 +42,11 @@
   `FORCE_RUN_INTEGRATION_TESTS=true`, absence of that secret is a hard failure.
   Both `.github/workflows/test.yaml` and
   `.github/workflows/cleanup-test-schemas.yaml` wire the credential, so repository
-  environments must keep it provisioned for integration tests and cleanup.
+  environments must keep it provisioned for integration tests and cleanup. The
+  secret was not provisioned during PR #581 review, so an owner must add it
+  before the Fabric CI scenario can pass and provide live coverage.
+- `sqlconnect/internal/base/dialect.go::doNormaliseIdentifier` ranges over byte
+  offsets but uses those offsets to index a rune slice during lookahead, so a
+  quoted Unicode identifier such as `"日本語""x"` can panic. Fabric admin commands
+  no longer call this parser, but its public `ParseRelationRef` remains exposed;
+  fix it in a separate shared-parser PR with Unicode regression coverage.

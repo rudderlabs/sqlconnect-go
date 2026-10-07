@@ -28,6 +28,7 @@ func TestFabricSQLCommands(t *testing.T) {
 	require.Equal(t, "name", catalogColumn)
 	require.Equal(t, `IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'sch''ema') EXEC(N'CREATE SCHEMA "sch''ema"')`, commands.CreateSchema(`"sch'ema"`))
 	require.Equal(t, `IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'sch''"ema') EXEC(N'CREATE SCHEMA "sch''""ema"')`, commands.CreateSchema(`"sch'""ema"`))
+	require.Equal(t, `IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = N'sales.eu') EXEC(N'CREATE SCHEMA "sales.eu"')`, commands.CreateSchema(`"sales.eu"`))
 	require.Equal(t,
 		"DECLARE @dropStatements NVARCHAR(MAX) = N''; "+
 			`SELECT @dropStatements += N'DROP VIEW '+QUOTENAME(TABLE_SCHEMA)+N'.'+QUOTENAME(TABLE_NAME)+N';' FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = N'sch''"ema' AND TABLE_TYPE = N'VIEW'; `+
@@ -35,8 +36,16 @@ func TestFabricSQLCommands(t *testing.T) {
 			`EXEC sp_executesql @dropStatements; DROP SCHEMA "sch'""ema"`,
 		commands.DropSchema(`"sch'""ema"`),
 	)
+	require.Equal(t,
+		"DECLARE @dropStatements NVARCHAR(MAX) = N''; "+
+			"SELECT @dropStatements += N'DROP VIEW '+QUOTENAME(TABLE_SCHEMA)+N'.'+QUOTENAME(TABLE_NAME)+N';' FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = N'tmp.prod' AND TABLE_TYPE = N'VIEW'; "+
+			"SELECT @dropStatements += N'DROP TABLE '+QUOTENAME(TABLE_SCHEMA)+N'.'+QUOTENAME(TABLE_NAME)+N';' FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = N'tmp.prod' AND TABLE_TYPE = N'BASE TABLE'; "+
+			`EXEC sp_executesql @dropStatements; DROP SCHEMA "tmp.prod"`,
+		commands.DropSchema(`"tmp.prod"`),
+	)
 	require.Equal(t, `IF OBJECT_ID(N'"schema"."table"', N'U') IS NULL CREATE TABLE "schema"."table" (c1 INT, c2 VARCHAR(255))`, commands.CreateTestTable(`"schema"."table"`))
 	require.Equal(t, `EXEC sp_rename N'"schema"."old"', N'new', N'OBJECT'`, commands.RenameTable(`"schema"`, `"old"`, `"new"`))
+	require.Equal(t, `EXEC sp_rename N'"schema"."old"', N'v1.2', N'OBJECT'`, commands.RenameTable(`"schema"`, `"old"`, `"v1.2"`))
 }
 
 func TestEffectiveBootstrapTimeout(t *testing.T) {
@@ -58,7 +67,11 @@ func TestFabricCatalogMetadataCommandsGuardMissingCatalogs(t *testing.T) {
 	tables := commands.ListTables("missing", "public", "ev")
 	require.Len(t, tables, 1)
 	require.Equal(t, "table_name", tables[0].B)
-	require.Equal(t, `IF DB_ID(N'missing') IS NULL SELECT CAST(NULL AS NVARCHAR(128)) AS table_name WHERE 1 = 0 ELSE EXEC(N'SELECT TABLE_NAME AS table_name FROM "missing".INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ''public'' AND TABLE_NAME LIKE ''ev%''')`, tables[0].A)
+	require.Equal(t, `IF DB_ID(N'missing') IS NULL SELECT CAST(NULL AS NVARCHAR(128)) AS table_name WHERE 1 = 0 ELSE EXEC(N'SELECT TABLE_NAME AS table_name FROM "missing".INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ''public'' AND TABLE_NAME LIKE ''ev%'' ESCAPE ''~''')`, tables[0].A)
+
+	tables = commands.ListTables("", "public", "a[1]_50%~'")
+	require.Len(t, tables, 1)
+	require.Equal(t, `SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'public' AND TABLE_NAME LIKE 'a~[1]~_50~%~~''%' ESCAPE '~'`, tables[0].A)
 
 	listColumns, nameColumn, typeColumn := commands.ListColumns("missing", "public", "events")
 	require.Equal(t, "column_name", nameColumn)

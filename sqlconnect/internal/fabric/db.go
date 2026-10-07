@@ -98,7 +98,8 @@ func fabricSQLCommands(cmds base.SQLCommands) base.SQLCommands {
 	cmds.ListTables = func(catalog, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 		stmt := fmt.Sprintf("SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s'", base.EscapeSqlString(schema))
 		if prefix != "" {
-			stmt += fmt.Sprintf(" AND TABLE_NAME LIKE '%s'", base.EscapeSqlString(base.UnquotedIdentifier(prefix+"%")))
+			pattern := escapeLikePattern(prefix) + "%"
+			stmt += fmt.Sprintf(" AND TABLE_NAME LIKE '%s' ESCAPE '~'", base.EscapeSqlString(base.UnquotedIdentifier(pattern)))
 		}
 		return []lo.Tuple2[string, string]{{A: catalogMetadataQuery(catalog, stmt, "table_name"), B: "table_name"}}
 	}
@@ -138,9 +139,12 @@ func catalogMetadataQuery(catalog base.UnquotedIdentifier, stmt string, columns 
 }
 
 func unquoteFabricIdentifier(value string) string {
-	relation, err := base.ParseRelationRef(value, '"', identity)
-	if err != nil {
-		return value
+	if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+		return strings.ReplaceAll(value[1:len(value)-1], `""`, `"`)
 	}
-	return relation.Name
+	return value
+}
+
+func escapeLikePattern(value string) string {
+	return strings.NewReplacer("~", "~~", "%", "~%", "_", "~_", "[", "~[").Replace(value)
 }

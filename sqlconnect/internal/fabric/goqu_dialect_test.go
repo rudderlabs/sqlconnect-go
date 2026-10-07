@@ -24,6 +24,10 @@ func TestGoquDialectOptions(t *testing.T) {
 	expression, err := newDialect().QueryCondition("enabled", "eq", true)
 	require.NoError(t, err)
 	require.Equal(t, "(enabled = 1)", expression.String())
+
+	expression, err = newDialect().QueryCondition("created_at", "gt", time.Date(2020, 1, 2, 3, 4, 5, 123456000, time.UTC))
+	require.NoError(t, err)
+	require.Equal(t, "(created_at > '2020-01-02 03:04:05.123456')", expression.String())
 }
 
 func TestGoquDialectUsesCallerQuotedIdentifiersAndEscapesStrings(t *testing.T) {

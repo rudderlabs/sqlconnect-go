@@ -78,3 +78,15 @@
   Quote-aware dot parsing or bracket-delimiter extensions to
   `sqlconnect/internal/base/dialect.go` are separate changes and must not be
   bundled into the Fabric driver PR.
+- Empty and unset integration credential environment variables are equivalent:
+  forced Fabric integration tests must fail with an explicit credential error,
+  while `sqlconnect/cmd/cleanup/cleanup.go` must skip an unconfigured warehouse
+  and continue cleaning every configured warehouse.
+- `sqlconnect/internal/fabric/db.go::unquoteFabricIdentifier` handles one quoted
+  identifier, so it must strip one pair of double quotes and unescape `""`
+  directly. Calling `base.ParseRelationRef` incorrectly treats dots inside
+  schema and table names as qualification separators.
+- Fabric's goqu dialect must retain six fractional-second digits for `datetime2`
+  comparisons. Its `ListTables` prefix query must escape T-SQL `LIKE`
+  metacharacters `%`, `_`, and `[`, plus the selected escape character, before
+  appending the prefix wildcard.

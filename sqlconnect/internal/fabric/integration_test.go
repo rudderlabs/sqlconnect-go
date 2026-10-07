@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,10 +15,10 @@ import (
 )
 
 func TestFabricDB(t *testing.T) {
-	configJSON, ok := os.LookupEnv("FABRIC_TEST_ENVIRONMENT_CREDENTIALS")
-	if !ok {
+	configJSON := strings.TrimSpace(os.Getenv("FABRIC_TEST_ENVIRONMENT_CREDENTIALS"))
+	if configJSON == "" {
 		if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
-			t.Fatal("FABRIC_TEST_ENVIRONMENT_CREDENTIALS environment variable not set")
+			t.Fatal("FABRIC_TEST_ENVIRONMENT_CREDENTIALS environment variable not set or empty")
 		}
 		t.Skip("skipping Fabric integration test due to lack of a test environment")
 	}

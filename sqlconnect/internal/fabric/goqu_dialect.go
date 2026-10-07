@@ -23,6 +23,7 @@ func GoquDialectOptions() *sqlgen.SQLDialectOptions {
 	// SQL Server/Fabric string literals escape apostrophes by doubling them;
 	// backslash escapes inherited from goqu's SQL Server dialect are not valid T-SQL.
 	opts.EscapedRunes = map[rune][]byte{'\'': []byte("''")}
+	opts.TimeFormat = "2006-01-02 15:04:05.999999"
 	opts.BooleanDataTypeSupported = true
 	opts.UseEqForBooleanDataTypes = true
 	return opts
