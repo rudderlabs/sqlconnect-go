@@ -3,6 +3,7 @@
 Sqlconnect provides a uniform client interface for accessing multiple warehouses:
 
 - bigquery ([configuration](sqlconnect/internal/bigquery/config.go))
+- clickhouse ([configuration](sqlconnect/internal/clickhouse/config.go))
 - databricks ([configuration](sqlconnect/internal/databricks/config.go))
 - Microsoft Fabric ([configuration](sqlconnect/internal/fabric/config.go)); unlike
   other dialects, its deprecated FormatTableName method preserves identifier case
@@ -23,6 +24,41 @@ go get github.com/rudderlabs/sqlconnect-go
 ## API
 
 All available `DB` methods can be found [here](sqlconnect/db.go)
+
+## ClickHouse setup
+
+The driver needs a working database for validation and working tables.
+The driver has no default name for it.
+rudder-sources owns the name and passes it in `ValidationOptions.WorkingDatabase`.
+Validation refuses an empty name with `CH_CONFIG_INVALID` (field `workingDatabase`).
+The rudder-sources ClickHouse client docs give the default name and the `rudderSchema` override.
+
+The customer creates the working database before connection validation.
+The driver does not create this database.
+Run these statements as an administrator.
+Replace `<working_database>`, `rudder_retl` and `analytics` with your working database, sync user and customer database:
+
+```sql
+CREATE DATABASE IF NOT EXISTS <working_database>;
+GRANT SELECT ON analytics.* TO rudder_retl;
+GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON <working_database>.* TO rudder_retl;
+GRANT SELECT ON system.processes TO rudder_retl;
+GRANT SELECT ON system.query_log TO rudder_retl;
+```
+
+Sync-log pruning also requires `GRANT ALTER DELETE ON <working_database>.sync_log TO rudder_retl` after that table exists.
+The driver rejects `rudderSchema` and `scratchDatabase` account keys.
+Validation checks database existence, its engine, and the required privileges.
+
+To revoke access and remove working tables, run:
+
+```sql
+REVOKE SELECT, INSERT, CREATE TABLE, DROP TABLE ON <working_database>.* FROM rudder_retl;
+DROP DATABASE IF EXISTS <working_database> SYNC;
+```
+
+Revoke `ALTER DELETE` on `<working_database>.sync_log` first if you granted it.
+Drop the database only when no sync uses its tables.
 
 ## Usage
 

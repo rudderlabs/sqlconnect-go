@@ -1,0 +1,382 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "compatible_link_local_v4_metadata",
+      "address": "::a9fe:a9fe",
+      "verdict": "refused",
+      "class": "link_local",
+      "embeddedIPv4": "169.254.169.254"
+    },
+    {
+      "name": "compatible_loopback_v4",
+      "address": "::7f00:1",
+      "verdict": "refused",
+      "class": "loopback",
+      "embeddedIPv4": "127.0.0.1"
+    },
+    {
+      "name": "compatible_multicast_v4",
+      "address": "::e000:1",
+      "verdict": "refused",
+      "class": "multicast",
+      "embeddedIPv4": "224.0.0.1"
+    },
+    {
+      "name": "compatible_public_v4",
+      "address": "::808:808",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "link_local_v4",
+      "address": "169.254.1.1",
+      "verdict": "refused",
+      "class": "link_local"
+    },
+    {
+      "name": "link_local_v4_metadata",
+      "address": "169.254.169.254",
+      "verdict": "refused",
+      "class": "link_local"
+    },
+    {
+      "name": "link_local_v6",
+      "address": "fe80::1",
+      "verdict": "refused",
+      "class": "link_local"
+    },
+    {
+      "name": "link_local_v6_multicast",
+      "address": "ff02::1",
+      "verdict": "refused",
+      "class": "link_local"
+    },
+    {
+      "name": "loopback_v4",
+      "address": "127.0.0.1",
+      "verdict": "refused",
+      "class": "loopback"
+    },
+    {
+      "name": "loopback_v4_range_end",
+      "address": "127.255.255.254",
+      "verdict": "refused",
+      "class": "loopback"
+    },
+    {
+      "name": "loopback_v6",
+      "address": "::1",
+      "verdict": "refused",
+      "class": "loopback"
+    },
+    {
+      "name": "mapped_link_local_v4",
+      "address": "::ffff:169.254.1.1",
+      "verdict": "refused",
+      "class": "link_local"
+    },
+    {
+      "name": "mapped_link_local_v4_metadata",
+      "address": "::ffff:169.254.169.254",
+      "verdict": "refused",
+      "class": "link_local"
+    },
+    {
+      "name": "mapped_loopback_v4",
+      "address": "::ffff:127.0.0.1",
+      "verdict": "refused",
+      "class": "loopback"
+    },
+    {
+      "name": "mapped_loopback_v4_range_end",
+      "address": "::ffff:127.255.255.254",
+      "verdict": "refused",
+      "class": "loopback"
+    },
+    {
+      "name": "mapped_multicast_v4_local_block",
+      "address": "::ffff:224.0.0.1",
+      "verdict": "refused",
+      "class": "multicast"
+    },
+    {
+      "name": "mapped_multicast_v4_range_end",
+      "address": "::ffff:239.255.255.255",
+      "verdict": "refused",
+      "class": "multicast"
+    },
+    {
+      "name": "mapped_public_v4",
+      "address": "::ffff:8.8.8.8",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "mapped_public_v4_near_link_local",
+      "address": "::ffff:169.255.0.1",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "mapped_rfc1918_10",
+      "address": "::ffff:10.0.0.5",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "mapped_rfc1918_10_b",
+      "address": "::ffff:10.1.2.3",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "mapped_rfc1918_172",
+      "address": "::ffff:172.16.0.1",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "mapped_rfc1918_192",
+      "address": "::ffff:192.168.1.1",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "mapped_unspecified_v4",
+      "address": "::ffff:0.0.0.0",
+      "verdict": "refused",
+      "class": "unspecified"
+    },
+    {
+      "name": "metadata_v6",
+      "address": "fd00:ec2::254",
+      "verdict": "refused",
+      "class": "metadata"
+    },
+    {
+      "name": "multicast_v4_local_block",
+      "address": "224.0.0.1",
+      "verdict": "refused",
+      "class": "multicast"
+    },
+    {
+      "name": "multicast_v4_range_end",
+      "address": "239.255.255.255",
+      "verdict": "refused",
+      "class": "multicast"
+    },
+    {
+      "name": "multicast_v6",
+      "address": "ff05::1",
+      "verdict": "refused",
+      "class": "multicast"
+    },
+    {
+      "name": "multicast_v6_interface_local",
+      "address": "ff01::1",
+      "verdict": "refused",
+      "class": "multicast"
+    },
+    {
+      "name": "nat64_local_48_loopback",
+      "address": "64:ff9b:1:7f00:0:100::",
+      "verdict": "refused",
+      "class": "loopback",
+      "embeddedIPv4": "127.0.0.1"
+    },
+    {
+      "name": "nat64_local_48_metadata",
+      "address": "64:ff9b:1:a9fe:a9:fe00::",
+      "verdict": "refused",
+      "class": "link_local",
+      "embeddedIPv4": "169.254.169.254"
+    },
+    {
+      "name": "nat64_local_48_public",
+      "address": "64:ff9b:1:808:8:800::",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "nat64_local_56_layout_loopback",
+      "address": "64:ff9b:1:87f:0:1::",
+      "verdict": "refused",
+      "class": "loopback",
+      "embeddedIPv4": "127.0.0.1"
+    },
+    {
+      "name": "nat64_local_64_layout_metadata",
+      "address": "64:ff9b:1:808:a9:fea9:fe00::",
+      "verdict": "refused",
+      "class": "link_local",
+      "embeddedIPv4": "169.254.169.254"
+    },
+    {
+      "name": "nat64_local_96_layout_metadata",
+      "address": "64:ff9b:1:808:8:808:a9fe:a9fe",
+      "verdict": "refused",
+      "class": "link_local",
+      "embeddedIPv4": "169.254.169.254"
+    },
+    {
+      "name": "nat64_local_96_loopback",
+      "address": "64:ff9b:1::7f00:1",
+      "verdict": "refused",
+      "class": "loopback",
+      "embeddedIPv4": "127.0.0.1"
+    },
+    {
+      "name": "nat64_local_96_public",
+      "address": "64:ff9b:1::808:808",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "nat64_local_96_subprefix_loopback",
+      "address": "64:ff9b:1:100::7f00:1",
+      "verdict": "refused",
+      "class": "loopback",
+      "embeddedIPv4": "127.0.0.1"
+    },
+    {
+      "name": "nat64_local_96_subprefix_metadata",
+      "address": "64:ff9b:1:100::a9fe:a9fe",
+      "verdict": "refused",
+      "class": "link_local",
+      "embeddedIPv4": "169.254.169.254"
+    },
+    {
+      "name": "nat64_local_96_subprefix_public",
+      "address": "64:ff9b:1:808:8:808:808:808",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "nat64_local_all_zero",
+      "address": "64:ff9b:1::",
+      "verdict": "refused",
+      "class": "unspecified",
+      "embeddedIPv4": "0.0.0.0"
+    },
+    {
+      "name": "nat64_metadata",
+      "address": "64:ff9b::a9fe:a9fe",
+      "verdict": "refused",
+      "class": "link_local",
+      "embeddedIPv4": "169.254.169.254"
+    },
+    {
+      "name": "nat64_public",
+      "address": "64:ff9b::808:808",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "public_v4",
+      "address": "8.8.8.8",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "public_v4_near_link_local",
+      "address": "169.255.0.1",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "public_v6",
+      "address": "2001:4860:4860::8888",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "rfc1918_10",
+      "address": "10.0.0.5",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "rfc1918_10_b",
+      "address": "10.1.2.3",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "rfc1918_172",
+      "address": "172.16.0.1",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "rfc1918_192",
+      "address": "192.168.1.1",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "sixtofour_loopback",
+      "address": "2002:7f00:1::",
+      "verdict": "refused",
+      "class": "loopback",
+      "embeddedIPv4": "127.0.0.1"
+    },
+    {
+      "name": "sixtofour_metadata",
+      "address": "2002:a9fe:a9fe::",
+      "verdict": "refused",
+      "class": "link_local",
+      "embeddedIPv4": "169.254.169.254"
+    },
+    {
+      "name": "sixtofour_public",
+      "address": "2002:808:808::",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "teredo_client_loopback",
+      "address": "2001:0:0808:0808::80ff:fffe",
+      "verdict": "refused",
+      "class": "loopback",
+      "embeddedIPv4": "127.0.0.1"
+    },
+    {
+      "name": "teredo_public",
+      "address": "2001:0:808:808::f7f7:f7f7",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "teredo_server_metadata",
+      "address": "2001:0:a9fe:a9fe::",
+      "verdict": "refused",
+      "class": "link_local",
+      "embeddedIPv4": "169.254.169.254"
+    },
+    {
+      "name": "ula",
+      "address": "fd12:3456::1",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "ula_next_to_metadata",
+      "address": "fd00:ec3::1",
+      "verdict": "allowed",
+      "class": null
+    },
+    {
+      "name": "unspecified_v4",
+      "address": "0.0.0.0",
+      "verdict": "refused",
+      "class": "unspecified"
+    },
+    {
+      "name": "unspecified_v6",
+      "address": "::",
+      "verdict": "refused",
+      "class": "unspecified"
+    }
+  ]
+}

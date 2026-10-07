@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/bigquery"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/clickhouse"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/databricks"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/fabric"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/mysql"
@@ -13,6 +14,7 @@ import (
 
 type (
 	BigQuery     = bigquery.Config
+	ClickHouse   = clickhouse.Config
 	Databricks   = databricks.Config
 	Fabric       = fabric.Config
 	Mysql        = mysql.Config

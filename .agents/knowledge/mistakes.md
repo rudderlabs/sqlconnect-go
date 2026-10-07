@@ -21,3 +21,10 @@
   `testdata/column-mapping-test-seed.sql`, while mapping query-result `TINYINT`,
   `SMALLMONEY`, `SMALLDATETIME`, and `BINARY` to `int`, `float`, `datetime`, and
   `string` for `ListColumnsForSqlQuery` and `QueryJSON`.
+## ACT2-766 — Audience guard and toolchain mistakes
+
+<!-- session: 2026-10-01 -->
+
+- `CheckAudienceSQL` in `sqlconnect/clickhousequery/queryguard.go` first refused table functions by inferred position: FROM and JOIN, parenthesised table lists, and a call used as an IN set. Each new shape was a bypass. For example, `SELECT uid FROM (url(...) AS a, db.users AS b)` passed the position rules, and the `url` table function can read from a remote source. Corrected model: refuse the exact 26.3 table function names and the scalar `file()` in any position, bare or quoted, in any letter case. The structural classifier (`tableFunctionAt`, `wrappedTableFunction`, `inReadsTableFunction`) was deleted. Do not add position rules back.
+- Do not dismiss a guard finding after one example query fails on the server. A later spelling of the same class can still read a file, and the ClickHouse parser maps several spellings to one tree. Before you reject a finding, try at least three other spellings of the same class on the pinned 26.3 server, with an admin user and with the customer user. `TestQueryGuard_TableFunctionForms` in `sqlconnect/clickhousequery/queryguard_test.go` holds the spelling cases.
+- The guard must accept the SQL that an audience compiler emits. Accepted forms: keywords after a dot (`u.format`, `t.final`, `analytics.sample`), keywords before a dot (`FROM sample.users`, `by.users`), and one- or two-value lists `x IN (CAST(...), CAST(...))`. A wrongly refused form fails every sync of that audience. Before you change a refusal, run representative compiled output through `CheckAudienceSQL`, and add an `accept_` row to `sqlconnect/clickhousequery/testdata/audience-sql.json` for each form.
