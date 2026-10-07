@@ -20,6 +20,7 @@ func TestDialectNewDialect(t *testing.T) {
 		{name: "redshift", warehouseType: "redshift", wantErr: false},
 		{name: "postgres", warehouseType: "postgres", wantErr: false},
 		{name: "databricks", warehouseType: "databricks", wantErr: false},
+		{name: "fabric", warehouseType: "fabric", wantErr: false},
 		{name: "mysql", warehouseType: "mysql", wantErr: false},
 		{name: "trino", warehouseType: "trino", wantErr: false},
 		{name: "unknown", warehouseType: "unknown", wantErr: true},
@@ -69,6 +70,10 @@ func TestDialectNormaliseIdentifier(t *testing.T) {
 		{warehouseType: "databricks", identifier: "USERS", expected: "users"},
 		{warehouseType: "databricks", identifier: "User_ID", expected: "user_id"},
 
+		// Fabric: case-sensitive (no transformation)
+		{warehouseType: "fabric", identifier: "Users", expected: "Users"},
+		{warehouseType: "fabric", identifier: `"MixedCase".Tbl`, expected: `"MixedCase".Tbl`},
+
 		// Trino: lowercase
 		{warehouseType: "trino", identifier: "USERS", expected: "users"},
 		{warehouseType: "trino", identifier: "User_ID", expected: "user_id"},
@@ -114,6 +119,10 @@ func TestDialectQuoteIdentifier(t *testing.T) {
 		// Databricks: backticks
 		{warehouseType: "databricks", identifier: "users", expected: "`users`"},
 		{warehouseType: "databricks", identifier: "user_id", expected: "`user_id`"},
+
+		// Fabric: double quotes
+		{warehouseType: "fabric", identifier: "users", expected: `"users"`},
+		{warehouseType: "fabric", identifier: `na"me`, expected: `"na""me"`},
 
 		// Trino: double quotes
 		{warehouseType: "trino", identifier: "users", expected: `"users"`},
@@ -166,6 +175,11 @@ func TestDialectQuoteTable(t *testing.T) {
 		{warehouseType: "databricks", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("default")), expected: "`default`.`users`"},
 		{warehouseType: "databricks", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("default"), sqlconnect.WithCatalog("catalog")), expected: "`catalog`.`default`.`users`"},
 
+		// Fabric
+		{warehouseType: "fabric", table: sqlconnect.NewRelationRef("users"), expected: `"users"`},
+		{warehouseType: "fabric", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public")), expected: `"public"."users"`},
+		{warehouseType: "fabric", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public"), sqlconnect.WithCatalog("mydb")), expected: `"mydb"."public"."users"`},
+
 		// Trino
 		{warehouseType: "trino", table: sqlconnect.NewRelationRef("users"), expected: `"users"`},
 		{warehouseType: "trino", table: sqlconnect.NewRelationRef("users", sqlconnect.WithSchema("public")), expected: `"public"."users"`},
@@ -211,6 +225,10 @@ func TestDialectParseRelationRef(t *testing.T) {
 		// Databricks: lowercase
 		{warehouseType: "databricks", identifier: "USERS", expected: sqlconnect.RelationRef{Name: "users"}},
 		{warehouseType: "databricks", identifier: "DEFAULT.USERS", expected: sqlconnect.RelationRef{Schema: "default", Name: "users"}},
+
+		// Fabric: preserve case and strip double-quote delimiters
+		{warehouseType: "fabric", identifier: "Users", expected: sqlconnect.RelationRef{Name: "Users"}},
+		{warehouseType: "fabric", identifier: `"MixedCase".Tbl`, expected: sqlconnect.RelationRef{Schema: "MixedCase", Name: "Tbl"}},
 	}
 
 	for _, tt := range tests {
@@ -225,10 +243,35 @@ func TestDialectParseRelationRef(t *testing.T) {
 	}
 }
 
+func TestDialectFormatTableName(t *testing.T) {
+	tests := []struct {
+		warehouseType string
+		name          string
+		expected      string
+	}{
+		{warehouseType: "snowflake", name: "Users", expected: "USERS"},
+		{warehouseType: "bigquery", name: "Users", expected: "users"},
+		{warehouseType: "redshift", name: "Users", expected: "users"},
+		{warehouseType: "postgres", name: "Users", expected: "users"},
+		{warehouseType: "databricks", name: "Users", expected: "users"},
+		{warehouseType: "fabric", name: "Users", expected: "Users"},
+		{warehouseType: "mysql", name: "Users", expected: "users"},
+		{warehouseType: "trino", name: "Users", expected: "users"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.warehouseType, func(t *testing.T) {
+			dialect, err := sqlconnect.NewDialect(tt.warehouseType, nil)
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, dialect.FormatTableName(tt.name))
+		})
+	}
+}
+
 func TestDialectQueryCondition(t *testing.T) {
 	// Test that QueryCondition works via NewDialect()
 	// This verifies the full Dialect interface is properly implemented
-	warehouses := []string{"snowflake", "bigquery", "redshift", "postgres", "databricks", "mysql", "trino"}
+	warehouses := []string{"snowflake", "bigquery", "redshift", "postgres", "databricks", "fabric", "mysql", "trino"}
 
 	for _, wh := range warehouses {
 		t.Run(wh, func(t *testing.T) {
@@ -258,7 +301,7 @@ func TestDialectQueryCondition(t *testing.T) {
 
 func TestDialectExpressions(t *testing.T) {
 	// Test that Expressions() (DateAdd, TimestampAdd) works via NewDialect()
-	warehouses := []string{"snowflake", "bigquery", "redshift", "postgres", "databricks", "mysql", "trino"}
+	warehouses := []string{"snowflake", "bigquery", "redshift", "postgres", "databricks", "fabric", "mysql", "trino"}
 
 	for _, wh := range warehouses {
 		t.Run(wh, func(t *testing.T) {

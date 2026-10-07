@@ -30,6 +30,7 @@ type Options struct {
 	LegacySupport bool
 
 	SpecialCharactersInQuotedTable string // special characters to test in quoted table identifiers (default: <space>,",',``)
+	DateOf                         func(column string) string
 
 	ExtraTests func(t *testing.T, db sqlconnect.DB)
 
@@ -54,6 +55,15 @@ type Options struct {
 }
 
 func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMessage, formatfn func(string) string, opts Options) {
+	dateOf := opts.DateOf
+	if dateOf == nil {
+		dateOf = func(column string) string {
+			if opts.QuotedConditionIdentifiers {
+				return column
+			}
+			return "DATE(" + column + ")"
+		}
+	}
 	schema := sqlconnect.SchemaRef{Name: GenerateTestSchema(formatfn)}
 	newDB := func(cfg json.RawMessage) (sqlconnect.DB, error) { return sqlconnect.NewDB(warehouse, cfg) }
 	if opts.NewDB != nil {
@@ -493,11 +503,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		t.Run(string(op.Inlast)+" operator", func(t *testing.T) {
 			op := string(op.Inlast)
 			rowCount := 0
-			inlastCol := "DATE(" + timeCol + ")"
-			if opts.QuotedConditionIdentifiers {
-				inlastCol = timeCol
-			}
-			validateCondition(t, getQueryCondition(t, inlastCol, op, 1, "day"), rowCount)
+			validateCondition(t, getQueryCondition(t, dateOf(timeCol), op, 1, "day"), rowCount)
 
 			t.Run("with invalid arguments", func(t *testing.T) {
 				_, err := db.QueryCondition("col", op)
@@ -526,10 +532,7 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 			op := string(op.Lt)
 			rowCount := 1
 
-			dateCol := "DATE(" + timeCol + ")"
-			if opts.QuotedConditionIdentifiers {
-				dateCol = timeCol // the dialect quotes the operand; ClickHouse compares DateTime64 with Date
-			}
+			dateCol := dateOf(timeCol)
 			validateCondition(t, getQueryCondition(t, dateCol, op, getDateAddExpression(t, timestampVal, 1, "day")), rowCount)
 			validateCondition(t, getQueryCondition(t, dateCol, op, getDateAddExpression(t, "CURRENT_TIMESTAMP", -1, "day")), rowCount)
 		})

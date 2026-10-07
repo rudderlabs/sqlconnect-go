@@ -36,6 +36,20 @@
 - Cleanup binary also comments out Trino cleanup path, reinforcing potential maintenance skew for Trino environments (`sqlconnect/cmd/cleanup/cleanup.go`).
 - Release workflow uses `package-name: rudder-server`, which appears mismatched for `sqlconnect-go` and may cause release metadata confusion if unintentional (`.github/workflows/release-please.yaml`).
 
+## INT-7271 — Fabric live-test credential dependency
+
+- Fabric integration tests require `FABRIC_TEST_ENVIRONMENT_CREDENTIALS`; when
+  `FORCE_RUN_INTEGRATION_TESTS=true`, absence of that secret is a hard failure.
+  Both `.github/workflows/test.yaml` and
+  `.github/workflows/cleanup-test-schemas.yaml` wire the credential, so repository
+  environments must keep it provisioned for integration tests and cleanup. The
+  secret was not provisioned during PR #581 review, so an owner must add it
+  before the Fabric CI scenario can pass and provide live coverage.
+- `sqlconnect/internal/base/dialect.go::doNormaliseIdentifier` ranges over byte
+  offsets but uses those offsets to index a rune slice during lookahead, so a
+  quoted Unicode identifier such as `"日本語""x"` can panic. Fabric admin commands
+  no longer call this parser, but its public `ParseRelationRef` remains exposed;
+  fix it in a separate shared-parser PR with Unicode regression coverage.
 ## ACT2-766 — ClickHouse driver residual risks
 
 <!-- session: 2026-10-01 -->

@@ -26,6 +26,9 @@
 - Cleanup workflow uses the same secret names as tests and drops only schemas matching `tsqlcon_`, preserving non-test schemas in shared environments (`sqlconnect/cmd/cleanup/cleanup.go::main`, `.github/workflows/cleanup-test-schemas.yaml`).
 - Verification conventions are enforced in CI as "clean diff" checks after `go mod tidy`, `make generate`, and `make fmt`; contributors are expected to run those before pushing (`.github/workflows/verify.yml`, `Makefile`).
 
+## INT-7271 — Fabric configuration compatibility
+
+- Keep `fabric.Config.Database` serialized under the JSON key `database`, matching both existing Fabric consumer payloads and the Azure SQL DSN parameter. Renaming it to `dbname` requires an explicit compatibility and migration plan (`sqlconnect/internal/fabric/config.go`).
 ## ACT2-766 — ClickHouse error text and test conventions
 
 <!-- session: 2026-10-01 -->
