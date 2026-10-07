@@ -21,11 +21,6 @@ type staticCredential struct {
 	scope chan string
 }
 
-func TestNewBootstrapperUsesBoundedHTTPClient(t *testing.T) {
-	bootstrap := newBootstrapper(nil)
-	require.Equal(t, bootstrapHTTPClientTimeout, bootstrap.client.Timeout)
-}
-
 func (c staticCredential) GetToken(_ context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error) {
 	if c.scope != nil {
 		c.scope <- opts.Scopes[0]
@@ -84,8 +79,8 @@ func TestBootstrapCacheIsWorkspaceScoped(t *testing.T) {
 
 func TestBootstrapNonSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write([]byte(`{"error":{"errorCode":"Forbidden","requestId":"request","isRetriable":false}}`))
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"errorCode":"EntityNotFound","requestId":"request"}`))
 	}))
 	defer server.Close()
 	bootstrap := newBootstrapper(server.Client())
@@ -93,11 +88,7 @@ func TestBootstrapNonSuccess(t *testing.T) {
 	bootstrap.credentialFactory = func(Config) (azcore.TokenCredential, error) { return staticCredential{token: "token"}, nil }
 
 	err := bootstrap.bootstrap(context.Background(), Config{TenantID: "tenant", ClientID: "client", FabricWorkspaceID: "11111111-1111-1111-1111-111111111111"})
-	require.ErrorContains(t, err, "spn_token_bootstrap: Fabric API request failed with HTTP 403")
-	require.ErrorContains(t, err, "errorCode=Forbidden")
-	require.ErrorContains(t, err, "requestId=request")
-	require.ErrorContains(t, err, "retryable=false")
-	require.ErrorContains(t, err, "Service principals can use Fabric APIs")
+	require.EqualError(t, err, "spn_token_bootstrap: Fabric API request failed with HTTP 404, errorCode=EntityNotFound, requestId=request")
 }
 
 func TestBootstrapSingleflight(t *testing.T) {
@@ -156,7 +147,7 @@ func TestBootstrapWaiterCancellation(t *testing.T) {
 	require.NoError(t, <-leaderErr)
 }
 
-func TestBootstrapFailuresAreNotCachedAndReportRetryability(t *testing.T) {
+func TestBootstrapFailuresAreNotCached(t *testing.T) {
 	var requests atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		request := requests.Add(1)
@@ -174,9 +165,7 @@ func TestBootstrapFailuresAreNotCachedAndReportRetryability(t *testing.T) {
 	config := Config{TenantID: "tenant", ClientID: "client", FabricWorkspaceID: "11111111-1111-1111-1111-111111111111"}
 
 	err := bootstrap.bootstrap(context.Background(), config)
-	require.ErrorContains(t, err, "spn_token_bootstrap: Fabric API request failed with HTTP 429")
-	require.ErrorContains(t, err, "retryable=true")
-	require.NotContains(t, err.Error(), "Service principals can use Fabric APIs")
+	require.EqualError(t, err, "spn_token_bootstrap: Fabric API request failed with HTTP 429, errorCode=, requestId=")
 	require.NoError(t, bootstrap.bootstrap(context.Background(), config))
 	require.EqualValues(t, 2, requests.Load())
 }
@@ -202,10 +191,10 @@ func TestBootstrapCacheExpires(t *testing.T) {
 	require.EqualValues(t, 2, requests.Load())
 }
 
-func TestBootstrapServerErrorIsRetryable(t *testing.T) {
+func TestBootstrapServerError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = w.Write([]byte(`{"errorCode":"Unavailable","isRetriable":false}`))
+		_, _ = w.Write([]byte(`{"errorCode":"Unavailable","requestId":"request"}`))
 	}))
 	defer server.Close()
 	bootstrap := newBootstrapper(server.Client())
@@ -213,9 +202,7 @@ func TestBootstrapServerErrorIsRetryable(t *testing.T) {
 	bootstrap.credentialFactory = func(Config) (azcore.TokenCredential, error) { return staticCredential{token: "token"}, nil }
 
 	err := bootstrap.bootstrap(context.Background(), Config{TenantID: "tenant", ClientID: "client", FabricWorkspaceID: "11111111-1111-1111-1111-111111111111"})
-	require.ErrorContains(t, err, "HTTP 503")
-	require.ErrorContains(t, err, "errorCode=Unavailable")
-	require.ErrorContains(t, err, "retryable=true")
+	require.EqualError(t, err, "spn_token_bootstrap: Fabric API request failed with HTTP 503, errorCode=Unavailable, requestId=request")
 }
 
 func TestBootstrapCancellationAndCredentialError(t *testing.T) {

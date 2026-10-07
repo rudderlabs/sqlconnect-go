@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -22,19 +23,13 @@ const (
 	bootstrapTTL   = 24 * time.Hour
 	maxErrorBody   = 64 << 10
 
-	defaultBootstrapTimeout    = 10 * time.Second
-	bootstrapHTTPClientTimeout = 30 * time.Second
+	defaultBootstrapTimeout = 10 * time.Second
 )
-
-type bootstrapCall struct {
-	done chan struct{}
-	err  error
-}
 
 type bootstrapper struct {
 	mu                sync.Mutex
 	successes         map[string]time.Time
-	inflight          map[string]*bootstrapCall
+	group             singleflight.Group
 	ttl               time.Duration
 	now               func() time.Time
 	client            *http.Client
@@ -44,11 +39,10 @@ type bootstrapper struct {
 
 func newBootstrapper(client *http.Client) *bootstrapper {
 	if client == nil {
-		client = &http.Client{Timeout: bootstrapHTTPClientTimeout}
+		client = &http.Client{}
 	}
 	return &bootstrapper{
 		successes: make(map[string]time.Time),
-		inflight:  make(map[string]*bootstrapCall),
 		ttl:       bootstrapTTL,
 		now:       time.Now,
 		client:    client,
@@ -68,28 +62,30 @@ func (b *bootstrapper) bootstrap(ctx context.Context, config Config) error {
 		b.mu.Unlock()
 		return nil
 	}
-	if call, ok := b.inflight[key]; ok {
-		b.mu.Unlock()
-		select {
-		case <-call.done:
-			return call.err
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-	call := &bootstrapCall{done: make(chan struct{})}
-	b.inflight[key] = call
 	b.mu.Unlock()
 
-	call.err = b.request(ctx, config)
-	b.mu.Lock()
-	if call.err == nil {
-		b.successes[key] = b.now()
+	result := b.group.DoChan(key, func() (any, error) {
+		b.mu.Lock()
+		if at, ok := b.successes[key]; ok && b.now().Sub(at) < b.ttl {
+			b.mu.Unlock()
+			return struct{}{}, nil
+		}
+		b.mu.Unlock()
+
+		err := b.request(ctx, config)
+		if err == nil {
+			b.mu.Lock()
+			b.successes[key] = b.now()
+			b.mu.Unlock()
+		}
+		return struct{}{}, err
+	})
+	select {
+	case result := <-result:
+		return result.Err
+	case <-ctx.Done():
+		return ctx.Err()
 	}
-	delete(b.inflight, key)
-	close(call.done)
-	b.mu.Unlock()
-	return call.err
 }
 
 func (b *bootstrapper) request(ctx context.Context, config Config) error {
@@ -126,36 +122,14 @@ func (b *bootstrapper) request(ctx context.Context, config Config) error {
 	}
 
 	var response struct {
-		ErrorCode   string `json:"errorCode"`
-		RequestID   string `json:"requestId"`
-		IsRetriable bool   `json:"isRetriable"`
-		Error       *struct {
-			ErrorCode   string `json:"errorCode"`
-			RequestID   string `json:"requestId"`
-			IsRetriable bool   `json:"isRetriable"`
-		} `json:"error"`
+		ErrorCode string `json:"errorCode"`
+		RequestID string `json:"requestId"`
 	}
 	_ = json.NewDecoder(io.LimitReader(resp.Body, maxErrorBody)).Decode(&response)
-	if response.Error != nil {
-		if response.ErrorCode == "" {
-			response.ErrorCode = response.Error.ErrorCode
-		}
-		if response.RequestID == "" {
-			response.RequestID = response.Error.RequestID
-		}
-		response.IsRetriable = response.IsRetriable || response.Error.IsRetriable
-	}
-	retryable := resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= http.StatusInternalServerError || response.IsRetriable
-	message := fmt.Sprintf("spn_token_bootstrap: Fabric API request failed with HTTP %d", resp.StatusCode)
-	if response.ErrorCode != "" {
-		message += ", errorCode=" + response.ErrorCode
-	}
-	if response.RequestID != "" {
-		message += ", requestId=" + response.RequestID
-	}
-	message += fmt.Sprintf(", retryable=%t", retryable)
-	if !retryable {
-		message += "; enable 'Service principals can use Fabric APIs' and grant the service principal the required workspace role"
-	}
-	return fmt.Errorf("%s", message)
+	return fmt.Errorf(
+		"spn_token_bootstrap: Fabric API request failed with HTTP %d, errorCode=%s, requestId=%s",
+		resp.StatusCode,
+		response.ErrorCode,
+		response.RequestID,
+	)
 }

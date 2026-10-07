@@ -98,8 +98,7 @@ func fabricSQLCommands(cmds base.SQLCommands) base.SQLCommands {
 	cmds.ListTables = func(catalog, schema base.UnquotedIdentifier, prefix string) []lo.Tuple2[string, string] {
 		stmt := fmt.Sprintf("SELECT TABLE_NAME AS table_name FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s'", base.EscapeSqlString(schema))
 		if prefix != "" {
-			pattern := escapeLikePattern(prefix) + "%"
-			stmt += fmt.Sprintf(" AND TABLE_NAME LIKE '%s' ESCAPE '~'", base.EscapeSqlString(base.UnquotedIdentifier(pattern)))
+			stmt += fmt.Sprintf(" AND TABLE_NAME LIKE '%s'", base.EscapeSqlString(base.UnquotedIdentifier(prefix+"%")))
 		}
 		return []lo.Tuple2[string, string]{{A: catalogMetadataQuery(catalog, stmt, "table_name"), B: "table_name"}}
 	}
@@ -143,8 +142,4 @@ func unquoteFabricIdentifier(value string) string {
 		return strings.ReplaceAll(value[1:len(value)-1], `""`, `"`)
 	}
 	return value
-}
-
-func escapeLikePattern(value string) string {
-	return strings.NewReplacer("~", "~~", "%", "~%", "_", "~_", "[", "~[").Replace(value)
 }
