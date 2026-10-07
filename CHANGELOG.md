@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.33.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.32.0...v1.33.0) (2026-10-07)
+
+
+### Features
+
+* **fabric:** add Microsoft Fabric SQL driver ([#581](https://github.com/rudderlabs/sqlconnect-go/issues/581)) ([9ca7452](https://github.com/rudderlabs/sqlconnect-go/commit/9ca74525898693dfa5a63b056d818e240cfb63c0))
+
 ## [1.32.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.31.0...v1.32.0) (2026-10-06)
 
 
