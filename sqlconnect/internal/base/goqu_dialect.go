@@ -29,6 +29,7 @@ type GoquDialect struct {
 type Expressions struct {
 	TimestampAdd func(time any, interval int, unit string) goqu.Expression
 	DateAdd      func(date any, interval int, unit string) goqu.Expression
+	CurrentDate  string
 }
 
 func (gq *GoquDialect) QueryCondition(identifier, operator string, args ...any) (sqlconnect.Expression, error) {
@@ -125,7 +126,11 @@ func (gq *GoquDialect) QueryCondition(identifier, operator string, args ...any) 
 		if unit, ok = args[1].(string); !ok {
 			return nil, fmt.Errorf("nbfinterval operator requires second argument to be a string")
 		}
-		dateAddExpr, err := gq.DateAdd("CURRENT_DATE", -interval, unit)
+		currentDate := gq.expressions.CurrentDate
+		if currentDate == "" {
+			currentDate = "CURRENT_DATE"
+		}
+		dateAddExpr, err := gq.DateAdd(currentDate, -interval, unit)
 		if err != nil {
 			return nil, err
 		}

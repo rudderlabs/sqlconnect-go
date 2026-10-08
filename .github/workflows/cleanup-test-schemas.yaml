@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         with:
-          go-version: '1.26'
+          go-version-file: 'go.mod'
           check-latest: true
       - run: go version
       - run: go mod download
@@ -31,11 +31,10 @@ jobs:
           REDSHIFT_DATA_TEST_ENVIRONMENT_ROLE_ARN_CREDENTIALS: ${{ secrets.REDSHIFT_DATA_TEST_ENVIRONMENT_ROLE_ARN_CREDENTIALS }}
           SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS }}
           BIGQUERY_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.BIGQUERY_TEST_ENVIRONMENT_CREDENTIALS }}
+          FABRIC_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.FABRIC_TEST_ENVIRONMENT_CREDENTIALS }}
           DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS }}
           TRINO_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.TRINO_TEST_ENVIRONMENT_CREDENTIALS }}
           SNOWFLAKE_TEST_AUTH_KEYPAIR_ENCRYPTED_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_AUTH_KEYPAIR_ENCRYPTED_CREDENTIALS }}
           SNOWFLAKE_TEST_AUTH_KEYPAIR_UNENCRYPTED_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_AUTH_KEYPAIR_UNENCRYPTED_CREDENTIALS }}
         run: |
           go run sqlconnect/cmd/cleanup/cleanup.go
-          
-        

@@ -1,0 +1,50 @@
+[
+    {
+        "_order": 1,
+        "_smallint": 1,
+        "_int": 1,
+        "_bigint": 1,
+        "_decimal": 1.1,
+        "_numeric": 1.1,
+        "_float": 1.1,
+        "_real": 1.100000023841858,
+        "_bit": true,
+        "_char": "abc",
+        "_varchar": "abc",
+        "_varbinary": "abc",
+        "_date": "2004-10-19T00:00:00Z",
+        "_datetime2": "2004-10-19T10:23:54.123456Z"
+    },
+    {
+        "_order": 2,
+        "_smallint": 0,
+        "_int": 0,
+        "_bigint": 0,
+        "_decimal": 0,
+        "_numeric": 0,
+        "_float": 0,
+        "_real": 0,
+        "_bit": false,
+        "_char": "   ",
+        "_varchar": "",
+        "_varbinary": "",
+        "_date": "2004-10-19T00:00:00Z",
+        "_datetime2": "2004-10-19T10:23:54Z"
+    },
+    {
+        "_order": 3,
+        "_smallint": null,
+        "_int": null,
+        "_bigint": null,
+        "_decimal": null,
+        "_numeric": null,
+        "_float": null,
+        "_real": null,
+        "_bit": null,
+        "_char": null,
+        "_varchar": null,
+        "_varbinary": null,
+        "_date": null,
+        "_datetime2": null
+    }
+]
