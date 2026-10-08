@@ -61,7 +61,7 @@ func blockedReason(ip net.IP, allowLoopback bool) string {
 // GuardedDialContext returns a dial function that checks each resolved address
 // against the process-wide egress policy before connecting.
 func GuardedDialContext(allowLoopback bool) func(ctx context.Context, network, addr string) (net.Conn, error) {
-	ctrl := func(_ string, address string, _ syscall.RawConn) error {
+	ctrl := func(_, address string, _ syscall.RawConn) error {
 		host, _, err := net.SplitHostPort(address)
 		if err != nil {
 			return err
