@@ -3,6 +3,7 @@ package util
 import (
 	"fmt"
 	"net"
+	"slices"
 )
 
 // HostValidationOption customises ValidateHost.
@@ -27,7 +28,8 @@ func AllowLoopback(allow bool) HostValidationOption {
 //
 // Rejected: unspecified (0.0.0.0, ::), loopback, link-local — which covers the
 // instance metadata endpoint 169.254.169.254 — multicast, and AWS's reserved
-// prefix for instance metadata over IPv6.
+// prefix for instance metadata over IPv6. An IPv6 answer that embeds an IPv4
+// address (NAT64, 6to4, Teredo) is also checked on the embedded address.
 //
 // Private RFC1918/ULA space is deliberately NOT rejected. Warehouses reached
 // over AWS PrivateLink resolve to a private address in the customer's VPC, so
@@ -59,7 +61,7 @@ func ValidateHost(hostname string, opts ...HostValidationOption) error {
 		if ip.IsLoopback() && options.allowLoopback {
 			continue
 		}
-		if reason := disallowedAddrReason(ip); reason != "" {
+		if reason := DisallowedAddrReason(ip); reason != "" {
 			return fmt.Errorf("invalid host in credentials: %s resolves to a %s address", hostname, reason)
 		}
 		for _, cidr := range blockedCIDRs() {
@@ -71,13 +73,58 @@ func ValidateHost(hostname string, opts ...HostValidationOption) error {
 	return nil
 }
 
-func disallowedAddrReason(ip net.IP) string {
+// DisallowedAddrReason returns why a connection must not reach ip, or "" when
+// the address is allowed. It checks ip itself, then every IPv4 address that ip
+// embeds (see EmbeddedIPv4), so a NAT64, 6to4 or Teredo form cannot hide a
+// refused IPv4 address.
+func DisallowedAddrReason(ip net.IP) string {
+	if r := classReason(ip); r != "" {
+		return r
+	}
+	for _, v4 := range EmbeddedIPv4(ip) {
+		if r := classReason(v4); r != "" {
+			return "embedded " + r
+		}
+	}
+	return ""
+}
+
+// RefusedClass returns the shared-fixture class of ip and the embedded IPv4
+// address the class was decided on. The class is "" when ip is allowed, and
+// the embedded address is nil unless an embedded IPv4 address decided it.
+func RefusedClass(ip net.IP) (string, net.IP) {
+	if r := classReason(ip); r != "" {
+		return classNames[r], nil
+	}
+	for _, v4 := range EmbeddedIPv4(ip) {
+		if r := classReason(v4); r != "" {
+			return classNames[r], v4.To4()
+		}
+	}
+	return "", nil
+}
+
+// classNames maps a reason to its class in the shared address fixture
+// (sqlconnect/clickhousequery/testdata/addresses.json). Lookout reads the same
+// fixture, so these names are a cross-repository contract.
+var classNames = map[string]string{
+	"unspecified":       "unspecified",
+	"loopback":          "loopback",
+	"link-local":        "link_local",
+	"multicast":         "multicast",
+	"instance metadata": "metadata",
+}
+
+func classReason(ip net.IP) string {
 	switch {
 	case ip.IsUnspecified():
 		return "unspecified"
 	case ip.IsLoopback():
 		return "loopback"
-	case ip.IsLinkLocalUnicast(), ip.IsLinkLocalMulticast():
+	// The refused address set puts all of 224.0.0.0/4 in the multicast class,
+	// but Go reports 224.0.0.0/24 as link-local multicast. Only IPv6 ff02::/16
+	// is link-local in the set.
+	case ip.IsLinkLocalUnicast(), ip.IsLinkLocalMulticast() && ip.To4() == nil:
 		return "link-local"
 	case ip.IsInterfaceLocalMulticast(), ip.IsMulticast():
 		return "multicast"
@@ -85,6 +132,47 @@ func disallowedAddrReason(ip net.IP) string {
 		return "instance metadata"
 	default:
 		return ""
+	}
+}
+
+var (
+	nat64WellKnown = mustCIDR("64:ff9b::/96")
+	ipv4Compatible = mustCIDR("::/96")
+	nat64Local     = mustCIDR("64:ff9b:1::/48")
+	sixToFour      = mustCIDR("2002::/16")
+	teredo         = mustCIDR("2001::/32")
+)
+
+func mustCIDR(s string) *net.IPNet {
+	_, n, err := net.ParseCIDR(s)
+	if err != nil {
+		panic(err)
+	}
+	return n
+}
+
+// EmbeddedIPv4 returns the IPv4 addresses that an IPv6 address carries under
+// the IPv4-compatible (::/96), NAT64 (64:ff9b::/96, 64:ff9b:1::/48), 6to4 (2002::/16) and Teredo
+// (2001::/32) prefixes. IPv4 and ::ffff: forms return nil, because the class
+// checks already read them as IPv4.
+func EmbeddedIPv4(ip net.IP) []net.IP {
+	b := ip.To16()
+	if b == nil || ip.To4() != nil {
+		return nil
+	}
+	switch {
+	case ipv4Compatible.Contains(b), nat64WellKnown.Contains(b):
+		return []net.IP{net.IPv4(b[12], b[13], b[14], b[15])}
+	case nat64Local.Contains(b):
+		return nat64LocalReadings(b)
+	case sixToFour.Contains(b):
+		return []net.IP{net.IPv4(b[2], b[3], b[4], b[5])}
+	case teredo.Contains(b):
+		// Teredo: the server is in bytes 4-7, the client in bytes 12-15 with
+		// every bit inverted.
+		return []net.IP{net.IPv4(b[4], b[5], b[6], b[7]), net.IPv4(^b[12], ^b[13], ^b[14], ^b[15])}
+	default:
+		return nil
 	}
 }
 
@@ -97,3 +185,38 @@ func disallowedAddrReason(ip net.IP) string {
 // reserved prefix is safe: it belongs to AWS, so no customer VPC is numbered
 // from it.
 var awsIMDSv6 = &net.IPNet{IP: net.ParseIP("fd00:ec2::"), Mask: net.CIDRMask(32, 128)}
+
+// nat64LocalReadings returns the IPv4 readings of an address in 64:ff9b:1::/48.
+// RFC 8215 lets an operator use any RFC 6052 prefix length inside this /48, and
+// the address alone does not say which one. So every layout the address is
+// valid under is read (RFC 6052 section 2.2): /48, /56 and /64 need the "u"
+// octet (byte 8) and the suffix after the IPv4 bytes to be zero; /96 is always
+// valid. The caller refuses the address when any reading is refused.
+//
+// A 0.0.0.0 reading is dropped while another reading is left, because a
+// translator never forwards to the unspecified address. Without this rule every
+// /48-layout address would read as 0.0.0.0 under the /96 layout.
+func nat64LocalReadings(b net.IP) []net.IP {
+	zero := func(s []byte) bool { return !slices.ContainsFunc(s, func(x byte) bool { return x != 0 }) }
+	var all []net.IP
+	if b[8] == 0 && zero(b[11:16]) {
+		all = append(all, net.IPv4(b[6], b[7], b[9], b[10]))
+	}
+	if b[8] == 0 && zero(b[12:16]) {
+		all = append(all, net.IPv4(b[7], b[9], b[10], b[11]))
+	}
+	if b[8] == 0 && zero(b[13:16]) {
+		all = append(all, net.IPv4(b[9], b[10], b[11], b[12]))
+	}
+	all = append(all, net.IPv4(b[12], b[13], b[14], b[15]))
+	var out []net.IP
+	for _, v4 := range all {
+		if !v4.IsUnspecified() {
+			out = append(out, v4)
+		}
+	}
+	if len(out) == 0 {
+		return []net.IP{net.IPv4zero.To16()}
+	}
+	return out
+}

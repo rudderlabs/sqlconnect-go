@@ -65,7 +65,7 @@ func (c Config) ConnectionString() (dsn string, err error) {
 		Host:               c.Host,
 		Port:               c.Port,
 		Application:        c.Application,
-		LoginTimeout:       c.LoginTimeout,
+		LoginTimeout:       c.LoginTimeout, //nolint:staticcheck // SA1019: gosnowflake v1.19.0 has no replacement for the login timeout
 		Params:             make(map[string]*string),
 		PasscodeInPassword: c.PasscodeInPassword,
 		Passcode:           c.Passcode,

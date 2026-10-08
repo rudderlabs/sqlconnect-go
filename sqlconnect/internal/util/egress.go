@@ -47,7 +47,7 @@ func blockedReason(ip net.IP, allowLoopback bool) string {
 	if ip.IsLoopback() && allowLoopback {
 		return ""
 	}
-	if reason := disallowedAddrReason(ip); reason != "" {
+	if reason := DisallowedAddrReason(ip); reason != "" {
 		return reason
 	}
 	for _, cidr := range blockedCIDRs() {
