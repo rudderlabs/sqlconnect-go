@@ -1,6 +1,7 @@
 package mysql
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -11,6 +12,24 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
+
+// Guarded dial networks registered with the mysql driver. The DSN's net name
+// selects the dialer, whose Control hook checks the dialled IP against the
+// egress policy. The loopback variant is used when a tunnel is active (the
+// driver then dials the local tunnel endpoint) or skipHostValidation is set.
+const (
+	guardedNetwork         = "rudder-guarded-tcp"
+	guardedNetworkLoopback = "rudder-guarded-tcp-loopback"
+)
+
+func init() {
+	mysqldriver.RegisterDialContext(guardedNetwork, func(ctx context.Context, addr string) (net.Conn, error) {
+		return util.GuardedDialContext(false)(ctx, "tcp", addr)
+	})
+	mysqldriver.RegisterDialContext(guardedNetworkLoopback, func(ctx context.Context, addr string) (net.Conn, error) {
+		return util.GuardedDialContext(true)(ctx, "tcp", addr)
+	})
+}
 
 type Config struct {
 	Host     string `json:"host"`
@@ -25,6 +44,10 @@ type Config struct {
 	// SkipHostValidation is used to skip host validation during tests
 	SkipHostValidation bool `json:"skipHostValidation"`
 	UseLegacyMappings  bool `json:"useLegacyMappings"`
+
+	// dialAllowLoopback selects the loopback-permitting guarded dialer. Set by
+	// NewDB when a tunnel is active or skipHostValidation is set; not serialised.
+	dialAllowLoopback bool
 }
 
 // ConnectionString builds the go-sql-driver DSN from typed fields.
@@ -41,7 +64,10 @@ func (c Config) ConnectionString() (string, error) {
 	cfg := mysqldriver.NewConfig()
 	cfg.User = c.User
 	cfg.Passwd = c.Password
-	cfg.Net = "tcp"
+	cfg.Net = guardedNetwork
+	if c.dialAllowLoopback {
+		cfg.Net = guardedNetworkLoopback
+	}
 	cfg.Addr = net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
 	cfg.DBName = c.DBName
 	cfg.TLSConfig = tls

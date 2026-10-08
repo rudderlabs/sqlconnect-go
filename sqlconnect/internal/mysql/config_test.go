@@ -97,7 +97,9 @@ func TestConfig(t *testing.T) {
 		t.Run("matches the previously hand-built dsn for a benign config", func(t *testing.T) {
 			c := baseConfig("analytics")
 
-			legacy := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?tls=%s",
+			// "rudder-guarded-tcp" is the registered net name whose dialer enforces
+			// the egress policy; a benign config uses it in place of plain "tcp".
+			legacy := fmt.Sprintf("%s:%s@rudder-guarded-tcp(%s:%d)/%s?tls=%s",
 				c.User, c.Password, c.Host, c.Port, c.DBName, "false")
 			legacyParsed, err := mysqldriver.ParseDSN(legacy)
 			require.NoError(t, err, "the legacy dsn should parse")

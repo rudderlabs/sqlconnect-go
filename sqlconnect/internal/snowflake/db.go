@@ -6,11 +6,12 @@ import (
 	"fmt"
 
 	"github.com/samber/lo"
-	_ "github.com/snowflakedb/gosnowflake" // snowflake driver
+	gosnowflake "github.com/snowflakedb/gosnowflake" // snowflake driver
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
 
 const (
@@ -29,10 +30,15 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := sql.Open(DatabaseType, connectionString)
+	// Build the connection from a parsed config so the HTTPS transport's dialer
+	// is guarded by the egress policy (validates the dialled IP). Snowflake has
+	// no SSH tunnel and no skipHostValidation, so loopback stays disallowed.
+	sfConfig, err := gosnowflake.ParseDSN(connectionString)
 	if err != nil {
 		return nil, err
 	}
+	sfConfig.Transporter = util.GuardedHTTPTransport(false)
+	db := sql.OpenDB(gosnowflake.NewConnector(gosnowflake.SnowflakeDriver{}, *sfConfig))
 
 	return &DB{
 		DB: base.NewDB(
