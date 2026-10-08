@@ -29,3 +29,12 @@
 - `sqlconnect/internal/postgres/db.go`: minimal path for TCP SQL driver + base composition.
 - `sqlconnect/internal/redshift/db.go`: dual-mode backend (Redshift Data API vs Postgres path) and SQL command overrides.
 - `sqlconnect/internal/trino/db.go`: SOCKS5 tunnel and custom HTTP client registration pattern.
+
+## ACT2-766 — ClickHouse entry points
+
+<!-- session: 2026-10-01 -->
+
+- `sqlconnect/internal/clickhouse/db.go`: `NewDB` is the factory entry point. It calls `newDB`, which parses the config, checks the dial policy and opens a lazy pool with `guardConn` and the guarded dialer. `init` registers the factory.
+- `sqlconnect/internal/clickhouse/validation.go`: `ValidateContext` with the five validation stages and the scratch probe and cleanup.
+- `sqlconnect/clickhousequery/queryguard.go`: `CheckAudienceSQL` returns the normalised SQL, or `CH_QUERY_INVALID` naming the first refused construct. The local corpus is `sqlconnect/clickhousequery/testdata/audience-sql.json`, run by `TestQueryGuard_SharedCorpus`.
+- `sqlconnect/internal/clickhouse/chtest/server.go`: test fixture with pinned containers (`Image`), TLS and users. `sqlconnect/internal/clickhouse/chtest/proxy.go` holds the fault proxy (`ProxyOptions`). Both are test-only.

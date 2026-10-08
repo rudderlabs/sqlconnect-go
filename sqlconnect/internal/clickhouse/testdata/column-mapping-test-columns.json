@@ -1,0 +1,12 @@
+{
+    "_order": "int",
+    "_int": "int",
+    "_bigint": "int",
+    "_double": "float",
+    "_varchar": "string",
+    "_boolean": "boolean",
+    "_date": "datetime",
+    "_timestamp": "datetime",
+    "_array": "array",
+    "_tuple": "json"
+}

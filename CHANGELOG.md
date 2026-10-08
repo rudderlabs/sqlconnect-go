@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.33.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.32.0...v1.33.0) (2026-10-07)
+
+
+### Features
+
+* **fabric:** add Microsoft Fabric SQL driver ([#581](https://github.com/rudderlabs/sqlconnect-go/issues/581)) ([9ca7452](https://github.com/rudderlabs/sqlconnect-go/commit/9ca74525898693dfa5a63b056d818e240cfb63c0))
+
+## [1.32.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.31.0...v1.32.0) (2026-10-06)
+
+
+### Features
+
+* **clickhouse:** add a ClickHouse driver for the reverse-ETL source ([#574](https://github.com/rudderlabs/sqlconnect-go/issues/574)) ([03999b9](https://github.com/rudderlabs/sqlconnect-go/commit/03999b9adfed989b5b0fb4b7e811f8b5a17ec9b2))
+
 ## [1.31.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.30.3...v1.31.0) (2026-09-28)
 
 

@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/bigquery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/databricks"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/fabric"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/snowflake"
 )
@@ -25,6 +26,10 @@ func main() {
 		}},
 		{Env: "DATABRICKS_TEST_ENVIRONMENT_CREDENTIALS", Type: databricks.DatabaseType, Fn: func(s string) string {
 			s, _ = sjson.Set(s, "catalog", "sqlconnect")
+			return s
+		}},
+		{Env: "FABRIC_TEST_ENVIRONMENT_CREDENTIALS", Type: fabric.DatabaseType, Fn: func(s string) string {
+			s, _ = sjson.Delete(s, "fabricWorkspaceId")
 			return s
 		}},
 		{Env: "REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS", Type: redshift.DatabaseType},

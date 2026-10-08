@@ -1,0 +1,75 @@
+package clickhouse
+
+// overflowModes are the settings that choose between an error and a silently
+// partial result when a limit is hit. Every driver map sets them to "throw".
+var overflowModes = []string{
+	"timeout_overflow_mode", "timeout_overflow_mode_leaf", "read_overflow_mode",
+	"read_overflow_mode_leaf", "group_by_overflow_mode", "sort_overflow_mode", "result_overflow_mode",
+	"set_overflow_mode", "join_overflow_mode", "transfer_overflow_mode", "distinct_overflow_mode",
+}
+
+// driverScratchSettings is the map for a statement that can write, when the
+// caller gave no map of its own. It pins every setting that can change a
+// result, so a user or profile default on the server cannot. Query logging
+// stays enabled so QueryOutcome can resolve a lost write response.
+func driverScratchSettings() map[string]any {
+	m := map[string]any{
+		"join_use_nulls": 1, "session_timezone": "UTC", "select_sequential_consistency": 1,
+		"transform_null_in": 0, "data_type_default_nullable": 0, "enable_parallel_replicas": 0,
+		"limit": 0, "offset": 0, "additional_result_filter": "", "additional_table_filters": "{}",
+		"async_insert": 0, "wait_for_async_insert": 1, "send_progress_in_http_headers": 0,
+		"log_queries": 1, "log_queries_min_type": "QUERY_START",
+		"log_queries_probability": 1, "log_queries_min_query_duration_ms": 0,
+		// A NULL into a non-nullable column fails instead of becoming the default.
+		"insert_null_as_default": 0,
+	}
+	for _, k := range overflowModes {
+		m[k] = "throw"
+	}
+	return m
+}
+
+// driverMaxResultBytes bounds the result of a driver read. Driver reads are
+// metadata reads, counts and validation checks, never a customer result: a
+// caller that streams a model result passes its own map. The bound stops a
+// runaway driver read from sending the client an unbounded result.
+// result_overflow_mode=throw turns it into an error instead of a truncated
+// answer.
+const driverMaxResultBytes = 256 << 20
+
+// driverReadSettings is the map for a read. readonly=2 refuses writes and still
+// lets the statement send its own settings.
+func driverReadSettings() map[string]any {
+	m := driverScratchSettings()
+	delete(m, "async_insert")
+	delete(m, "wait_for_async_insert")
+	m["readonly"] = 2
+	m["cancel_http_readonly_queries_on_client_close"] = 1
+	m["max_result_bytes"] = driverMaxResultBytes
+	return m
+}
+
+// controlSettings is the map for a control statement such as a ping.
+func controlSettings() map[string]any { return map[string]any{"send_progress_in_http_headers": 0} }
+
+// stage2UnionSettings is the map for the stage 2 union read that fills a
+// scratch table under a statement budget.
+func stage2UnionSettings(budgetSeconds int) map[string]any {
+	m := driverReadSettings()
+	m["async_insert"], m["wait_for_async_insert"] = 0, 1
+	m["final"] = 1
+	m["skip_unavailable_shards"] = 0
+	m["max_replica_delay_for_distributed_queries"] = 1
+	m["fallback_to_stale_replicas_for_distributed_queries"] = 0
+	m["max_execution_time"] = budgetSeconds
+	return m
+}
+
+// helloSettings is the map for the connection-open hello and the validation
+// stage 1 read. It keeps a profile default from hiding their one row. Each
+// value equals the server default, so a readonly=1 profile accepts it. It
+// sends no other driver setting: validation stage 2 checks those, so a
+// constraint on one of them is named there and does not fail the open.
+func helloSettings() map[string]any {
+	return map[string]any{"send_progress_in_http_headers": 0, "limit": 0, "offset": 0, "additional_result_filter": ""}
+}

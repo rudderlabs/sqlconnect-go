@@ -126,7 +126,8 @@ type (
 		// QuoteIdentifier quotes an identifier, e.g. a column name
 		QuoteIdentifier(name string) string
 
-		// FormatTableName formats a table name, typically by lower or upper casing it, depending on the database
+		// FormatTableName formats a table name, typically by lower or upper casing it, depending on the database.
+		// Fabric preserves the original case because its default collation is case-sensitive.
 		//
 		// Deprecated: to be removed in future versions, since its behaviour is not consistent across databases, e.g. using lowercase for BigQuery while it shouldn't.
 		// If you want to have a consistent behaviour across databases, use [NormaliseIdentifier] and [ParseRelationRef] instead.
