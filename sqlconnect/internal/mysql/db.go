@@ -36,6 +36,9 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		config.Port = tunnel.Port()
 	}
 
+	// When a tunnel is active the driver dials the local tunnel endpoint
+	// (loopback), so the guarded dialer must permit loopback then.
+	config.dialAllowLoopback = config.SkipHostValidation || config.TunnelInfo != nil
 	connectionString, err := config.ConnectionString()
 	if err != nil {
 		return nil, err

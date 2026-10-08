@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
 
 const (
@@ -53,6 +54,10 @@ func NewDB(configJson json.RawMessage) (*DB, error) {
 		tunnelCloser = tunnel.Close
 		// Use a custom http transport in the client to route the connection through the tunnel's socks5 proxy
 		opts = append(opts, databricks.WithTransport(sshtunnel.Socks5HTTPTransport(tunnel.Host(), tunnel.Port())))
+	} else {
+		// No tunnel: guard the HTTPS transport's dialer so the dialled IP is
+		// checked against the egress policy.
+		opts = append(opts, databricks.WithTransport(util.GuardedHTTPTransport(config.SkipHostValidation)))
 	}
 
 	connector, err := databricks.NewConnector(opts...)

@@ -7,15 +7,15 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/lib/pq" // postgres driver
+	"github.com/lib/pq" // postgres driver
 	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
-	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/postgres"
 	redshiftdriver "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift/driver"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
 
 const (
@@ -129,10 +129,15 @@ func newPostgresDB(credentialsJSON json.RawMessage) (*sql.DB, func() error, erro
 		config.Port = tunnel.Port()
 	}
 
-	db, err := sql.Open(postgres.DatabaseType, config.ConnectionString())
+	// Open through a pq connector with a guarded dialer so the dialled IP is
+	// checked against the egress policy. When a tunnel is active the driver
+	// dials the local tunnel endpoint (loopback), so loopback is allowed then.
+	connector, err := pq.NewConnector(config.ConnectionString())
 	if err != nil {
 		return nil, nil, err
 	}
+	connector.Dialer(util.NewGuardedDialer(config.SkipHostValidation || config.TunnelInfo != nil))
+	db := sql.OpenDB(connector)
 	return db, tunnelCloser, nil
 }
 
