@@ -351,8 +351,8 @@ github.com/rudderlabs/goqu/v10 v10.3.1 h1:rnfX+b4EwBWQ2UQfIGeEW299JBBkK5biEbnf7K
 github.com/rudderlabs/goqu/v10 v10.3.1/go.mod h1:LH2vI5gGHBxEQuESqFyk5ZA2anGINc8o25hbidDWOYw=
 github.com/rudderlabs/rudder-go-kit v0.82.0 h1:FfoYLG18ToTqbeWGlVQDThYlSFVG6rIZAC0gO9tSOgY=
 github.com/rudderlabs/rudder-go-kit v0.82.0/go.mod h1:flYgxDSbTbkCgBBc/WbwKEyPcSa3uw70WTcl+HB1Ihc=
-github.com/rudderlabs/sql-tunnels v0.1.7 h1:wDCRl6zY4M5gfWazf7XkSTGQS3yjBzUiUgEMBIfHNDA=
-github.com/rudderlabs/sql-tunnels v0.1.7/go.mod h1:5f7+YL49JHYgteP4rAgqKnr4K2OadB0oIpUS+Tt3sPM=
+github.com/rudderlabs/sql-tunnels v0.1.8 h1:owX5QL9BEXxtRW3a+JwMGlGQwpDUQGGtDOvnJG4evgs=
+github.com/rudderlabs/sql-tunnels v0.1.8/go.mod h1:/t75DbI2eQQsolWtHawF3MzIddI1iAhE7X/rTy3X27o=
 github.com/sagikazarmark/locafero v0.12.0 h1:/NQhBAkUb4+fH1jivKHWusDYFjMOOKU88eegjfxfHb4=
 github.com/sagikazarmark/locafero v0.12.0/go.mod h1:sZh36u/YSZ918v0Io+U9ogLYQJ9tLLBmM4eneO6WwsI=
 github.com/samber/lo v1.53.0 h1:t975lj2py4kJPQ6haz1QMgtId2gtmfktACxIXArw3HM=
