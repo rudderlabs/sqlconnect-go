@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.34.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.33.0...v1.34.0) (2026-10-09)
+
+
+### Features
+
+* **util:** dial-time egress guard and package-level CIDR policy ([#585](https://github.com/rudderlabs/sqlconnect-go/issues/585)) ([e62924b](https://github.com/rudderlabs/sqlconnect-go/commit/e62924b705cb7409b14095db5309c658e5328d54))
+
+
+### Miscellaneous
+
+* **clickhouse:** use go-kit v0.82.0 ClickHouse TLS options in chtest ([#584](https://github.com/rudderlabs/sqlconnect-go/issues/584)) ([6cb17b4](https://github.com/rudderlabs/sqlconnect-go/commit/6cb17b4d6fbb97fadd9e71b86ec1707ffdb98115))
+
 ## [1.33.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.32.0...v1.33.0) (2026-10-07)
 
 
