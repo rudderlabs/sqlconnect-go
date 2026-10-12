@@ -14,6 +14,7 @@ import (
 	_ "embed"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"math/big"
@@ -24,7 +25,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -77,12 +77,9 @@ type Options struct {
 type Server struct {
 	Host      string // "localhost": a name that both certificates carry
 	HTTPSPort int    // the server's own HTTPS port, with the go-kit certificate
-	// HTTPPort is a plain HTTP port on 127.0.0.1. The go-kit resource
-	// publishes only TLS ports in TLS mode, so a local bridge relays this port
-	// to HTTPSPort.
-	HTTPPort int
-	// CA trusts the server's own certificate and the front certificate that
-	// proxies and balancers present.
+	HTTPPort  int    // the server's own plain HTTP port on 127.0.0.1
+	// CA holds the one fixture CA. It signs the server certificate and the
+	// front certificate that proxies and balancers present.
 	CA            *x509.CertPool
 	AdminUser     string
 	AdminPassword string
@@ -111,10 +108,13 @@ func Start(t *testing.T, o Options) *Server {
 	pool.MaxWait = 5 * time.Minute
 
 	password := randomString(t, 24)
+	ca := newCA(t)
 	opts := []chresource.Opt{
 		// go-kit pulls by digest and refuses a container whose image has another digest.
 		chresource.WithImage(repository + ":" + o.Tag + "@" + digest),
 		chresource.WithTLS(),
+		chresource.WithCertificateAuthority(ca.certPEM, ca.keyPEM),
+		chresource.WithPlainHTTPPort(),
 		chresource.WithUser(adminUser),
 		chresource.WithPassword(password),
 		chresource.WithDatabase("default"),
@@ -130,21 +130,19 @@ func Start(t *testing.T, o Options) *Server {
 
 	httpsPort, err := strconv.Atoi(res.HTTPPort)
 	require.NoError(t, err)
-	frontCA, frontCert := newFrontCert(t)
+	httpPort, err := strconv.Atoi(res.PlainHTTPPort)
+	require.NoError(t, err)
 	caPool := x509.NewCertPool()
-	require.True(t, caPool.AppendCertsFromPEM(res.CAPEM), "the go-kit CA parses")
-	caPool.AddCert(frontCA)
+	caPool.AddCert(ca.cert)
 
-	bridgeTLS := res.TLSConfig.Clone()
-	bridgeTLS.ServerName = "localhost"
 	s := &Server{
 		Host:          "localhost",
 		HTTPSPort:     httpsPort,
-		HTTPPort:      startPlainBridge(t, net.JoinHostPort("127.0.0.1", res.HTTPPort), bridgeTLS),
+		HTTPPort:      httpPort,
 		CA:            caPool,
 		AdminUser:     adminUser,
 		AdminPassword: password,
-		frontCert:     frontCert,
+		frontCert:     newFrontCert(t, ca),
 		pool:          pool,
 		containerID:   res.ContainerID,
 		httpClient:    newLoopbackClient(),
@@ -155,34 +153,6 @@ func Start(t *testing.T, o Options) *Server {
 	require.True(t, strings.HasPrefix(version, o.Tag+"."), "server version %s for tag %s", version, o.Tag)
 	t.Logf("clickhouse image=%s version=%s", s.ImageDigest(t), version)
 	return s
-}
-
-// startPlainBridge listens on 127.0.0.1 and relays each plain connection to
-// upstream over TLS. It returns the port.
-func startPlainBridge(t *testing.T, upstream string, cfg *tls.Config) int {
-	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		for {
-			c, err := ln.Accept()
-			if err != nil {
-				return
-			}
-			wg.Go(func() {
-				relay(c, func() (net.Conn, error) {
-					d := tls.Dialer{Config: cfg}
-					return d.Dial("tcp", upstream)
-				})
-			})
-		}
-	})
-	t.Cleanup(func() {
-		_ = ln.Close()
-		wg.Wait()
-	})
-	return ln.Addr().(*net.TCPAddr).Port
 }
 
 // ImageDigest returns the digest of the running container's image, read from
@@ -383,16 +353,23 @@ func (s *Server) plainURL(path string, q url.Values) string {
 	return u.String()
 }
 
-// newFrontCert creates a test CA and a front certificate with the SANs
-// DNS:localhost and DNS:rebind.test only.
-func newFrontCert(t *testing.T) (*x509.Certificate, tls.Certificate) {
+// testCA is the fixture CA. go-kit signs the server certificate with it, and
+// newFrontCert signs the front certificate with it.
+type testCA struct {
+	cert    *x509.Certificate
+	key     *ecdsa.PrivateKey
+	certPEM []byte
+	keyPEM  []byte
+}
+
+func newCA(t *testing.T) testCA {
 	t.Helper()
 	now := time.Now()
 	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	caTmpl := &x509.Certificate{
 		SerialNumber:          serial(t),
-		Subject:               pkix.Name{CommonName: "chtest front CA"},
+		Subject:               pkix.Name{CommonName: "chtest CA"},
 		NotBefore:             now.Add(-time.Minute),
 		NotAfter:              now.Add(24 * time.Hour),
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
@@ -404,7 +381,21 @@ func newFrontCert(t *testing.T) (*x509.Certificate, tls.Certificate) {
 	require.NoError(t, err)
 	caCert, err := x509.ParseCertificate(caDER)
 	require.NoError(t, err)
+	keyDER, err := x509.MarshalECPrivateKey(caKey)
+	require.NoError(t, err)
+	return testCA{
+		cert:    caCert,
+		key:     caKey,
+		certPEM: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: caDER}),
+		keyPEM:  pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}),
+	}
+}
 
+// newFrontCert issues a certificate with the SANs DNS:localhost and
+// DNS:rebind.test only.
+func newFrontCert(t *testing.T, ca testCA) tls.Certificate {
+	t.Helper()
+	now := time.Now()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
 	tmpl := &x509.Certificate{
@@ -416,9 +407,9 @@ func newFrontCert(t *testing.T) (*x509.Certificate, tls.Certificate) {
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, caCert, &key.PublicKey, caKey)
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, ca.cert, &key.PublicKey, ca.key)
 	require.NoError(t, err)
-	return caCert, tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
+	return tls.Certificate{Certificate: [][]byte{der}, PrivateKey: key}
 }
 
 func serial(t *testing.T) *big.Int {
