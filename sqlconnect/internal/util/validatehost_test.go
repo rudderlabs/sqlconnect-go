@@ -16,7 +16,7 @@ import (
 
 func TestValidateHost(t *testing.T) {
 	t.Run("valid host", func(t *testing.T) {
-		err := util.ValidateHost("github.com")
+		err := util.ValidateHost("localhost", util.AllowLoopback(true))
 		require.NoError(t, err)
 	})
 
@@ -108,6 +108,15 @@ func TestValidateHost(t *testing.T) {
 				})
 			}
 		})
+	})
+
+	t.Run("rejects operator CIDR", func(t *testing.T) {
+		_, cidr, err := net.ParseCIDR("172.20.0.0/16")
+		require.NoError(t, err)
+		util.SetBlockedCIDRs([]*net.IPNet{cidr})
+		t.Cleanup(func() { util.SetBlockedCIDRs(nil) })
+		require.EqualError(t, util.ValidateHost("172.20.0.1"),
+			"invalid host in credentials: 172.20.0.1 resolves to a blocked range address")
 	})
 }
 

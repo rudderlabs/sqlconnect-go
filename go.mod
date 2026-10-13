@@ -24,7 +24,7 @@ require (
 	github.com/ory/dockertest/v3 v3.12.0
 	github.com/rudderlabs/clickhouse-go/v2 v2.48.0
 	github.com/rudderlabs/goqu/v10 v10.3.1
-	github.com/rudderlabs/rudder-go-kit v0.81.0
+	github.com/rudderlabs/rudder-go-kit v0.83.0
 	github.com/rudderlabs/sql-tunnels v0.1.7
 	github.com/samber/lo v1.53.0
 	github.com/sirupsen/logrus v1.9.4
@@ -50,7 +50,7 @@ require (
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.12.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.1.0 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.7.2 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect

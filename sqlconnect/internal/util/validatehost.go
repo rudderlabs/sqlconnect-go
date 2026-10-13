@@ -64,6 +64,11 @@ func ValidateHost(hostname string, opts ...HostValidationOption) error {
 		if reason := DisallowedAddrReason(ip); reason != "" {
 			return fmt.Errorf("invalid host in credentials: %s resolves to a %s address", hostname, reason)
 		}
+		for _, cidr := range blockedCIDRs() {
+			if cidr != nil && cidr.Contains(ip) {
+				return fmt.Errorf("invalid host in credentials: %s resolves to a %s address", hostname, "blocked range")
+			}
+		}
 	}
 	return nil
 }
