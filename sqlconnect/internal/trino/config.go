@@ -44,7 +44,11 @@ func (c Config) ConnectionString() (string, error) {
 		ServerURI: uri,
 		Catalog:   c.Catalog,
 	}
-	if c.TunnelInfo != nil {
+	// Route through the registered custom client whenever one is set. sshTunnelling
+	// always registers one — a socks5 client through the tunnel, otherwise a
+	// transport whose dialer is guarded by the egress policy — so keying this on the
+	// tunnel alone left the non-tunnel path on http.DefaultClient, unguarded.
+	if c.customClientName != "" {
 		config.CustomClientName = c.customClientName
 	}
 	dsn, err := config.FormatDSN()

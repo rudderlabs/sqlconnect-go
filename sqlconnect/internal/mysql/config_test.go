@@ -97,7 +97,9 @@ func TestConfig(t *testing.T) {
 		t.Run("matches the previously hand-built dsn for a benign config", func(t *testing.T) {
 			c := baseConfig("analytics")
 
-			legacy := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?tls=%s",
+			// "rudder-guarded-tcp" is the registered net name whose dialer enforces
+			// the egress policy; a benign config uses it in place of plain "tcp".
+			legacy := fmt.Sprintf("%s:%s@rudder-guarded-tcp(%s:%d)/%s?tls=%s",
 				c.User, c.Password, c.Host, c.Port, c.DBName, "false")
 			legacyParsed, err := mysqldriver.ParseDSN(legacy)
 			require.NoError(t, err, "the legacy dsn should parse")
@@ -109,6 +111,14 @@ func TestConfig(t *testing.T) {
 
 			require.Equal(t, legacyParsed, parsed,
 				"the driver must see an identical config, legacy: %s, new: %s", legacy, dsn)
+		})
+
+		t.Run("host metacharacters cannot escape the guarded net", func(t *testing.T) {
+			c := baseConfig("analytics")
+			c.Host = "x@tcp(evil.example.com"
+			_, err := c.ConnectionString()
+			require.Error(t, err,
+				"a host carrying dsn metacharacters must be refused, not downgraded to an unguarded net")
 		})
 
 		t.Run("tls mode reaches the driver", func(t *testing.T) {

@@ -4,11 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	_ "github.com/lib/pq" // postgres driver
+	"github.com/lib/pq" // postgres driver
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
 
 const (
@@ -35,10 +36,15 @@ func NewDB(credentialsJSON json.RawMessage) (*DB, error) {
 		config.Port = tunnel.Port()
 	}
 
-	db, err := sql.Open(DatabaseType, config.ConnectionString())
+	// Open through a pq connector with a guarded dialer so the dialled IP is
+	// checked against the egress policy. When a tunnel is active the driver
+	// dials the local tunnel endpoint (loopback), so loopback is allowed then.
+	connector, err := pq.NewConnector(config.ConnectionString())
 	if err != nil {
 		return nil, err
 	}
+	connector.Dialer(util.NewGuardedDialer(config.SkipHostValidation || config.TunnelInfo != nil))
+	db := sql.OpenDB(connector)
 
 	return &DB{
 		DB: base.NewDB(

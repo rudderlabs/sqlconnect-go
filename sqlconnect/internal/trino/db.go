@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
 
 const (
@@ -95,25 +96,35 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	}, nil
 }
 
-// passing config as a pointer since we might need to modify [customClientName]
+// passing config as a pointer since we need to set [customClientName]. Every
+// connection goes through a registered custom client: through the tunnel's
+// socks5 proxy when a tunnel is configured, otherwise through a transport whose
+// dialer is guarded by the egress policy so the dialled IP is checked.
 func sshTunnelling(config *Config) (tunnelCloser func() error, err error) {
-	tunnelCloser = func() error { return nil }
+	customClientKey := uuid.New().String()
+	config.customClientName = customClientKey
+
 	if config.TunnelInfo != nil {
 		tunnel, err := sshtunnel.NewSocks5Tunnel(*config.TunnelInfo)
 		if err != nil {
 			return nil, err
 		}
-		customClientKey := uuid.New().String()
-		config.customClientName = customClientKey
 		_ = trino.RegisterCustomClient(customClientKey, &http.Client{
 			Transport: sshtunnel.Socks5HTTPTransport(tunnel.Host(), tunnel.Port()),
 		})
-		tunnelCloser = func() error {
+		return func() error {
 			trino.DeregisterCustomClient(customClientKey)
 			return tunnel.Close()
-		}
+		}, nil
 	}
-	return tunnelCloser, nil
+
+	_ = trino.RegisterCustomClient(customClientKey, &http.Client{
+		Transport: util.GuardedHTTPTransport(config.SkipHostValidation),
+	})
+	return func() error {
+		trino.DeregisterCustomClient(customClientKey)
+		return nil
+	}, nil
 }
 
 func init() {

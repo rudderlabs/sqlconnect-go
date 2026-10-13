@@ -1,7 +1,9 @@
 package mysql
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -11,6 +13,24 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
+
+// Guarded dial networks registered with the mysql driver. The DSN's net name
+// selects the dialer, whose Control hook checks the dialled IP against the
+// egress policy. The loopback variant is used when a tunnel is active (the
+// driver then dials the local tunnel endpoint) or skipHostValidation is set.
+const (
+	guardedNetwork         = "rudder-guarded-tcp"
+	guardedNetworkLoopback = "rudder-guarded-tcp-loopback"
+)
+
+func init() {
+	mysqldriver.RegisterDialContext(guardedNetwork, func(ctx context.Context, addr string) (net.Conn, error) {
+		return util.GuardedDialContext(false)(ctx, "tcp", addr)
+	})
+	mysqldriver.RegisterDialContext(guardedNetworkLoopback, func(ctx context.Context, addr string) (net.Conn, error) {
+		return util.GuardedDialContext(true)(ctx, "tcp", addr)
+	})
+}
 
 type Config struct {
 	Host     string `json:"host"`
@@ -25,6 +45,10 @@ type Config struct {
 	// SkipHostValidation is used to skip host validation during tests
 	SkipHostValidation bool `json:"skipHostValidation"`
 	UseLegacyMappings  bool `json:"useLegacyMappings"`
+
+	// dialAllowLoopback selects the loopback-permitting guarded dialer. Set by
+	// NewDB when a tunnel is active or skipHostValidation is set; not serialised.
+	dialAllowLoopback bool
 }
 
 // ConnectionString builds the go-sql-driver DSN from typed fields.
@@ -41,14 +65,30 @@ func (c Config) ConnectionString() (string, error) {
 	cfg := mysqldriver.NewConfig()
 	cfg.User = c.User
 	cfg.Passwd = c.Password
-	cfg.Net = "tcp"
+	cfg.Net = guardedNetwork
+	if c.dialAllowLoopback {
+		cfg.Net = guardedNetworkLoopback
+	}
 	cfg.Addr = net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
 	cfg.DBName = c.DBName
 	cfg.TLSConfig = tls
 	// Pinned explicitly: reading local files on behalf of the server is never
 	// wanted here, and the connection config is caller-supplied.
 	cfg.AllowAllFiles = false
-	return cfg.FormatDSN(), nil
+	dsn := cfg.FormatDSN()
+	// Defence in depth: Host is caller-supplied, and a value carrying DSN
+	// metacharacters (for example "x@tcp(...") can make the driver parse a
+	// different net and bypass the guarded dialer. ValidateHost rejects such a
+	// host earlier; re-parse here and fail closed if the net is not the guarded
+	// one, so a dsn that would dial unguarded is never returned.
+	parsed, err := mysqldriver.ParseDSN(dsn)
+	if err != nil {
+		return "", fmt.Errorf("creating connection string: %w", err)
+	}
+	if parsed.Net != cfg.Net {
+		return "", errors.New("refusing to build a mysql connection string that bypasses the guarded network")
+	}
+	return dsn, nil
 }
 
 func (c Config) TLS() (string, error) {
