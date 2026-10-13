@@ -9,10 +9,18 @@ import (
 
 // GuardedHTTPTransport returns a clone of http.DefaultTransport whose DialContext
 // is guarded by the egress policy. Use it for the HTTPS-based connectors
-// (snowflake, trino, databricks, bigquery), so the TCP connection underneath each
-// HTTPS request is checked against the dialled IP.
+// (snowflake, trino, databricks), so the TCP connection underneath each HTTPS
+// request is checked against the dialled IP.
 func GuardedHTTPTransport(allowLoopback bool) *http.Transport {
-	t := http.DefaultTransport.(*http.Transport).Clone()
+	base, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		// http.DefaultTransport is a *http.Transport in the standard library;
+		// only a process that has replaced it with a different RoundTripper
+		// reaches here. Fall back to a fresh transport rather than panic on the
+		// type assertion.
+		base = &http.Transport{}
+	}
+	t := base.Clone()
 	t.DialContext = GuardedDialContext(allowLoopback)
 	return t
 }
@@ -23,7 +31,9 @@ type GuardedDialer struct {
 	dial func(context.Context, string, string) (net.Conn, error)
 }
 
-// NewGuardedDialer returns a GuardedDialer bound to the current egress policy.
+// NewGuardedDialer returns a GuardedDialer that enforces the egress policy. The
+// policy is re-read on every dial, so a later SetEgressPolicy takes effect
+// without reopening the connection.
 func NewGuardedDialer(allowLoopback bool) GuardedDialer {
 	return GuardedDialer{dial: GuardedDialContext(allowLoopback)}
 }
