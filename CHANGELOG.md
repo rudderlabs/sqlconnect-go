@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.34.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.33.0...v1.34.0) (2026-10-13)
+
+
+### Features
+
+* enforce the egress guard in all connectors ([#586](https://github.com/rudderlabs/sqlconnect-go/issues/586)) ([478315a](https://github.com/rudderlabs/sqlconnect-go/commit/478315aae0df83129919538f9bd2321f030149d3))
+* **util:** dial-time egress guard and package-level CIDR policy ([#585](https://github.com/rudderlabs/sqlconnect-go/issues/585)) ([e62924b](https://github.com/rudderlabs/sqlconnect-go/commit/e62924b705cb7409b14095db5309c658e5328d54))
+
+
+### Bug Fixes
+
+* **bigquery:** restrict service account token_uri and universe_domain to Google hosts ([#573](https://github.com/rudderlabs/sqlconnect-go/issues/573)) ([e43cb4f](https://github.com/rudderlabs/sqlconnect-go/commit/e43cb4f6ec775732dd5125897a95602899e80799))
+
+
+### Miscellaneous
+
+* **clickhouse:** use go-kit v0.82.0 ClickHouse TLS options in chtest ([#584](https://github.com/rudderlabs/sqlconnect-go/issues/584)) ([6cb17b4](https://github.com/rudderlabs/sqlconnect-go/commit/6cb17b4d6fbb97fadd9e71b86ec1707ffdb98115))
+* **deps:** bump rudder-go-kit to v0.83.0 ([#591](https://github.com/rudderlabs/sqlconnect-go/issues/591)) ([cfae6e7](https://github.com/rudderlabs/sqlconnect-go/commit/cfae6e7abf930d8f1ed6ca622ec25e081e652eb2))
+
 ## [1.33.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.32.0...v1.33.0) (2026-10-07)
 
 
