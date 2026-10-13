@@ -2,6 +2,7 @@ package bigquery
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -45,10 +46,10 @@ func validateServiceAccountJSON(jsonKey []byte) error {
 		return fmt.Errorf("unsupported credential type %q: only service account credentials are supported", f.Type)
 	}
 	if f.TokenURI != "" && !allowedGoogleHost(f.TokenURI) {
-		return fmt.Errorf("unsupported bigquery credential endpoint")
+		return errors.New("unsupported bigquery credential endpoint")
 	}
 	if f.UniverseDomain != "" && f.UniverseDomain != "googleapis.com" {
-		return fmt.Errorf("unsupported bigquery universe domain")
+		return errors.New("unsupported bigquery universe domain")
 	}
 	return nil
 }
@@ -63,7 +64,7 @@ func allowedGoogleHost(rawURL string) bool {
 		return false
 	}
 	h := strings.ToLower(u.Hostname())
-	return h == "oauth2.googleapis.com" || strings.HasSuffix(h, ".googleapis.com")
+	return strings.HasSuffix(h, ".googleapis.com")
 }
 
 // isEmptyCredentials reports whether the credentials field carries no document.
