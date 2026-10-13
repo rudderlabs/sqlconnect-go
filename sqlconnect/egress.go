@@ -17,10 +17,10 @@ import (
 // It is enforced only on connections opened through a guarded driver path:
 // mysql, postgres, redshift over the Postgres/JDBC path, snowflake, databricks
 // and trino. Other outbound paths are not covered and rely on the network layer
-// instead — among them clickhouse (which has its own dial guard), the Redshift
-// Data API (AWS SDK), bigquery's token_uri exchange, the SSH bastion dial, and
-// OAuth/OIDC discovery and token requests. Treat it as defence in depth, not the
-// sole egress control.
+// instead — among them fabric (mssql, which has no guarded dialer), clickhouse
+// (which has its own dial guard), the Redshift Data API (AWS SDK), bigquery's
+// token_uri exchange, the SSH bastion dial, and OAuth/OIDC discovery and token
+// requests. Treat it as defence in depth, not the sole egress control.
 func SetEgressPolicy(blockedCIDRs []string) error {
 	parsed := make([]*net.IPNet, 0, len(blockedCIDRs))
 	for _, s := range blockedCIDRs {
