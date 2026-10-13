@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -74,7 +75,20 @@ func (c Config) ConnectionString() (string, error) {
 	// Pinned explicitly: reading local files on behalf of the server is never
 	// wanted here, and the connection config is caller-supplied.
 	cfg.AllowAllFiles = false
-	return cfg.FormatDSN(), nil
+	dsn := cfg.FormatDSN()
+	// Defence in depth: Host is caller-supplied, and a value carrying DSN
+	// metacharacters (for example "x@tcp(...") can make the driver parse a
+	// different net and bypass the guarded dialer. ValidateHost rejects such a
+	// host earlier; re-parse here and fail closed if the net is not the guarded
+	// one, so a dsn that would dial unguarded is never returned.
+	parsed, err := mysqldriver.ParseDSN(dsn)
+	if err != nil {
+		return "", fmt.Errorf("creating connection string: %w", err)
+	}
+	if parsed.Net != cfg.Net {
+		return "", errors.New("refusing to build a mysql connection string that bypasses the guarded network")
+	}
+	return dsn, nil
 }
 
 func (c Config) TLS() (string, error) {

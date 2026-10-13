@@ -113,6 +113,14 @@ func TestConfig(t *testing.T) {
 				"the driver must see an identical config, legacy: %s, new: %s", legacy, dsn)
 		})
 
+		t.Run("host metacharacters cannot escape the guarded net", func(t *testing.T) {
+			c := baseConfig("analytics")
+			c.Host = "x@tcp(evil.example.com"
+			_, err := c.ConnectionString()
+			require.Error(t, err,
+				"a host carrying dsn metacharacters must be refused, not downgraded to an unguarded net")
+		})
+
 		t.Run("tls mode reaches the driver", func(t *testing.T) {
 			for sslMode, want := range map[string]string{
 				"":            "false",
