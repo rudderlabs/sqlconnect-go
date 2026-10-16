@@ -10,14 +10,27 @@ import (
 )
 
 func TestSetEgressPolicy(t *testing.T) {
-	require.NoError(t, sqlconnect.SetEgressPolicy([]string{"172.20.0.0/16", "10.100.0.0/16"}))
 	t.Cleanup(func() { require.NoError(t, sqlconnect.SetEgressPolicy(nil)) })
+
+	require.NoError(t, sqlconnect.SetEgressPolicy([]string{"172.20.0.0/16", "10.100.0.0/16"}))
 	require.ErrorContains(t, util.ValidateHost("172.20.0.1"), "blocked range")
 	require.ErrorContains(t, util.ValidateHost("10.100.0.1"), "blocked range")
 
-	err := sqlconnect.SetEgressPolicy([]string{"192.168.0.0/16", "nonsense"})
-	require.ErrorContains(t, err, `invalid CIDR "nonsense"`)
+	err := sqlconnect.SetEgressPolicy([]string{"192.168.0.0/16", " 198.51.100.0/24"})
+	require.ErrorContains(t, err, `invalid CIDR " 198.51.100.0/24"`)
 	require.ErrorContains(t, util.ValidateHost("172.20.0.1"), "blocked range")
 	require.ErrorContains(t, util.ValidateHost("10.100.0.1"), "blocked range")
+	require.NoError(t, util.ValidateHost("192.168.0.1"))
+
+	require.NoError(t, sqlconnect.SetEgressPolicy([]string{"192.168.0.0/16"}))
+	require.NoError(t, util.ValidateHost("172.20.0.1"))
+	require.NoError(t, util.ValidateHost("10.100.0.1"))
+	require.ErrorContains(t, util.ValidateHost("192.168.0.1"), "blocked range")
+
+	require.NoError(t, sqlconnect.SetEgressPolicy([]string{}))
+	require.NoError(t, util.ValidateHost("192.168.0.1"))
+
+	require.NoError(t, sqlconnect.SetEgressPolicy([]string{"192.168.0.0/16"}))
+	require.NoError(t, sqlconnect.SetEgressPolicy(nil))
 	require.NoError(t, util.ValidateHost("192.168.0.1"))
 }
