@@ -114,7 +114,6 @@ func forbiddenSQLLiterals(n ast.Node) []string {
 			hits = append(hits, text)
 		}
 		return false // the whole constant expression was checked
-
 	})
 	return hits
 }

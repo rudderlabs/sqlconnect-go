@@ -760,7 +760,6 @@ func definiteCreateRefusal(err error) bool {
 	return false
 }
 
-
 // parseVersion reads the first three numeric parts of a server version.
 func parseVersion(s string) ([3]int, error) {
 	var v [3]int
