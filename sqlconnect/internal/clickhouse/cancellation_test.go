@@ -61,7 +61,7 @@ func TestSQ28_RunningCheck(t *testing.T) {
 		call := rec.last()
 		require.Empty(t, call.args, "the target id is sent as the query id, never spliced into the SQL")
 		require.Equal(t, "retl-x", queryIDOf(call.ctx), "the check runs under the target's id")
-		require.Equal(t, map[string]any{"send_progress_in_http_headers": 0, "replace_running_query": 0}, settingsOf(call.ctx),
+		require.Equal(t, map[string]any{"send_progress_in_http_headers": 0, "limit": 0, "offset": 0, "additional_result_filter": "", "replace_running_query": 0}, settingsOf(call.ctx),
 			"the check never asks the server to replace the target, and no caller setting reaches it")
 	}
 	secret := "other-user-secret-text"
@@ -91,7 +91,7 @@ func TestSQ28_StopQuery(t *testing.T) {
 	require.Equal(t, []string{runningSQL, stopSQL, runningSQL}, rec.queries())
 	stop := rec.calls()[1]
 	require.Equal(t, "retl-x", queryIDOf(stop.ctx))
-	require.Equal(t, map[string]any{"send_progress_in_http_headers": 0, "replace_running_query": 1}, settingsOf(stop.ctx))
+	require.Equal(t, map[string]any{"send_progress_in_http_headers": 0, "limit": 0, "offset": 0, "additional_result_filter": "", "replace_running_query": 1}, settingsOf(stop.ctx))
 	_, hasDeadline := stop.ctx.Deadline()
 	require.True(t, hasDeadline, "a caller without a deadline gets stopTimeout")
 
@@ -497,4 +497,14 @@ func TestControlPool_OpenedAndClosedWithTheDB(t *testing.T) {
 	require.Equal(t, controlConns, db.control.Stats().MaxOpenConnections)
 	require.NoError(t, db.Close())
 	require.ErrorContains(t, db.control.PingContext(context.Background()), "database is closed")
+}
+
+func TestTargetCtx_KeepsTheCheckRow(t *testing.T) {
+	t.Parallel()
+	for _, replace := range []bool{false, true} {
+		got := settingsOf(targetCtx(context.Background(), "retl-x", replace))
+		require.Equal(t, 0, got["limit"], "a profile limit must not hide the check row")
+		require.Equal(t, 0, got["offset"], "a profile offset must not hide the check row")
+		require.Equal(t, "", got["additional_result_filter"])
+	}
 }

@@ -50,12 +50,13 @@ var (
 	stopConfirmInterval = 200 * time.Millisecond
 )
 
-// targetCtx sends the control map under the target's query id. It replaces
-// any caller map: these two statements read nothing, so no caller setting
-// changes their result. It pins replace_running_query to 0 for a check and
-// to 1 for a stop, overriding the user's profile default.
+// targetCtx sends the hello map under the target's query id. It replaces any
+// caller map. The hello map keeps a profile limit, offset or result filter
+// from hiding the one row the check reads back. It pins
+// replace_running_query to 0 for a check and to 1 for a stop, overriding the
+// user's profile default.
 func targetCtx(ctx context.Context, queryID string, replace bool) context.Context {
-	m := controlSettings()
+	m := helloSettings()
 	m["replace_running_query"] = 0
 	if replace {
 		m["replace_running_query"] = 1
