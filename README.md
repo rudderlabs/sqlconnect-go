@@ -42,13 +42,12 @@ Replace `<working_database>`, `rudder_retl` and `analytics` with your working da
 CREATE DATABASE IF NOT EXISTS <working_database>;
 GRANT SELECT ON analytics.* TO rudder_retl;
 GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON <working_database>.* TO rudder_retl;
-GRANT SELECT ON system.processes TO rudder_retl;
-GRANT SELECT ON system.query_log TO rudder_retl;
 ```
 
 Sync-log pruning also requires `GRANT ALTER DELETE ON <working_database>.sync_log TO rudder_retl` after that table exists.
 The driver rejects `rudderSchema` and `scratchDatabase` account keys.
 Validation checks database existence, its engine, and the required privileges.
+The driver needs no grant on a system table. It checks and stops its own queries by query id, so it never reads `system.processes` or `system.query_log`.
 
 To revoke access and remove working tables, run:
 

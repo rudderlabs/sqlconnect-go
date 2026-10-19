@@ -106,8 +106,8 @@ func TestCP26_CloudReplicatedDefault(t *testing.T) {
 	}
 }
 
-// TestSQ28_CloudCancellation runs the kill and outcome lookups on Cloud, where
-// the answering replica can differ between requests.
+// TestSQ28_CloudCancellation runs the stop and the running check on Cloud,
+// where the answering replica can differ between requests.
 func TestSQ28_CloudCancellation(t *testing.T) {
 	db, ctx := cloudDB(t, 0), context.Background()
 	scratch := scratchOf(t)
@@ -115,7 +115,7 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 	_, err := pinned(t, db).ExecContext(ctx, "CREATE TABLE "+db.QuoteTable(sink)+" (n UInt64) ENGINE = MergeTree ORDER BY n")
 	require.NoError(t, err)
 
-	t.Run("kill a running insert", func(t *testing.T) {
+	t.Run("stop a running insert", func(t *testing.T) {
 		id := clickhousequery.NewQueryID()
 		conn := pinned(t, db)
 		done := make(chan error, 1)
@@ -125,31 +125,28 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 			done <- err
 		}()
 		require.Eventually(t, func() bool {
-			o, err := db.QueryOutcome(ctx, id, "Insert")
-			return err == nil && o == sqlconnect.QueryRunning
+			running, err := db.QueryRunning(ctx, id)
+			return err == nil && running
 		}, 2*time.Minute, time.Second)
-		var res sqlconnect.KillResult
 		require.Eventually(t, func() bool {
-			res, err = db.KillQuery(ctx, id)
-			return err == nil && len(res.Rows) == 1 && res.Rows[0].KillStatus == "finished"
-		}, 2*time.Minute, time.Second, "the kill reaches the replica that runs the insert")
+			stopped, err := db.StopQuery(ctx, id)
+			return err == nil && stopped
+		}, 2*time.Minute, time.Second, "the stop reaches the replica that runs the insert")
 		werr := <-done
 		require.Error(t, werr)
-		require.EqualValues(t, 394, db.ClassifyError(werr).ServerCode, "the killed insert fails mid-stream with code 394")
-		require.Eventually(t, func() bool {
-			o, err := db.QueryOutcome(ctx, id, "Insert")
-			return err == nil && o == sqlconnect.QueryFailed
-		}, 2*time.Minute, 2*time.Second)
+		require.EqualValues(t, 394, db.ClassifyError(werr).ServerCode, "the stopped insert fails mid-stream with code 394")
+		running, err := db.QueryRunning(ctx, id)
+		require.NoError(t, err)
+		require.False(t, running)
 	})
 
 	t.Run("finished", func(t *testing.T) {
 		id := clickhousequery.NewQueryID()
 		_, err := pinned(t, db).ExecContext(stmtCtx(ctx, map[string]any{}, id), "INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(10)")
 		require.NoError(t, err)
-		require.Eventually(t, func() bool {
-			o, err := db.QueryOutcome(ctx, id, "Insert")
-			return err == nil && o == sqlconnect.QueryFinished
-		}, 2*time.Minute, 2*time.Second)
+		running, err := db.QueryRunning(ctx, id)
+		require.NoError(t, err)
+		require.False(t, running, "a finished insert does not run")
 	})
 
 	t.Run("mid-stream kill", func(t *testing.T) {
@@ -160,8 +157,8 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 		defer func() { _ = rows.Close() }()
 		require.True(t, rows.Next(), "the first block arrives before the kill")
 		require.Eventually(t, func() bool {
-			res, err := db.KillQuery(ctx, id)
-			return err == nil && len(res.Rows) == 1 && res.Rows[0].KillStatus == "finished"
+			stopped, err := db.StopQuery(ctx, id)
+			return err == nil && stopped
 		}, 2*time.Minute, time.Second)
 		drain(rows)
 		require.EqualValues(t, 394, db.ClassifyError(rows.Err()).ServerCode, "the stream ends with code 394")

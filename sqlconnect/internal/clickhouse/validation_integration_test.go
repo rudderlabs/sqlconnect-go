@@ -92,6 +92,15 @@ func TestValidation_Grants(t *testing.T) {
 	require.False(t, res.GrantsChecked)
 	require.Len(t, filterOp(res.Warnings, "inspect_grants"), 1)
 	require.Empty(t, filterOp(res.Warnings, "check_alter_delete"), "the published script grants ALTER DELETE on sync_log")
+	require.Empty(t, systemGrantWarnings(res.Warnings), "no grant on a system table: no warning names one")
+	// The same user plus both system grants: the driver reads neither table,
+	// so the result is the same.
+	sysUser, sysDB := fresh(t, false)
+	srv.AdminExec(t, "GRANT SELECT ON system.processes TO "+sysUser)
+	srv.AdminExec(t, "GRANT SELECT ON system.query_log TO "+sysUser)
+	withSys, err := sysDB.ValidateContext(named)
+	require.NoError(t, err, "the system grants change nothing")
+	require.Equal(t, res, withSys)
 	user, db := fresh(t, false)
 	srv.AdminExec(t, "REVOKE ALTER DELETE ON _rudderstack.sync_log FROM "+user)
 	res, err = db.ValidateContext(named)
@@ -101,10 +110,8 @@ func TestValidation_Grants(t *testing.T) {
 		revoke  string
 		pruning bool
 	}{
-		"CREATE TABLE":               {"REVOKE CREATE TABLE ON _rudderstack.* FROM ", false},
-		"SELECT ON system.processes": {"REVOKE SELECT ON system.processes FROM ", false},
-		"SELECT ON system.query_log": {"REVOKE SELECT ON system.query_log FROM ", false},
-		"ALTER DELETE":               {"REVOKE ALTER DELETE ON _rudderstack.sync_log FROM ", true},
+		"CREATE TABLE": {"REVOKE CREATE TABLE ON _rudderstack.* FROM ", false},
+		"ALTER DELETE": {"REVOKE ALTER DELETE ON _rudderstack.sync_log FROM ", true},
 	} {
 		user, db := fresh(t, false)
 		ctx := withWorkingDB(context.Background())
@@ -123,7 +130,6 @@ func TestValidation_Grants(t *testing.T) {
 	for _, g := range []string{
 		"CREATE USER retl_user IDENTIFIED WITH sha256_password BY 'pw_Role_123'", "CREATE ROLE retl_permissions", "CREATE ROLE retl_login",
 		"GRANT SELECT ON customer_db.* TO retl_permissions", "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON _rudderstack.* TO retl_permissions",
-		"GRANT SELECT ON system.processes TO retl_permissions", "GRANT SELECT ON system.query_log TO retl_permissions",
 		"GRANT retl_permissions TO retl_login", "GRANT retl_login TO retl_user", "SET DEFAULT ROLE retl_login TO retl_user",
 	} {
 		srv.AdminExec(t, g)
@@ -331,4 +337,15 @@ func TestSQ14_RunBudgetUnderCallerDeadline(t *testing.T) {
 			"a caller deadline must not replace the two-hour budget (%s): %v", d, err)
 		requireStage(t, err, 2, "settings")
 	}
+}
+
+// systemGrantWarnings returns the warnings whose operation names a system table.
+func systemGrantWarnings(ws []sqlconnect.ValidationWarning) []sqlconnect.ValidationWarning {
+	var out []sqlconnect.ValidationWarning
+	for _, w := range ws {
+		if strings.Contains(w.Operation, "system") || strings.Contains(w.Operation, "processes") || strings.Contains(w.Operation, "query_log") {
+			out = append(out, w)
+		}
+	}
+	return out
 }

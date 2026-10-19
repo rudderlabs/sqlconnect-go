@@ -33,6 +33,9 @@ func init() {
 		cherr.CodeNetwork:        {95, 96, 198, 210, 279},
 		cherr.CodeObjectNotFound: {60, 81},
 		cherr.CodeCancelled:      {394},
+		// A normal statement getting 216 cannot prove the other execution
+		// under its id has ended or what it wrote.
+		cherr.CodeOutcomeUnknown: {216},
 		cherr.CodeUnavailable:    {242},
 	} {
 		for _, sc := range list {

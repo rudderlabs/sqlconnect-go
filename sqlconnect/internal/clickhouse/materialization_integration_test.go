@@ -287,8 +287,6 @@ func publishAsCustomer(t *testing.T, tag string) {
 		"GRANT SELECT ON customer_db.* TO rudder_retl",
 		"GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON _rudderstack.* TO rudder_retl",
 		"GRANT ALTER DELETE ON _rudderstack.sync_log TO rudder_retl",
-		"GRANT SELECT ON system.processes TO rudder_retl",
-		"GRANT SELECT ON system.query_log TO rudder_retl",
 	}, grants, "the user holds the customer grant set and nothing more")
 
 	db := openScoped(t, srv, "rudder_retl", "pw_Retl_123")

@@ -21,9 +21,9 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/clickhouse/chtest"
 )
 
-// The production grants let the sync user read system.query_log and
+// A customer can still grant the sync user system.query_log and
 // system.processes, so the guard alone keeps audience SQL inside the customer
-// databases. This test lets the server judge the guard: each query the guard
+// databases. The test user holds both grants for that worst case. This test lets the server judge the guard: each query the guard
 // accepts runs as the scoped production user, and the server's query_log
 // records what the query touched.
 
@@ -163,6 +163,8 @@ func startGuardServer(t *testing.T) *guardServer {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
 	g := &guardServer{srv: srv, user: "guard_scoped", pass: "pw_guard_scoped_0123456789"}
 	srv.CreateScopedUser(t, g.user, g.pass, "db", "rudder_scratch", false)
+	srv.AdminExec(t, "GRANT SELECT ON system.processes TO "+g.user)
+	srv.AdminExec(t, "GRANT SELECT ON system.query_log TO "+g.user)
 	for _, name := range guardDatabases {
 		srv.AdminExec(t, "CREATE DATABASE IF NOT EXISTS `"+name+"`")
 		srv.AdminExec(t, "GRANT SELECT ON `"+name+"`.* TO "+g.user)

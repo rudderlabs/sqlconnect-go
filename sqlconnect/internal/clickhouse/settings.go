@@ -11,7 +11,7 @@ var overflowModes = []string{
 // driverScratchSettings is the map for a statement that can write, when the
 // caller gave no map of its own. It pins every setting that can change a
 // result, so a user or profile default on the server cannot. Query logging
-// stays enabled so QueryOutcome can resolve a lost write response.
+// stays enabled for the customer's own audit; Cloud pins it to 1 anyway.
 func driverScratchSettings() map[string]any {
 	m := map[string]any{
 		"join_use_nulls": 1, "session_timezone": "UTC", "select_sequential_consistency": 1,

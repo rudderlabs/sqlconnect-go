@@ -10,35 +10,72 @@ import (
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/clickhouse"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/clickhouse/chtest"
 )
 
-func TestSQ28_KillAndOutcome(t *testing.T) {
-	srv, db := retlFixture(t)
+// TestSQ28_StopAndRunningCheck runs the stop and the running check for a user
+// without system grants and for one with them. Both must behave the same.
+func TestSQ28_StopAndRunningCheck(t *testing.T) {
+	srv, plain := retlFixture(t)
+	srv.CreateScopedUser(t, "retl_sys", "pw_Sys_12345", "customer_db", "_rudderstack", false)
+	srv.AdminExec(t, "GRANT SELECT ON system.processes TO retl_sys")
+	srv.AdminExec(t, "GRANT SELECT ON system.query_log TO retl_sys")
+	ctx := context.Background()
+	for name, db := range map[string]*clickhouse.DB{"no system grants": plain, "system grants": openScoped(t, srv, "retl_sys", "pw_Sys_12345")} {
+		target := clickhousequery.NewQueryID()
+		done := startSlow(t, db, ctx, target)
+		require.Eventually(t, func() bool {
+			running, err := db.QueryRunning(ctx, target)
+			return err == nil && running
+		}, time.Minute, 100*time.Millisecond, name)
+		require.Equal(t, 1, srv.ProcessCount(t, target), "%s: the running check leaves the target running", name)
+		stopped, err := db.StopQuery(idCtx(ctx, target), target)
+		require.NoError(t, err, name)
+		require.True(t, stopped, name)
+		require.Equal(t, sqlconnect.ErrorInfo{Category: "cancellation", Code: "CH_CANCELLED", ServerCode: 394}, db.ClassifyError(<-done), name)
+		require.Equal(t, 0, srv.ProcessCount(t, target), name)
+		running, err := db.QueryRunning(ctx, target)
+		require.NoError(t, err, name)
+		require.False(t, running, "%s: the running check is false after the stop", name)
+		stopped, err = db.StopQuery(ctx, target)
+		require.NoError(t, err, name)
+		require.False(t, stopped, "%s: nothing runs, so nothing stops", name)
+
+		// The deprecated methods sit on the same primitives.
+		res, err := db.KillQuery(ctx, target)
+		require.NoError(t, err, name)
+		require.Empty(t, res.Rows, name)
+		o, err := db.QueryOutcome(ctx, target, "Insert")
+		require.NoError(t, err, name)
+		require.Equal(t, sqlconnect.QueryFailed, o, "%s: an ended query is failed until the caller verifies it", name)
+	}
+	srv.FlushLogs(t)
+	require.Empty(t, srv.KillStatements(t), "the driver never sends KILL QUERY")
+	require.Empty(t, srv.QueryLogLike(t, "%system.processes%"), "the driver never reads system.processes")
+	require.Empty(t, srv.QueryLogLike(t, "%system.query_log%"), "the driver never reads system.query_log")
+}
+
+// TestSQ28_StopRefusedFailsClosed: a constraint pins replace_running_query to
+// 0, so the server refuses the stop. StopQuery returns a classified error at
+// once, and the target keeps running.
+func TestSQ28_StopRefusedFailsClosed(t *testing.T) {
+	srv, _ := retlFixture(t)
+	srv.CreateScopedUser(t, "retl_pinned", "pw_Pin_12345", "customer_db", "_rudderstack", false)
+	srv.AdminExec(t, "ALTER USER retl_pinned SETTINGS replace_running_query = 0 CONST")
+	db := openScoped(t, srv, "retl_pinned", "pw_Pin_12345")
 	ctx := context.Background()
 	target := clickhousequery.NewQueryID()
 	done := startSlow(t, db, ctx, target)
-	require.Eventually(t, func() bool {
-		o, err := db.QueryOutcome(ctx, target, "Insert")
-		return err == nil && o == sqlconnect.QueryRunning
-	}, time.Minute, 100*time.Millisecond)
-	callerCtx := idCtx(ctx, target)
-	res, err := db.KillQuery(callerCtx, target) // a fresh id even with the target's id on the context
-	require.NoError(t, err)
-	require.Equal(t, []sqlconnect.KillRow{{QueryID: target, KillStatus: "finished"}}, res.Rows)
-	require.Equal(t, sqlconnect.ErrorInfo{Category: "cancellation", Code: "CH_CANCELLED", ServerCode: 394}, db.ClassifyError(<-done))
-	empty, err := db.KillQuery(ctx, clickhousequery.NewQueryID())
-	require.NoError(t, err)
-	require.Empty(t, empty.Rows)
-	require.Eventually(t, func() bool {
-		o, err := db.QueryOutcome(callerCtx, target, "Insert")
-		return err == nil && o == sqlconnect.QueryFailed
-	}, time.Minute, time.Second, "polls past the 7 to 10 s flush lag; its own rows never count")
-	kills := srv.KillStatements(t)
-	require.Len(t, kills, 2, "both KillQuery calls reached the server")
-	for _, k := range kills {
-		require.NotContains(t, k, "ON CLUSTER")
-	}
+	require.Eventually(t, func() bool { return srv.ProcessCount(t, target) == 1 }, time.Minute, 100*time.Millisecond)
+	start := time.Now()
+	stopped, err := db.StopQuery(ctx, target)
+	require.False(t, stopped)
+	require.Equal(t, sqlconnect.ErrorInfo{Category: "permission", Code: "CH_PERMISSION", ServerCode: 452}, db.ClassifyError(err))
+	require.Less(t, time.Since(start), 10*time.Second, "a refused stop returns at once")
+	require.Equal(t, 1, srv.ProcessCount(t, target), "the refused stop leaves the target running")
+	srv.AdminExec(t, "KILL QUERY WHERE query_id = '"+target+"' SYNC")
+	<-done
 }
 
 func TestSQ28_ContextCancelLeavesServerRunning(t *testing.T) {
@@ -54,14 +91,16 @@ func TestSQ28_ContextCancelLeavesServerRunning(t *testing.T) {
 	srv.AdminExec(t, "KILL QUERY WHERE query_id = '"+id+"' SYNC")
 }
 
-func TestSQ28_LostResponseOutcomes(t *testing.T) {
+// TestSQ28_LostResponseRunningCheck: after a lost response the running check
+// says the write has ended, and the caller's own table shows what it wrote.
+func TestSQ28_LostResponseRunningCheck(t *testing.T) {
 	srv, _ := retlFixture(t)
 	p := chtest.NewProxy(t, srv, chtest.ProxyOptions{})
 	db := openScopedVia(t, srv, p, "rudder_retl", "pw_Retl_123")
 	ctx := context.Background()
-	for sql, want := range map[string]sqlconnect.QueryOutcome{
-		"INSERT INTO _rudderstack.sink SELECT number FROM numbers(10)":                      sqlconnect.QueryFinished,
-		"INSERT INTO _rudderstack.sink SELECT throwIf(number = 5, 'boom') FROM numbers(10)": sqlconnect.QueryFailed,
+	for sql, rows := range map[string]string{
+		"INSERT INTO _rudderstack.sink SELECT number FROM numbers(10)":                      "10",
+		"INSERT INTO _rudderstack.sink SELECT throwIf(number = 5, 'boom') FROM numbers(10)": "10",
 	} {
 		id := clickhousequery.NewQueryID()
 		p.DropResponseOnce(func(r chtest.Request) bool { return r.Query.Get("query_id") == id })
@@ -71,63 +110,30 @@ func TestSQ28_LostResponseOutcomes(t *testing.T) {
 		require.Error(t, err)
 		_ = conn.Close()
 		require.Eventually(t, func() bool {
-			o, err := db.QueryOutcome(idCtx(ctx, id), id, "Insert")
-			return err == nil && o == want
-		}, time.Minute, time.Second, "the lookup runs under its own id")
+			running, err := db.QueryRunning(ctx, id)
+			return err == nil && !running
+		}, time.Minute, 100*time.Millisecond)
+		require.Equal(t, rows, srv.AdminQuery(t, "SELECT count() FROM _rudderstack.sink")[0][0], "only the finished write landed")
 	}
 }
 
-func TestSQ28_OwnUserOnlyAndGrants(t *testing.T) {
+// TestSQ28_OwnUserOnly: the server matches a query id only against queries
+// of the same user, so the stop cannot reach another user's query. The
+// running check sees that id as taken, and the stop then fails closed.
+func TestSQ28_OwnUserOnly(t *testing.T) {
 	srv, db := retlFixture(t)
 	srv.CreateScopedUser(t, "other_user", "pw_Other_123", "customer_db", "other_scratch", false)
-	srv.FlushLogs(t) // a fresh server creates system.query_log at the first flush
 	ctx := context.Background()
 	id := clickhousequery.NewQueryID()
 	// One row per block, 3 s each: the query runs long enough to be seen.
 	other := srv.StartAs(t, "other_user", "pw_Other_123", id, "SELECT 'other-user-secret-text', sleep(3) FROM numbers(3) SETTINGS max_block_size = 1")
-	res, err := db.KillQuery(ctx, id)
+	running, err := db.QueryRunning(ctx, id)
 	require.NoError(t, err)
-	require.Empty(t, res.Rows, "the kill filters on user = currentUser()")
+	require.True(t, running, "the id is taken on the server")
+	stopped, err := db.StopQuery(ctx, id)
+	require.False(t, stopped)
+	require.Equal(t, "CH_OUTCOME_UNKNOWN", db.ClassifyError(err).Code)
+	require.NotContains(t, fmt.Sprintf("%v", err), "other-user-secret-text")
 	require.Equal(t, 1, srv.ProcessCount(t, id), "the other user's query keeps running")
-	o, err := db.QueryOutcome(ctx, id, "Select")
-	require.NoError(t, err)
-	require.Equal(t, sqlconnect.QueryNotFound, o)
-	require.NotContains(t, fmt.Sprintf("%v %v", res, err), "other-user-secret-text")
 	other.Wait(t)
-	srv.FlushLogs(t)
-	o, err = db.QueryOutcome(ctx, id, "Select")
-	require.NoError(t, err)
-	require.Equal(t, sqlconnect.QueryNotFound, o, "another user's finished query_log row is never read")
-
-	srv.AdminExec(t, "REVOKE SELECT ON system.processes FROM rudder_retl")
-	_, err = db.KillQuery(ctx, clickhousequery.NewQueryID())
-	require.Equal(t, sqlconnect.ErrorInfo{Category: "permission", Code: "CH_PERMISSION", ServerCode: 497}, db.ClassifyError(err))
-	srv.AdminExec(t, "GRANT SELECT ON system.processes TO rudder_retl")
-	srv.AdminExec(t, "REVOKE SELECT ON system.query_log FROM rudder_retl")
-	_, err = db.QueryOutcome(ctx, clickhousequery.NewQueryID(), "Insert")
-	require.EqualValues(t, 497, db.ClassifyError(err).ServerCode)
-
-	admin := openAdmin(t, srv) // rudder-sources passes query_kind to QueryOutcome, so each statement kind is pinned here
-	kinds := []struct{ name, sql, id string }{
-		{"INSERT SELECT", "INSERT INTO _rudderstack.sink SELECT 1", ""},
-		{"CREATE", "CREATE TABLE _rudderstack.k (a UInt8) ENGINE = MergeTree ORDER BY a", ""},
-		{"RENAME", "RENAME TABLE _rudderstack.k TO _rudderstack.k2", ""},
-		{"EXCHANGE", "EXCHANGE TABLES _rudderstack.k2 AND _rudderstack.sink", ""},
-		{"ALTER DELETE", "ALTER TABLE _rudderstack.k2 DELETE WHERE n = 1 SETTINGS mutations_sync = 1", ""},
-		{"DROP", "DROP TABLE _rudderstack.k2 SYNC", ""},
-	}
-	for i := range kinds {
-		kinds[i].id = clickhousequery.NewQueryID()
-		_, err := admin.ExecContext(idCtx(ctx, kinds[i].id), kinds[i].sql)
-		require.NoError(t, err, kinds[i].name)
-	}
-	srv.FlushLogs(t)
-	for _, k := range kinds {
-		t.Logf("query_kind %s = %s", k.name, srv.QueryLogKind(t, k.id))
-	}
-	got := make([]string, len(kinds))
-	for i, k := range kinds {
-		got[i] = srv.QueryLogKind(t, k.id)
-	}
-	require.Equal(t, []string{"Insert", "Create", "Rename", "Rename", "Alter", "Drop"}, got, "EXCHANGE logs as Rename")
 }

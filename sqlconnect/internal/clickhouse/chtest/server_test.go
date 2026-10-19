@@ -151,12 +151,11 @@ func TestFixture_ProxyResetModes(t *testing.T) {
 		for _, want := range []string{
 			"GRANT SELECT ON customer_db.*",
 			"GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON _rudderstack.*",
-			"GRANT SELECT ON system.processes",
-			"GRANT SELECT ON system.query_log",
 			"GRANT ALTER DELETE ON _rudderstack.sync_log",
 		} {
 			require.Contains(t, joined, want)
 		}
+		require.NotContains(t, joined, "system.", "the customer grant set has no system table")
 		srv.FlushLogs(t)
 
 		var cfg map[string]any

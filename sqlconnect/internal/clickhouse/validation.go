@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
-	"database/sql/driver"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -15,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	ch "github.com/rudderlabs/clickhouse-go/v2"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
@@ -44,8 +45,7 @@ const (
 	// detached from the caller.
 	probeCleanupTimeout = 60 * time.Second
 	// probeSettlePolls and probeSettleInterval bound the wait for a probe
-	// CREATE with an unknown outcome. The window outlasts the default
-	// query_log flush interval of 7.5 s, so a finished CREATE shows up in it.
+	// CREATE with an unknown outcome. Absence never proves that it failed.
 	probeSettlePolls    = 15
 	probeSettleInterval = time.Second
 	hostNameSQL         = "SELECT hostName()"
@@ -246,16 +246,15 @@ func (b readBudget) context(ctx context.Context) (context.Context, func()) {
 }
 
 // checkGrants runs one CHECK GRANT per required privilege, so CH_PERMISSION
-// names the failing one, then the diagnostic checks that only warn.
+// names the failing one, then the diagnostic checks that only warn. No grant
+// on a system table is checked: the driver reads none of them, so the result
+// does not depend on whether the customer granted them.
 func (db *DB) checkGrants(ctx context.Context, ex sqlconnect.QueryExecutor) ([]sqlconnect.ValidationWarning, error) {
 	scratch := db.QuoteIdentifier(workingDatabase(ctx))
 	type grant struct{ privilege, stmt string }
 	var checks []grant
 	for _, p := range []string{"SELECT", "INSERT", "CREATE TABLE", "DROP TABLE"} {
 		checks = append(checks, grant{p, "CHECK GRANT " + p + " ON " + scratch + ".*"})
-	}
-	for _, tbl := range []string{"system.processes", "system.query_log"} {
-		checks = append(checks, grant{"SELECT ON " + tbl, "CHECK GRANT SELECT ON " + tbl})
 	}
 	alterDelete := "CHECK GRANT ALTER DELETE ON " + scratch + ".`sync_log`"
 	opts, hasOpts := sqlconnect.ValidationOptionsFrom(ctx)
@@ -564,13 +563,18 @@ type probeCleanup struct {
 	created bool // true after an acknowledged CREATE; false for an unknown outcome
 	// createID is the query id of a CREATE with an unknown outcome. That
 	// CREATE can still be in transit, so the DROP waits until it is over.
-	createID string
+	createID  string
+	createErr error // a definite server error proves that the CREATE ended
 	// acquire gives the connection for each step. In production it is the
 	// validation's own connection while that stays usable, so a busy pool
 	// cannot starve the cleanup, and a fresh pool connection after
 	// database/sql has closed it.
 	acquire func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
 	policy  sqlconnect.VisibilityPolicy
+	// running replaces DB.QueryRunning in unit tests. The running check goes
+	// to the control pool: it must run under createID, and acquire gives a
+	// connection that sends its own query ids.
+	running func(ctx context.Context, queryID string) (bool, error)
 }
 
 // run drops the probe on a context detached from the caller, so a caller
@@ -616,32 +620,45 @@ func (c probeCleanup) step(ctx context.Context, fn func(ex sqlconnect.QueryExecu
 	return fn(ex)
 }
 
-// createSettled waits until the unknown-outcome CREATE has finished or
-// failed, so it cannot create the table after the DROP. It polls at most
-// probeSettlePolls times, each read bounded by probeLookupTimeout, and stops
-// when less than probeCleanupReserve of ctx remains. Only a finished or
-// failed outcome proves that the CREATE is over. A CREATE that is still
-// running or never seen, or an outcome read that fails, leaves the outcome
-// open, and it returns false.
+// createSettled waits for an unknown-outcome CREATE to end before the DROP.
+// Only refusals before the DDL queue prove it ended. Other server errors can
+// leave a queued CREATE running after the initiator stops waiting.
+// A table seen after the running check is false proves that it landed.
+// Absence does not prove failure: the CREATE may be in flight or on another
+// replica. Polls are bounded by probeSettlePolls, probeLookupTimeout and the
+// cleanup reserve. Without positive evidence it returns false.
 func (c probeCleanup) createSettled(ctx context.Context) bool {
+	if definiteCreateRefusal(c.createErr) {
+		return true
+	}
 	for i := range probeSettlePolls {
 		if dl, ok := ctx.Deadline(); ok && time.Until(dl) < probeCleanupReserve {
 			return false
 		}
-		var o sqlconnect.QueryOutcome
 		lctx, stop := context.WithTimeout(ctx, probeLookupTimeout)
-		err := c.step(lctx, func(ex sqlconnect.QueryExecutor) error {
-			var err error
-			o, err = queryOutcome(func(q string, args ...any) *sql.Row { return ex.QueryRowContext(lctx, q, args...) }, c.createID, "Create")
-			return err
-		})
+		running, err := c.isRunning(lctx)
+		exists := false
+		if err == nil && !running {
+			err = c.step(lctx, func(ex sqlconnect.QueryExecutor) error {
+				var uuid string
+				switch err := ex.QueryRowContext(lctx, visibilitySQL, c.ref.Schema, c.ref.Name).Scan(&uuid); {
+				case errors.Is(err, sql.ErrNoRows):
+					return nil
+				case err != nil:
+					return err
+				}
+				exists = true
+				return nil
+			})
+		}
 		stop()
 		switch {
 		case err != nil:
 			return false
-		case o == sqlconnect.QueryFinished, o == sqlconnect.QueryFailed:
+		case exists:
 			return true
-		case i == probeSettlePolls-1:
+		}
+		if i == probeSettlePolls-1 {
 			return false
 		}
 		if sleep(ctx, probeSettleInterval) != nil {
@@ -649,6 +666,15 @@ func (c probeCleanup) createSettled(ctx context.Context) bool {
 		}
 	}
 	return false
+}
+
+// isRunning runs the running check for the CREATE. Unit tests replace it
+// through running.
+func (c probeCleanup) isRunning(ctx context.Context) (bool, error) {
+	if c.running != nil {
+		return c.running(ctx, c.createID)
+	}
+	return c.db.QueryRunning(ctx, c.createID)
 }
 
 // cleanupAcquire returns the probe cleanup's connection source: the
@@ -694,9 +720,10 @@ func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 	if _, cerr := ex.execAs(ctx, createID, "CREATE TABLE "+t+" (probe UInt8)\nENGINE = MergeTree\nORDER BY tuple()"); cerr != nil {
 		// An unknown outcome may have created the table, or may still create
 		// it: wait for the CREATE, then reconcile with DROP TABLE IF EXISTS.
-		// A refused CREATE needs no cleanup.
-		registered = unknownOutcome(cerr)
+		// Only a refusal before the DDL queue needs no cleanup.
+		registered = !definiteCreateRefusal(cerr)
 		cleanup.createID = createID
+		cleanup.createErr = cerr
 		return fail(cerr)
 	}
 	registered, cleanup.created = true, true
@@ -719,17 +746,20 @@ func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 	return nil
 }
 
-// unknownOutcome reports whether a failed statement may still have run.
-func unknownOutcome(err error) bool {
-	if errors.Is(err, driver.ErrBadConn) {
-		return true
+// definiteCreateRefusal reports a server refusal that never reaches the DDL
+// queue, so the CREATE cannot land later.
+func definiteCreateRefusal(err error) bool {
+	ex, ok := errors.AsType[*ch.Exception](err)
+	if !ok {
+		return false
 	}
-	switch classify(err).Code {
-	case cherr.CodeNetwork, cherr.CodeTimeout, cherr.CodeCancelled, cherr.CodeUnavailable:
+	switch ex.Code {
+	case 62, 497, 81, 57: // SYNTAX_ERROR, ACCESS_DENIED, UNKNOWN_DATABASE, TABLE_ALREADY_EXISTS
 		return true
 	}
 	return false
 }
+
 
 // parseVersion reads the first three numeric parts of a server version.
 func parseVersion(s string) ([3]int, error) {

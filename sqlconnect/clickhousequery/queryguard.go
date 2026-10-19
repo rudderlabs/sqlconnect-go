@@ -28,8 +28,8 @@ var refusedDatabases = map[string]bool{"system": true, "information_schema": tru
 // one terminal semicolon and the trailing whitespace; nothing else changes.
 // The error never contains query text.
 // The guard refuses system, information_schema and INFORMATION_SCHEMA table
-// references: the sync credential's grant script permits system.query_log and
-// system.processes, which can expose other database users' query text.
+// references: a customer can still grant system.query_log and system.processes
+// to the sync credential, and they expose other database users' query text.
 func CheckAudienceSQL(sql string) (string, error) {
 	if len(sql) > MaxAudienceSQLBytes {
 		return "", refuse("SIZE")
