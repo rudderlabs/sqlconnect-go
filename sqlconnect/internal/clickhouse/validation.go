@@ -582,11 +582,7 @@ type probeCleanup struct {
 func (c probeCleanup) run(parent context.Context) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), probeCleanupTimeout)
 	defer cancel()
-	failed := func(err error) error {
-		e := wrap(cherr.CodeScratchCleanupFailed, c.ref.Name, "the probe table could not be removed", err)
-		e.ServerCode = classify(err).ServerCode
-		return stageErr(4, "scratch_cleanup", e)
-	}
+	failed := func(err error) error { return c.failure("the probe table could not be removed", err) }
 	stmt := "DROP TABLE " + c.db.QuoteTable(c.ref) + " SYNC"
 	if !c.created {
 		stmt = "DROP TABLE IF EXISTS " + c.db.QuoteTable(c.ref) + " SYNC"
@@ -608,9 +604,17 @@ func (c probeCleanup) run(parent context.Context) error {
 		// carries the server code of the CREATE's own error.
 		e := wrap(cherr.CodeOutcomeUnknown, "", "the probe CREATE outcome is still unknown, so the probe table can still appear", c.createErr)
 		e.ServerCode = classify(c.createErr).ServerCode
-		return failed(e)
+		return c.failure("the probe table was dropped, but the CREATE can still create it", e)
 	}
 	return nil
+}
+
+// failure is the CH_SCRATCH_CLEANUP_FAILED stage error. It keeps the server
+// code of its cause.
+func (c probeCleanup) failure(detail string, err error) error {
+	e := wrap(cherr.CodeScratchCleanupFailed, c.ref.Name, detail, err)
+	e.ServerCode = classify(err).ServerCode
+	return stageErr(4, "scratch_cleanup", e)
 }
 
 // step runs fn on the connection from acquire and releases it after. It
@@ -756,7 +760,7 @@ func createEnded(err error) bool {
 	if !ok {
 		return false
 	}
-	switch classify(ex).Code {
+	switch classify(err).Code {
 	case cherr.CodeTimeout, cherr.CodeNetwork, cherr.CodeCancelled, cherr.CodeUnavailable, cherr.CodeOutcomeUnknown:
 		return false
 	}

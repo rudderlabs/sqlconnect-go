@@ -1024,7 +1024,10 @@ func TestCreateEnded(t *testing.T) {
 	} {
 		require.False(t, createEnded(&ch.Exception{Code: code}), "code %d", code)
 	}
-	for _, err := range []error{driver.ErrBadConn, errors.New("eof"), context.DeadlineExceeded} {
+	for _, err := range []error{
+		driver.ErrBadConn, errors.New("eof"), context.DeadlineExceeded,
+		errors.Join(context.DeadlineExceeded, &ch.Exception{Code: 47}),
+	} {
 		require.False(t, createEnded(err), "%v", err)
 	}
 }

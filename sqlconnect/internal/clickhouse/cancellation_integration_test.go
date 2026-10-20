@@ -94,7 +94,8 @@ func TestSQ28_ContextCancelStopsRead(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		rows, err := db.QueryContext(clickhouse.ReadCtxForTest(ctx, id), "SELECT number FROM numbers(600) WHERE sleepEachRow(0.1) = 0 SETTINGS max_block_size = 1")
+		// One row at the end: no output write can end the read early.
+		rows, err := db.QueryContext(clickhouse.ReadCtxForTest(ctx, id), "SELECT count() FROM numbers(600) WHERE sleepEachRow(0.1) = 0 SETTINGS max_block_size = 1")
 		if err == nil {
 			for rows.Next() {
 			}

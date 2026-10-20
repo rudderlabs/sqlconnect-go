@@ -13,9 +13,9 @@ import (
 
 var _ sqlconnect.QueryController = (*DB)(nil)
 
-// A read needs no stop: driverReadSettings sends
-// cancel_http_readonly_queries_on_client_close, so the server stops a read when
-// its context ends and the request closes. A write keeps running after its
+// A read under driverReadSettings needs no stop: the map sends readonly=2 and
+// cancel_http_readonly_queries_on_client_close, so the server stops the read
+// when its context ends and the request closes. A write keeps running after its
 // request closes, so StopQuery stops it.
 //
 // The driver never reads system.processes or system.query_log and never sends
@@ -193,7 +193,9 @@ func (db *DB) stopQuery(ctx context.Context, queryID string) (bool, error) {
 		if alreadyRunning(err) {
 			// The target did not stop within the server wait, or another
 			// user's query holds the id.
-			return false, cherr.New(cherr.CodeOutcomeUnknown, "", "the query did not stop in time")
+			e := cherr.New(cherr.CodeOutcomeUnknown, "", "the query did not stop in time")
+			e.ServerCode = codeAlreadyRunning
+			return false, e
 		}
 		if classify(err).ServerCode == codeQueryCancelled {
 			e := wrap(cherr.CodeOutcomeUnknown, "", "the stop statement was cancelled by a contending query", err)
