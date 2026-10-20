@@ -43,7 +43,7 @@ func TestValidation_NamesPinnedConstraints(t *testing.T) {
 			conn, err := pool.Conn(context.Background())
 			require.NoError(t, err)
 			defer conn.Close()
-			err = settingFailure(context.Background(), conn, &ch.Exception{Code: 452})
+			err = settingFailure(context.Background(), conn, stage2UnionSettings(int(clickhousequery.MaxRunBudget.Seconds())), &ch.Exception{Code: 452})
 			for _, settingsCtx := range settingsContexts {
 				p12SettingsAt(t, settingsCtx)
 			}
@@ -56,6 +56,35 @@ func TestValidation_NamesPinnedConstraints(t *testing.T) {
 			require.ErrorAs(t, err, &stage)
 			require.Equal(t, 2, stage.Stage)
 			require.Equal(t, "settings", stage.Tag)
+		})
+	}
+}
+
+// A stop sends replace_running_query = 1 and its running check sends 0. A
+// profile that pins the setting as CONST to either value must fail stage 2,
+// or every later stop fails with 452.
+func TestValidation_RejectsPinnedReplaceRunningQuery(t *testing.T) {
+	for _, pinned := range []int{0, 1} {
+		t.Run(fmt.Sprint(pinned), func(t *testing.T) {
+			db := (&validationStub{}).db(t, nil, nil)
+			require.NoError(t, db.DB.DB.Close())
+			db.DB.DB = answerDBCtx(t, func(ctx context.Context, q string, _ []any) ([]string, [][]driver.Value, error) {
+				// The server accepts a CONST setting sent with its pinned value.
+				if v, ok := settingsOf(ctx)["replace_running_query"]; ok && v != pinned {
+					return nil, nil, &ch.Exception{Code: 452}
+				}
+				if q == "SELECT version(), currentDatabase()" {
+					return []string{"version", "database"}, [][]driver.Value{{"26.3.33.24", "analytics"}}, nil
+				}
+				return []string{"one"}, [][]driver.Value{{uint8(1)}}, nil
+			}, nil)
+			_, err := db.ValidateContext(workingCtx(t.Context()))
+			requireCode(t, err, "CH_PERMISSION")
+			requireStage(t, err, 2, "settings")
+			d, ok := clickhousequery.Describe(err)
+			require.True(t, ok)
+			require.Equal(t, "replace_running_query", d.Field)
+			require.EqualValues(t, 452, d.ServerCode)
 		})
 	}
 }

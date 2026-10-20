@@ -166,7 +166,14 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 	budgetCtx, stopBudget := withoutDeadline(ctx)
 	defer stopBudget()
 	if err := union.QueryRowContext(budgetCtx, "SELECT 1").Scan(&one); err != nil {
-		return res, settingFailure(budgetCtx, conn, err)
+		return res, settingFailure(budgetCtx, conn, union.settings(), err)
+	}
+	// The union read sends replace_running_query = 1, as a stop does. The
+	// running check sends 0, so a profile that pins the setting to 1 passes
+	// the union read and fails every stop. This read sends the check map.
+	check := driverExec{conn: conn, settings: func() map[string]any { return targetSettings(false) }}
+	if err := check.QueryRowContext(budgetCtx, "SELECT 1").Scan(&one); err != nil {
+		return res, settingFailure(budgetCtx, conn, check.settings(), err)
 	}
 
 	// Stage 3: grants and engine.
@@ -428,7 +435,7 @@ func withoutDeadline(ctx context.Context) (context.Context, func()) {
 
 // settingFailure maps a stage 2 failure. Codes 164 and 452 are CH_PERMISSION
 // and code 115 is CH_QUERY_INVALID, each naming the refused setting.
-func settingFailure(ctx context.Context, conn *sql.Conn, err error) error {
+func settingFailure(ctx context.Context, conn *sql.Conn, sent map[string]any, err error) error {
 	i := classify(err)
 	var code string
 	switch i.ServerCode {
@@ -439,17 +446,16 @@ func settingFailure(ctx context.Context, conn *sql.Conn, err error) error {
 	default:
 		return stageErr(2, "settings", err)
 	}
-	e := wrap(code, refusedSetting(ctx, conn, i.ServerCode), fixedMessages[code], err)
+	e := wrap(code, refusedSetting(ctx, conn, sent, i.ServerCode), fixedMessages[code], err)
 	e.ServerCode = i.ServerCode
 	return stageErr(2, "settings", e)
 }
 
-// refusedSetting finds the stage 2 key that the server refuses with code. The
-// error text is redacted before it reaches the driver, so it sends SELECT 1
-// once per key, in name order, and returns the first key refused with the
-// same code. The result is always a fixed key, never server text, or "".
-func refusedSetting(ctx context.Context, conn *sql.Conn, code int32) string {
-	full := stage2UnionSettings(int(clickhousequery.MaxRunBudget.Seconds()))
+// refusedSetting finds the key of the sent map that the server refuses with
+// code. The error text is redacted before it reaches the driver, so it sends
+// SELECT 1 once per key, in name order, and returns the first key refused with
+// the same code. The result is always a fixed key, never server text, or "".
+func refusedSetting(ctx context.Context, conn *sql.Conn, full map[string]any, code int32) string {
 	keys := slices.Sorted(maps.Keys(full))
 	for _, k := range keys {
 		single := driverExec{conn: conn, settings: func() map[string]any {

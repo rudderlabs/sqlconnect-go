@@ -64,12 +64,17 @@ var (
 // replace_running_query to 0 for a check and to 1 for a stop, and pins
 // replace_running_query_max_wait_ms, overriding the user's profile defaults.
 func targetCtx(ctx context.Context, queryID string, replace bool) context.Context {
+	return clickhousequery.WithStatement(ctx, targetSettings(replace), queryID)
+}
+
+// targetSettings is the map that targetCtx sends.
+func targetSettings(replace bool) map[string]any {
 	m := helloSettings()
 	m["replace_running_query"], m["replace_running_query_max_wait_ms"] = 0, stopMaxWaitMS
 	if replace {
 		m["replace_running_query"] = 1
 	}
-	return clickhousequery.WithStatement(ctx, m, queryID)
+	return m
 }
 
 // controlPool returns the control pool. A DB that a unit test builds by hand
