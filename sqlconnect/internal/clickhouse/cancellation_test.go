@@ -118,7 +118,8 @@ func TestSQ28_StopQuery(t *testing.T) {
 
 	// The server did not stop the target within its wait: the stop itself gets 216.
 	db, _ = controlServer(t, func(int, string) error { return running216 })
-	_, err = db.StopQuery(context.Background(), "retl-x")
+	stopped, err = db.StopQuery(context.Background(), "retl-x")
+	require.Equal(t, sqlconnect.StopError, stopped)
 	requireCode(t, err, "CH_OUTCOME_UNKNOWN")
 	require.NotContains(t, err.Error(), "other-user-secret-text")
 
@@ -129,7 +130,8 @@ func TestSQ28_StopQuery(t *testing.T) {
 		}
 		return nil
 	})
-	_, err = db.StopQuery(context.Background(), "retl-x")
+	stopped, err = db.StopQuery(context.Background(), "retl-x")
+	require.Equal(t, sqlconnect.StopError, stopped)
 	requireCode(t, err, "CH_OUTCOME_UNKNOWN")
 	require.Len(t, rec.queries(), 2+stopConfirmTries)
 }

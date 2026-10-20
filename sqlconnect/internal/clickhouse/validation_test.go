@@ -1018,12 +1018,13 @@ func TestCreateEnded(t *testing.T) {
 		require.True(t, createEnded(bound("create table", "", &ch.Exception{Code: code})), "code %d", code)
 	}
 	// Codes that can leave a queued CREATE running, and non-server errors, keep cleanup registered.
-	for _, err := range []error{
-		&ch.Exception{Code: 159}, &ch.Exception{Code: 209}, &ch.Exception{Code: 210}, &ch.Exception{Code: 216},
-		&ch.Exception{Code: 242}, &ch.Exception{Code: 341}, &ch.Exception{Code: 394}, &ch.Exception{Code: 999},
-		&ch.Exception{Code: 3}, &ch.Exception{Code: 425}, &ch.Exception{Code: 1001},
-		driver.ErrBadConn, errors.New("eof"), context.DeadlineExceeded,
+	for _, code := range []int32{
+		159, 160, 209, 95, 96, 198, 210, 279, 216, 242, 394,
+		3, 32, 49, 225, 236, 341, 425, 999, 1000, 1001, 1002,
 	} {
+		require.False(t, createEnded(&ch.Exception{Code: code}), "code %d", code)
+	}
+	for _, err := range []error{driver.ErrBadConn, errors.New("eof"), context.DeadlineExceeded} {
 		require.False(t, createEnded(err), "%v", err)
 	}
 }

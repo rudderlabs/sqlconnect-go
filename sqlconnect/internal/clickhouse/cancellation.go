@@ -155,7 +155,9 @@ func (db *DB) queryRunning(ctx context.Context, queryID string) (bool, error) {
 }
 
 // StopQuery implements sqlconnect.QueryController. It checks first, so it
-// sends the stop statement only for a query that runs, then confirms. Every
+// sends the stop statement only for a query that runs, then confirms. The
+// check, the stop and each confirm are separate requests, and on a
+// multi-replica service each can reach another replica. Every
 // step is bounded, and every failure is a classified error: a refused setting
 // (a readonly profile or a constraint) is CH_PERMISSION, and a query that
 // still runs after the stop is CH_OUTCOME_UNKNOWN.
@@ -189,6 +191,8 @@ func (db *DB) stopQuery(ctx context.Context, queryID string) (bool, error) {
 	var one uint8
 	if err := db.controlPool().QueryRowContext(targetCtx(ctx, queryID, true), stopSQL).Scan(&one); err != nil {
 		if alreadyRunning(err) {
+			// The target did not stop within the server wait, or another
+			// user's query holds the id.
 			return false, cherr.New(cherr.CodeOutcomeUnknown, "", "the query did not stop in time")
 		}
 		if classify(err).ServerCode == codeQueryCancelled {

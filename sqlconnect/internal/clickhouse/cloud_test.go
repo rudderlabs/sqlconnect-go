@@ -106,8 +106,8 @@ func TestCP26_CloudReplicatedDefault(t *testing.T) {
 	}
 }
 
-// TestSQ28_CloudCancellation runs the stop and the running check on Cloud,
-// where the answering replica can differ between requests.
+// TestSQ28_CloudCancellation stops a write on Cloud, where the answering
+// replica can differ between requests.
 func TestSQ28_CloudCancellation(t *testing.T) {
 	db, ctx := cloudDB(t, 0), context.Background()
 	scratch := scratchOf(t)
@@ -135,42 +135,6 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 		werr := stopUntilDone(ctx, t, db, id, done)
 		require.Error(t, werr)
 		require.EqualValues(t, 394, db.ClassifyError(werr).ServerCode, "the stopped insert fails mid-stream with code 394")
-		running, err := db.RunningForTest(ctx, id)
-		require.NoError(t, err)
-		require.False(t, running)
-	})
-
-	t.Run("finished", func(t *testing.T) {
-		id := clickhousequery.NewQueryID()
-		_, err := pinned(t, db).ExecContext(stmtCtx(ctx, map[string]any{}, id), "INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(10)")
-		require.NoError(t, err)
-		running, err := db.RunningForTest(ctx, id)
-		require.NoError(t, err)
-		require.False(t, running, "a finished insert does not run")
-	})
-
-	t.Run("mid-stream kill", func(t *testing.T) {
-		id := clickhousequery.NewQueryID()
-		streamCtx, cancel := context.WithCancel(ctx)
-		defer cancel()
-		rows, err := db.QueryContext(stmtCtx(streamCtx, map[string]any{"max_block_size": 1}, id),
-			midStreamSQL)
-		require.NoError(t, err)
-		// Close waits for a blocked Next, so the cancel runs first and unblocks
-		// the drain goroutine when the test fails early.
-		defer func() {
-			cancel()
-			_ = rows.Close()
-		}()
-		require.True(t, rows.Next(), "the first block arrives before the kill")
-		done := make(chan error, 1)
-		go func() {
-			drain(rows)
-			done <- rows.Err()
-		}()
-		serr := stopUntilDone(ctx, t, db, id, done)
-		require.EqualValues(t, 394, db.ClassifyError(serr).ServerCode, "the stream ends with code 394")
-		require.Equal(t, "CH_CANCELLED", db.ClassifyError(serr).Code)
 	})
 
 	t.Run("mid-stream timeout", func(t *testing.T) {

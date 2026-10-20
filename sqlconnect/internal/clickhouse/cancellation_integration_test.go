@@ -110,9 +110,9 @@ func TestSQ28_ContextCancelStopsRead(t *testing.T) {
 		"the server stops a read when its client goes away")
 }
 
-// TestSQ28_OwnUserOnly: the server matches a query id only against queries
-// of the same user, so the stop cannot reach another user's query. The
-// running check sees that id as taken, and the stop then fails closed.
+// TestSQ28_OwnUserOnly: the server replaces only a query of the same user, so
+// the stop cannot reach another user's query. Another user's query still
+// holds the id: the running check answers 216, and the stop fails closed.
 func TestSQ28_OwnUserOnly(t *testing.T) {
 	srv, db := retlFixture(t)
 	srv.CreateScopedUser(t, "other_user", "pw_Other_123", "customer_db", "other_scratch", false)

@@ -7,9 +7,11 @@ import "context"
 type StopOutcome string
 
 const (
-	// StopLanded means the query ran on the answering replica at the first
-	// check and does not run there now. It may have ended on its own between
-	// the check and the stop.
+	// StopLanded means the first check saw the query, and the stop and its
+	// confirmation succeeded. The query may have ended on its own in between.
+	// On a multi-replica service the stop can reach a replica that does not
+	// run the query, so only the query's own error proves the stop: the
+	// server ends a stopped query with code 394 (CH_CANCELLED).
 	StopLanded StopOutcome = "landed"
 	// StopMissed means no query ran under the id on the answering replica. The
 	// query has ended, or it runs on another replica of a multi-replica
@@ -22,8 +24,11 @@ const (
 
 // QueryController stops the connector's own write by query id. It reads no
 // system table, so it needs no grant beyond the connector's own login. A read
-// needs no stop: cancelling its context closes the request, and the server
-// stops a read when its client goes away.
+// needs no stop: cancelling its context closes the request, and a read sent
+// with readonly > 0 and cancel_http_readonly_queries_on_client_close = 1 stops
+// when its client goes away. A server that ends TLS itself sees the close only
+// when it next writes output. A read with little output then runs on until
+// its max_execution_time.
 type QueryController interface {
 	// StopQuery stops the connector's own query with queryID on the replica
 	// that answers. It never stops a query of another user. Query ids must be
