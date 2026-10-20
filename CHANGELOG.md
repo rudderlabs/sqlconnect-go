@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.34.0...v1.35.0) (2026-10-20)
+
+
+### Features
+
+* **clickhouse:** check and stop own queries without system tables ([#594](https://github.com/rudderlabs/sqlconnect-go/issues/594)) ([03261ac](https://github.com/rudderlabs/sqlconnect-go/commit/03261ac56ac6d839789b03ca873d2eeadfdadb19))
+
 ## [1.34.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.33.0...v1.34.0) (2026-10-13)
 
 
