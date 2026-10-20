@@ -98,10 +98,13 @@ func TestSQ28_LostResponseRunningCheck(t *testing.T) {
 	p := chtest.NewProxy(t, srv, chtest.ProxyOptions{})
 	db := openScopedVia(t, srv, p, "rudder_retl", "pw_Retl_123")
 	ctx := context.Background()
-	for sql, rows := range map[string]string{
-		"INSERT INTO _rudderstack.sink SELECT number FROM numbers(10)":                      "10",
-		"INSERT INTO _rudderstack.sink SELECT throwIf(number = 5, 'boom') FROM numbers(10)": "10",
+	// The cases share the sink, so they run in order: the failed write must
+	// leave the count from the finished write unchanged.
+	for _, c := range []struct{ sql, rows string }{
+		{"INSERT INTO _rudderstack.sink SELECT number FROM numbers(10)", "10"},
+		{"INSERT INTO _rudderstack.sink SELECT throwIf(number = 5, 'boom') FROM numbers(10)", "10"},
 	} {
+		sql, rows := c.sql, c.rows
 		id := clickhousequery.NewQueryID()
 		p.DropResponseOnce(func(r chtest.Request) bool { return r.Query.Get("query_id") == id })
 		conn, err := db.Conn(ctx)

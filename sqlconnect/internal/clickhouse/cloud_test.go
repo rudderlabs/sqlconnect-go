@@ -128,11 +128,7 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 			running, err := db.QueryRunning(ctx, id)
 			return err == nil && running
 		}, 2*time.Minute, time.Second)
-		require.Eventually(t, func() bool {
-			stopped, err := db.StopQuery(ctx, id)
-			return err == nil && stopped
-		}, 2*time.Minute, time.Second, "the stop reaches the replica that runs the insert")
-		werr := <-done
+		werr := stopUntilDone(ctx, t, db, id, done)
 		require.Error(t, werr)
 		require.EqualValues(t, 394, db.ClassifyError(werr).ServerCode, "the stopped insert fails mid-stream with code 394")
 		running, err := db.QueryRunning(ctx, id)
@@ -156,13 +152,14 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 		require.NoError(t, err)
 		defer func() { _ = rows.Close() }()
 		require.True(t, rows.Next(), "the first block arrives before the kill")
-		require.Eventually(t, func() bool {
-			stopped, err := db.StopQuery(ctx, id)
-			return err == nil && stopped
-		}, 2*time.Minute, time.Second)
-		drain(rows)
-		require.EqualValues(t, 394, db.ClassifyError(rows.Err()).ServerCode, "the stream ends with code 394")
-		require.Equal(t, "CH_CANCELLED", db.ClassifyError(rows.Err()).Code)
+		done := make(chan error, 1)
+		go func() {
+			drain(rows)
+			done <- rows.Err()
+		}()
+		serr := stopUntilDone(ctx, t, db, id, done)
+		require.EqualValues(t, 394, db.ClassifyError(serr).ServerCode, "the stream ends with code 394")
+		require.Equal(t, "CH_CANCELLED", db.ClassifyError(serr).Code)
 	})
 
 	t.Run("mid-stream timeout", func(t *testing.T) {
@@ -175,6 +172,30 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 		require.EqualValues(t, 159, db.ClassifyError(rows.Err()).ServerCode, "the stream ends with code 159")
 		require.Equal(t, "CH_TIMEOUT", db.ClassifyError(rows.Err()).Code)
 	})
+}
+
+// stopUntilDone sends the stop once a second until the target ends, and
+// returns the target's error. A stop on a multi-replica service can answer
+// from a replica that does not run the target, so stopped=true does not prove
+// a cancel. Only the target's own 394 proves it.
+func stopUntilDone(ctx context.Context, t *testing.T, db *clickhouse.DB, id string, done <-chan error) error {
+	t.Helper()
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	deadline := time.After(2 * time.Minute)
+	for {
+		select {
+		case err := <-done:
+			return err
+		case <-deadline:
+			t.Fatal("the target did not end within 2 minutes of stops")
+			return nil
+		case <-tick.C:
+			if _, err := db.StopQuery(ctx, id); err != nil {
+				t.Logf("stop attempt: %v", err)
+			}
+		}
+	}
 }
 
 // midStreamSQL streams 1 MiB rows slowly. The server buffers about 1 MiB of
