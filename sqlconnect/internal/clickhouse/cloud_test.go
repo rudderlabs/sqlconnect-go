@@ -147,10 +147,14 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 
 	t.Run("mid-stream kill", func(t *testing.T) {
 		id := clickhousequery.NewQueryID()
-		rows, err := db.QueryContext(stmtCtx(ctx, map[string]any{"max_block_size": 1}, id),
+		streamCtx, cancel := context.WithCancel(ctx)
+		rows, err := db.QueryContext(stmtCtx(streamCtx, map[string]any{"max_block_size": 1}, id),
 			midStreamSQL)
 		require.NoError(t, err)
 		defer func() { _ = rows.Close() }()
+		// Close waits for a blocked Next, so the cancel runs first and unblocks
+		// the drain goroutine when the test fails early.
+		defer cancel()
 		require.True(t, rows.Next(), "the first block arrives before the kill")
 		done := make(chan error, 1)
 		go func() {
@@ -183,17 +187,29 @@ func stopUntilDone(ctx context.Context, t *testing.T, db *clickhouse.DB, id stri
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	deadline := time.After(2 * time.Minute)
+	attempts := 0
 	for {
 		select {
 		case err := <-done:
+			t.Logf("the target ended after %d stop attempts", attempts)
 			return err
 		case <-deadline:
-			t.Fatal("the target did not end within 2 minutes of stops")
+			select {
+			case err := <-done:
+				return err
+			default:
+			}
+			t.Fatalf("the target did not end after %d stop attempts in 2 minutes", attempts)
 			return nil
 		case <-tick.C:
-			if _, err := db.StopQuery(ctx, id); err != nil {
-				t.Logf("stop attempt: %v", err)
+			attempts++
+			_, err := db.StopQuery(ctx, id)
+			if err == nil {
+				continue
 			}
+			// A refused setting does not change between attempts.
+			require.NotEqual(t, "CH_PERMISSION", db.ClassifyError(err).Code, "the stop is refused: %v", err)
+			t.Logf("stop attempt %d: %v", attempts, err)
 		}
 	}
 }
