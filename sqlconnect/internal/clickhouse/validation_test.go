@@ -155,9 +155,13 @@ func TestProbeCleanup_Codes(t *testing.T) {
 	} {
 		err := c.run(context.Background())
 		requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
+		require.Equal(t, cherr.CodeScratchCleanupFailed, classify(err).Code, "%s: no context error hides the cleanup failure", name)
 		requireStage(t, err, 4, "scratch_cleanup")
-		_ = name
 	}
+	// A DROP error that joins a context error keeps the cleanup code and the server code.
+	joined := probeCleanup{db: db, ref: ref, created: true, acquire: fixed(scripted(t, execErr(errors.Join(context.DeadlineExceeded, &ch.Exception{Code: 159}))))}.run(context.Background())
+	require.Equal(t, cherr.CodeScratchCleanupFailed, classify(joined).Code)
+	require.EqualValues(t, 159, classify(joined).ServerCode, "the failure keeps the DROP's server code")
 	require.NoError(t, probeCleanup{db: db, ref: ref, created: false, acquire: fixed(scripted(t, execOK, noRow))}.run(context.Background()))
 
 	// Each step takes its own connection and releases it.
@@ -320,6 +324,33 @@ func TestProbeCleanup_AmbiguousCreateErrorPolls(t *testing.T) {
 						require.Contains(t, err.Error(), fmt.Sprintf("[server code %d]", code))
 					}
 				})
+			}
+		})
+	}
+}
+
+// A CREATE cut by a context error whose cleanup cannot settle must classify as a
+// cleanup failure: the probe table can still appear.
+func TestProbeCleanup_ContextCreateErrorKeepsCleanupCode(t *testing.T) {
+	orig := sleep
+	sleep = func(context.Context, time.Duration) error { return nil }
+	t.Cleanup(func() { sleep = orig })
+	for name, createErr := range map[string]error{
+		"canceled":          context.Canceled,
+		"deadline":          context.DeadlineExceeded,
+		"bound canceled":    bound("create table", "", context.Canceled),
+		"joined with a 394": errors.Join(context.Canceled, &ch.Exception{Code: 394}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			l := &lateCreate{}
+			err := probeCleanup{
+				db: unitDB(t), ref: sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("_rudderstack")),
+				createID: "retl-create", createErr: createErr, acquire: fixed(l.exec(t)), running: l.isRunning(t),
+			}.run(context.Background())
+			require.Equal(t, cherr.CodeScratchCleanupFailed, classify(err).Code, "the unresolved cleanup is not hidden by the CREATE's context error")
+			requireStage(t, err, 4, "scratch_cleanup")
+			if ex, ok := errors.AsType[*ch.Exception](createErr); ok {
+				require.Equal(t, ex.Code, classify(err).ServerCode, "the failure keeps the CREATE's server code")
 			}
 		})
 	}

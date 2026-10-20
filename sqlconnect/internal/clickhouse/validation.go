@@ -602,8 +602,8 @@ func (c probeCleanup) run(parent context.Context) error {
 	if unresolved {
 		// The DROP ran, but the CREATE can still land after it. The failure
 		// carries the server code of the CREATE's own error.
-		e := wrap(cherr.CodeOutcomeUnknown, "", "the probe CREATE outcome is still unknown, so the probe table can still appear", c.createErr)
-		e.ServerCode = classify(c.createErr).ServerCode
+		e := wrap(cherr.CodeOutcomeUnknown, "", "the probe CREATE outcome is still unknown, so the probe table can still appear", withoutContext(c.createErr))
+		e.ServerCode = classify(withoutContext(c.createErr)).ServerCode
 		return c.failure("the probe table was dropped, but the CREATE can still create it", e)
 	}
 	return nil
@@ -612,9 +612,23 @@ func (c probeCleanup) run(parent context.Context) error {
 // failure is the CH_SCRATCH_CLEANUP_FAILED stage error. It keeps the server
 // code of its cause.
 func (c probeCleanup) failure(detail string, err error) error {
-	e := wrap(cherr.CodeScratchCleanupFailed, c.ref.Name, detail, err)
-	e.ServerCode = classify(err).ServerCode
+	cause := withoutContext(err)
+	e := wrap(cherr.CodeScratchCleanupFailed, c.ref.Name, detail, cause)
+	e.ServerCode = classify(cause).ServerCode
 	return stageErr(4, "scratch_cleanup", e)
+}
+
+// withoutContext drops a context error from a cleanup failure's cause. classify
+// checks context errors first, so a chained one would report a cancel or a
+// timeout and hide that the probe table can remain. The server exception stays.
+func withoutContext(err error) error {
+	if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	if ex, ok := errors.AsType[*ch.Exception](err); ok {
+		return ex
+	}
+	return nil
 }
 
 // step runs fn on the connection from acquire and releases it after. It
