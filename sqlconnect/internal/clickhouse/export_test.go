@@ -10,6 +10,7 @@ import (
 
 	ch "github.com/rudderlabs/clickhouse-go/v2"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chpolicy"
 )
 
@@ -69,3 +70,15 @@ var DriverScratchSettings = driverScratchSettings
 
 // CodeOf returns the registry code that the classifier gives err.
 func CodeOf(err error) string { return classify(err).Code }
+
+// RunningForTest exposes the running check that the stop and the probe
+// cleanup use.
+func (db *DB) RunningForTest(ctx context.Context, queryID string) (bool, error) {
+	return db.checkRunning(ctx, queryID)
+}
+
+// ReadCtxForTest attaches the driver read map under queryID, so a test can
+// watch the read on the server.
+func ReadCtxForTest(ctx context.Context, queryID string) context.Context {
+	return clickhousequery.WithStatement(ctx, driverReadSettings(), queryID)
+}

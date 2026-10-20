@@ -27,8 +27,8 @@ const (
 	connMaxLifetime = 30 * time.Minute
 	// dialTimeout bounds the lookup and the TCP dial of one connection.
 	dialTimeout = 90 * time.Second
-	// controlConns is the size of the control pool. KillQuery and QueryOutcome
-	// use it, so they never wait for a slot in the main pool.
+	// controlConns is the size of the control pool. StopQuery uses it, so a
+	// stop never waits for a slot in the main pool.
 	controlConns = 2
 )
 
@@ -43,8 +43,8 @@ type DB struct {
 	// connector opens connections outside the pool, for the validation
 	// lookup of a refused hello setting.
 	connector *connectGuard
-	// control is the pool of KillQuery and QueryOutcome. A run can hold every
-	// main pool connection, and a kill must still reach the server.
+	// control is the pool of StopQuery. A run can hold every main pool
+	// connection, and a stop must still reach the server.
 	control *sql.DB
 }
 

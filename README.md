@@ -42,13 +42,12 @@ Replace `<working_database>`, `rudder_retl` and `analytics` with your working da
 CREATE DATABASE IF NOT EXISTS <working_database>;
 GRANT SELECT ON analytics.* TO rudder_retl;
 GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON <working_database>.* TO rudder_retl;
-GRANT SELECT ON system.processes TO rudder_retl;
-GRANT SELECT ON system.query_log TO rudder_retl;
 ```
 
 Sync-log pruning also requires `GRANT ALTER DELETE ON <working_database>.sync_log TO rudder_retl` after that table exists.
 The driver rejects `rudderSchema` and `scratchDatabase` account keys.
 Validation checks database existence, its engine, and the required privileges.
+The driver needs no grant on a system table and never reads `system.processes` or `system.query_log`. When a read's context ends, a read with readonly > 0 and `cancel_http_readonly_queries_on_client_close = 1` stops at its next input read, or at `max_execution_time`; the driver's own read settings set both. A CPU-bound read, such as a large join, can run on for many seconds. A server that ends TLS itself sees the closed request only when it next writes output, so a read with little output runs until `max_execution_time`. A write is stopped by its query id. Validation fails at stage 2 when the user's profile pins `replace_running_query` or `replace_running_query_max_wait_ms`, because every stop sets both.
 
 To revoke access and remove working tables, run:
 

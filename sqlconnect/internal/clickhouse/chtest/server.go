@@ -257,15 +257,15 @@ func (s *Server) FlushLogs(t *testing.T) {
 // customerGrants is the grant set customers run, in the order of the Setup
 // SQL panel. It mirrors GRANTS in rudder-lookout src/lib/clickhouse-grants.ts
 // (rudder-lookout c9d9d407a), the one source of truth. Change both together.
+// It has no grant on a system table: the driver reads none (ACT2-1269), and
+// the Lookout list drops them in the same change.
 var customerGrants = []struct {
 	privileges string
-	scope      string // customer, working, working.sync_log, or a system table
+	scope      string // customer, working or working.sync_log
 }{
 	{"SELECT", "customer"},
 	{"SELECT, INSERT, CREATE TABLE, DROP TABLE", "working"},
 	{"ALTER DELETE", "working.sync_log"},
-	{"SELECT", "system.processes"},
-	{"SELECT", "system.query_log"},
 }
 
 // scopedUserStatements renders CreateScopedUser's statements: the user, both

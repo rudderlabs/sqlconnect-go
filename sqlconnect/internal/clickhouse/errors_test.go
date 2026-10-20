@@ -37,6 +37,7 @@ func TestSQ22_ServerCodes(t *testing.T) {
 		"CH_NETWORK":          {95, 96, 198, 210, 279},
 		"CH_OBJECT_NOT_FOUND": {60, 81},
 		"CH_CANCELLED":        {394},
+		"CH_OUTCOME_UNKNOWN":  {216},
 		"CH_UNAVAILABLE":      {242},
 		"CH_UNKNOWN":          {1, 999},
 	}

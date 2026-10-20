@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
-	"database/sql/driver"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -15,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	ch "github.com/rudderlabs/clickhouse-go/v2"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
@@ -44,8 +45,7 @@ const (
 	// detached from the caller.
 	probeCleanupTimeout = 60 * time.Second
 	// probeSettlePolls and probeSettleInterval bound the wait for a probe
-	// CREATE with an unknown outcome. The window outlasts the default
-	// query_log flush interval of 7.5 s, so a finished CREATE shows up in it.
+	// CREATE with an unknown outcome. Absence never proves that it failed.
 	probeSettlePolls    = 15
 	probeSettleInterval = time.Second
 	hostNameSQL         = "SELECT hostName()"
@@ -166,7 +166,14 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 	budgetCtx, stopBudget := withoutDeadline(ctx)
 	defer stopBudget()
 	if err := union.QueryRowContext(budgetCtx, "SELECT 1").Scan(&one); err != nil {
-		return res, settingFailure(budgetCtx, conn, err)
+		return res, settingFailure(budgetCtx, conn, union.settings(), err)
+	}
+	// The union read sends replace_running_query = 1, as a stop does. The
+	// running check sends 0, so a profile that pins the setting to 1 passes
+	// the union read and fails every stop. This read sends the check map.
+	check := driverExec{conn: conn, settings: func() map[string]any { return targetSettings(false) }}
+	if err := check.QueryRowContext(budgetCtx, "SELECT 1").Scan(&one); err != nil {
+		return res, settingFailure(budgetCtx, conn, check.settings(), err)
 	}
 
 	// Stage 3: grants and engine.
@@ -246,16 +253,15 @@ func (b readBudget) context(ctx context.Context) (context.Context, func()) {
 }
 
 // checkGrants runs one CHECK GRANT per required privilege, so CH_PERMISSION
-// names the failing one, then the diagnostic checks that only warn.
+// names the failing one, then the diagnostic checks that only warn. No grant
+// on a system table is checked: the driver reads none of them, so the result
+// does not depend on whether the customer granted them.
 func (db *DB) checkGrants(ctx context.Context, ex sqlconnect.QueryExecutor) ([]sqlconnect.ValidationWarning, error) {
 	scratch := db.QuoteIdentifier(workingDatabase(ctx))
 	type grant struct{ privilege, stmt string }
 	var checks []grant
 	for _, p := range []string{"SELECT", "INSERT", "CREATE TABLE", "DROP TABLE"} {
 		checks = append(checks, grant{p, "CHECK GRANT " + p + " ON " + scratch + ".*"})
-	}
-	for _, tbl := range []string{"system.processes", "system.query_log"} {
-		checks = append(checks, grant{"SELECT ON " + tbl, "CHECK GRANT SELECT ON " + tbl})
 	}
 	alterDelete := "CHECK GRANT ALTER DELETE ON " + scratch + ".`sync_log`"
 	opts, hasOpts := sqlconnect.ValidationOptionsFrom(ctx)
@@ -429,7 +435,7 @@ func withoutDeadline(ctx context.Context) (context.Context, func()) {
 
 // settingFailure maps a stage 2 failure. Codes 164 and 452 are CH_PERMISSION
 // and code 115 is CH_QUERY_INVALID, each naming the refused setting.
-func settingFailure(ctx context.Context, conn *sql.Conn, err error) error {
+func settingFailure(ctx context.Context, conn *sql.Conn, sent map[string]any, err error) error {
 	i := classify(err)
 	var code string
 	switch i.ServerCode {
@@ -440,17 +446,16 @@ func settingFailure(ctx context.Context, conn *sql.Conn, err error) error {
 	default:
 		return stageErr(2, "settings", err)
 	}
-	e := wrap(code, refusedSetting(ctx, conn, i.ServerCode), fixedMessages[code], err)
+	e := wrap(code, refusedSetting(ctx, conn, sent, i.ServerCode), fixedMessages[code], err)
 	e.ServerCode = i.ServerCode
 	return stageErr(2, "settings", e)
 }
 
-// refusedSetting finds the stage 2 key that the server refuses with code. The
-// error text is redacted before it reaches the driver, so it sends SELECT 1
-// once per key, in name order, and returns the first key refused with the
-// same code. The result is always a fixed key, never server text, or "".
-func refusedSetting(ctx context.Context, conn *sql.Conn, code int32) string {
-	full := stage2UnionSettings(int(clickhousequery.MaxRunBudget.Seconds()))
+// refusedSetting finds the key of the sent map that the server refuses with
+// code. The error text is redacted before it reaches the driver, so it sends
+// SELECT 1 once per key, in name order, and returns the first key refused with
+// the same code. The result is always a fixed key, never server text, or "".
+func refusedSetting(ctx context.Context, conn *sql.Conn, full map[string]any, code int32) string {
 	keys := slices.Sorted(maps.Keys(full))
 	for _, k := range keys {
 		single := driverExec{conn: conn, settings: func() map[string]any {
@@ -564,13 +569,18 @@ type probeCleanup struct {
 	created bool // true after an acknowledged CREATE; false for an unknown outcome
 	// createID is the query id of a CREATE with an unknown outcome. That
 	// CREATE can still be in transit, so the DROP waits until it is over.
-	createID string
+	createID  string
+	createErr error // the CREATE's own error; the failure keeps its server code
 	// acquire gives the connection for each step. In production it is the
 	// validation's own connection while that stays usable, so a busy pool
 	// cannot starve the cleanup, and a fresh pool connection after
 	// database/sql has closed it.
 	acquire func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
 	policy  sqlconnect.VisibilityPolicy
+	// running replaces DB.checkRunning in unit tests. The running check goes
+	// to the control pool: it must run under createID, and acquire gives a
+	// connection that sends its own query ids.
+	running func(ctx context.Context, queryID string) (bool, error)
 }
 
 // run drops the probe on a context detached from the caller, so a caller
@@ -578,9 +588,7 @@ type probeCleanup struct {
 func (c probeCleanup) run(parent context.Context) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), probeCleanupTimeout)
 	defer cancel()
-	failed := func(err error) error {
-		return stageErr(4, "scratch_cleanup", wrap(cherr.CodeScratchCleanupFailed, c.ref.Name, "the probe table could not be removed", err))
-	}
+	failed := func(err error) error { return c.failure("the probe table could not be removed", err) }
 	stmt := "DROP TABLE " + c.db.QuoteTable(c.ref) + " SYNC"
 	if !c.created {
 		stmt = "DROP TABLE IF EXISTS " + c.db.QuoteTable(c.ref) + " SYNC"
@@ -598,8 +606,33 @@ func (c probeCleanup) run(parent context.Context) error {
 		return failed(err)
 	}
 	if unresolved {
-		// The DROP ran, but the CREATE can still land after it.
-		return failed(cherr.New(cherr.CodeOutcomeUnknown, "", "the probe CREATE outcome is still unknown, so the probe table can still appear"))
+		// The DROP ran, but the CREATE can still land after it. The failure
+		// carries the server code of the CREATE's own error.
+		e := wrap(cherr.CodeOutcomeUnknown, "", "the probe CREATE outcome is still unknown, so the probe table can still appear", withoutContext(c.createErr))
+		e.ServerCode = classify(withoutContext(c.createErr)).ServerCode
+		return c.failure("the probe table was dropped, but the CREATE can still create it", e)
+	}
+	return nil
+}
+
+// failure is the CH_SCRATCH_CLEANUP_FAILED stage error. It keeps the server
+// code of its cause.
+func (c probeCleanup) failure(detail string, err error) error {
+	cause := withoutContext(err)
+	e := wrap(cherr.CodeScratchCleanupFailed, c.ref.Name, detail, cause)
+	e.ServerCode = classify(cause).ServerCode
+	return stageErr(4, "scratch_cleanup", e)
+}
+
+// withoutContext drops a context error from a cleanup failure's cause. classify
+// checks context errors first, so a chained one would report a cancel or a
+// timeout and hide that the probe table can remain. The server exception stays.
+func withoutContext(err error) error {
+	if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	if ex, ok := errors.AsType[*ch.Exception](err); ok {
+		return ex
 	}
 	return nil
 }
@@ -616,32 +649,40 @@ func (c probeCleanup) step(ctx context.Context, fn func(ex sqlconnect.QueryExecu
 	return fn(ex)
 }
 
-// createSettled waits until the unknown-outcome CREATE has finished or
-// failed, so it cannot create the table after the DROP. It polls at most
-// probeSettlePolls times, each read bounded by probeLookupTimeout, and stops
-// when less than probeCleanupReserve of ctx remains. Only a finished or
-// failed outcome proves that the CREATE is over. A CREATE that is still
-// running or never seen, or an outcome read that fails, leaves the outcome
-// open, and it returns false.
+// createSettled waits for an unknown-outcome CREATE to end before the DROP.
+// A table seen after the running check is false proves that it landed.
+// Absence does not prove failure: the CREATE may be in flight or on another
+// replica. Polls are bounded by probeSettlePolls, probeLookupTimeout and the
+// cleanup reserve. Without positive evidence it returns false.
 func (c probeCleanup) createSettled(ctx context.Context) bool {
 	for i := range probeSettlePolls {
 		if dl, ok := ctx.Deadline(); ok && time.Until(dl) < probeCleanupReserve {
 			return false
 		}
-		var o sqlconnect.QueryOutcome
 		lctx, stop := context.WithTimeout(ctx, probeLookupTimeout)
-		err := c.step(lctx, func(ex sqlconnect.QueryExecutor) error {
-			var err error
-			o, err = queryOutcome(func(q string, args ...any) *sql.Row { return ex.QueryRowContext(lctx, q, args...) }, c.createID, "Create")
-			return err
-		})
+		running, err := c.isRunning(lctx)
+		exists := false
+		if err == nil && !running {
+			err = c.step(lctx, func(ex sqlconnect.QueryExecutor) error {
+				var uuid string
+				switch err := ex.QueryRowContext(lctx, visibilitySQL, c.ref.Schema, c.ref.Name).Scan(&uuid); {
+				case errors.Is(err, sql.ErrNoRows):
+					return nil
+				case err != nil:
+					return err
+				}
+				exists = true
+				return nil
+			})
+		}
 		stop()
 		switch {
 		case err != nil:
 			return false
-		case o == sqlconnect.QueryFinished, o == sqlconnect.QueryFailed:
+		case exists:
 			return true
-		case i == probeSettlePolls-1:
+		}
+		if i == probeSettlePolls-1 {
 			return false
 		}
 		if sleep(ctx, probeSettleInterval) != nil {
@@ -649,6 +690,15 @@ func (c probeCleanup) createSettled(ctx context.Context) bool {
 		}
 	}
 	return false
+}
+
+// isRunning runs the running check for the CREATE. Unit tests replace it
+// through running.
+func (c probeCleanup) isRunning(ctx context.Context) (bool, error) {
+	if c.running != nil {
+		return c.running(ctx, c.createID)
+	}
+	return c.db.checkRunning(ctx, c.createID)
 }
 
 // cleanupAcquire returns the probe cleanup's connection source: the
@@ -694,9 +744,10 @@ func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 	if _, cerr := ex.execAs(ctx, createID, "CREATE TABLE "+t+" (probe UInt8)\nENGINE = MergeTree\nORDER BY tuple()"); cerr != nil {
 		// An unknown outcome may have created the table, or may still create
 		// it: wait for the CREATE, then reconcile with DROP TABLE IF EXISTS.
-		// A refused CREATE needs no cleanup.
-		registered = unknownOutcome(cerr)
+		// A CREATE that the server ended needs no cleanup.
+		registered = !createEnded(cerr)
 		cleanup.createID = createID
+		cleanup.createErr = cerr
 		return fail(cerr)
 	}
 	registered, cleanup.created = true, true
@@ -719,16 +770,28 @@ func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 	return nil
 }
 
-// unknownOutcome reports whether a failed statement may still have run.
-func unknownOutcome(err error) bool {
-	if errors.Is(err, driver.ErrBadConn) {
-		return true
+// createEnded reports a server error that proves the CREATE ended and can
+// no longer create the table. A refusal, a limit or an invalid statement ends
+// it. A timeout, a cancel, a lost connection, a Keeper fault or an internal
+// error can leave the CREATE queued or running after the answer, so those keep
+// the cleanup.
+func createEnded(err error) bool {
+	ex, ok := errors.AsType[*ch.Exception](err)
+	if !ok {
+		return false
 	}
 	switch classify(err).Code {
-	case cherr.CodeNetwork, cherr.CodeTimeout, cherr.CodeCancelled, cherr.CodeUnavailable:
-		return true
+	case cherr.CodeTimeout, cherr.CodeNetwork, cherr.CodeCancelled, cherr.CodeUnavailable, cherr.CodeOutcomeUnknown:
+		return false
 	}
-	return false
+	switch ex.Code {
+	// UNEXPECTED_END_OF_FILE, ATTEMPT_TO_READ_AFTER_EOF, LOGICAL_ERROR,
+	// NO_ZOOKEEPER, ABORTED, UNFINISHED, SYSTEM_ERROR, KEEPER_EXCEPTION,
+	// POCO_EXCEPTION, STD_EXCEPTION, UNKNOWN_EXCEPTION.
+	case 3, 32, 49, 225, 236, 341, 425, 999, 1000, 1001, 1002:
+		return false
+	}
+	return true
 }
 
 // parseVersion reads the first three numeric parts of a server version.

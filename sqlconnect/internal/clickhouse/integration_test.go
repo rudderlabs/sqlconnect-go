@@ -31,7 +31,7 @@ func TestClickHouseDB(t *testing.T) {
 						return clickhouse.NewDBForTest(cfg, chpolicy.Policy{AllowLoopback: true, AllowPlainHTTP: true}, srv.CA)
 					},
 					ExtraTests: func(t *testing.T, db sqlconnect.DB) {
-						require.True(t, is[sqlconnect.ValidationReporter](db) && is[sqlconnect.MaterializationAdmin](db) && is[sqlconnect.QueryCanceller](db) &&
+						require.True(t, is[sqlconnect.ValidationReporter](db) && is[sqlconnect.MaterializationAdmin](db) && is[sqlconnect.QueryController](db) &&
 							is[sqlconnect.VisibilityChecker](db) && is[sqlconnect.ErrorClassifier](db), "the optional interfaces are implemented")
 					},
 				})

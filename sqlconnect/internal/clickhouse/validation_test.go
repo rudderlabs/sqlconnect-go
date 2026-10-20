@@ -43,7 +43,7 @@ func TestValidation_NamesPinnedConstraints(t *testing.T) {
 			conn, err := pool.Conn(context.Background())
 			require.NoError(t, err)
 			defer conn.Close()
-			err = settingFailure(context.Background(), conn, &ch.Exception{Code: 452})
+			err = settingFailure(context.Background(), conn, stage2UnionSettings(int(clickhousequery.MaxRunBudget.Seconds())), &ch.Exception{Code: 452})
 			for _, settingsCtx := range settingsContexts {
 				p12SettingsAt(t, settingsCtx)
 			}
@@ -56,6 +56,35 @@ func TestValidation_NamesPinnedConstraints(t *testing.T) {
 			require.ErrorAs(t, err, &stage)
 			require.Equal(t, 2, stage.Stage)
 			require.Equal(t, "settings", stage.Tag)
+		})
+	}
+}
+
+// A stop sends replace_running_query = 1 and its running check sends 0. A
+// profile that pins the setting as CONST to either value must fail stage 2,
+// or every later stop fails with 452.
+func TestValidation_RejectsPinnedReplaceRunningQuery(t *testing.T) {
+	for _, pinned := range []int{0, 1} {
+		t.Run(fmt.Sprint(pinned), func(t *testing.T) {
+			db := (&validationStub{}).db(t, nil, nil)
+			require.NoError(t, db.DB.DB.Close())
+			db.DB.DB = answerDBCtx(t, func(ctx context.Context, q string, _ []any) ([]string, [][]driver.Value, error) {
+				// The server accepts a CONST setting sent with its pinned value.
+				if v, ok := settingsOf(ctx)["replace_running_query"]; ok && v != pinned {
+					return nil, nil, &ch.Exception{Code: 452}
+				}
+				if q == "SELECT version(), currentDatabase()" {
+					return []string{"version", "database"}, [][]driver.Value{{"26.3.33.24", "analytics"}}, nil
+				}
+				return []string{"one"}, [][]driver.Value{{uint8(1)}}, nil
+			}, nil)
+			_, err := db.ValidateContext(workingCtx(t.Context()))
+			requireCode(t, err, "CH_PERMISSION")
+			requireStage(t, err, 2, "settings")
+			d, ok := clickhousequery.Describe(err)
+			require.True(t, ok)
+			require.Equal(t, "replace_running_query", d.Field)
+			require.EqualValues(t, 452, d.ServerCode)
 		})
 	}
 }
@@ -155,9 +184,13 @@ func TestProbeCleanup_Codes(t *testing.T) {
 	} {
 		err := c.run(context.Background())
 		requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
+		require.Equal(t, cherr.CodeScratchCleanupFailed, classify(err).Code, "%s: no context error hides the cleanup failure", name)
 		requireStage(t, err, 4, "scratch_cleanup")
-		_ = name
 	}
+	// A DROP error that joins a context error keeps the cleanup code and the server code.
+	joined := probeCleanup{db: db, ref: ref, created: true, acquire: fixed(scripted(t, execErr(errors.Join(context.DeadlineExceeded, &ch.Exception{Code: 159}))))}.run(context.Background())
+	require.Equal(t, cherr.CodeScratchCleanupFailed, classify(joined).Code)
+	require.EqualValues(t, 159, classify(joined).ServerCode, "the failure keeps the DROP's server code")
 	require.NoError(t, probeCleanup{db: db, ref: ref, created: false, acquire: fixed(scripted(t, execOK, noRow))}.run(context.Background()))
 
 	// Each step takes its own connection and releases it.
@@ -176,57 +209,46 @@ func TestProbeCleanup_Codes(t *testing.T) {
 }
 
 // lateCreate is a server where the probe CREATE is still in flight when the
-// cleanup starts. The CREATE runs for running polls of system.processes and
-// then lands, which creates the table. It records every statement in order.
+// cleanup starts. The running check sees the CREATE for running polls; then it
+// ends, and the table exists when lands is set. It records every statement in
+// order, with the running check as runningSQL.
 type lateCreate struct {
 	mu      sync.Mutex
-	running int // polls left that still see the CREATE in system.processes
-	logRow  string
+	running int // running checks left that still see the CREATE
+	lands   bool
 	exists  bool
 	log     []string
 }
 
-func (l *lateCreate) exec(t *testing.T) *sql.DB {
-	var outcomeCalls []stubCall
-	t.Cleanup(func() {
+func (l *lateCreate) isRunning(t *testing.T) func(context.Context, string) (bool, error) {
+	return func(_ context.Context, id string) (bool, error) {
+		require.Equal(t, "retl-create", id, "the running check uses the CREATE's id")
 		l.mu.Lock()
 		defer l.mu.Unlock()
-		for _, call := range outcomeCalls {
-			want := []any{"retl-create"}
-			if call.q == queryLogSQL {
-				want = append(want, "Create")
-			}
-			require.Equal(t, want, call.args, "%s", call.q)
+		l.log = append(l.log, runningSQL)
+		if l.running == 0 {
+			return false, nil
 		}
-	})
+		if l.running--; l.running == 0 && l.lands {
+			l.exists = true
+		}
+		return true, nil
+	}
+}
+
+func (l *lateCreate) exec(t *testing.T) *sql.DB {
 	return answerDB(t, func(q string, args []any) ([]string, [][]driver.Value, error) {
 		l.mu.Lock()
 		defer l.mu.Unlock()
 		l.log = append(l.log, q)
-		switch q {
-		case processesSQL:
-			outcomeCalls = append(outcomeCalls, stubCall{q: q, args: args})
-			if l.running > 0 {
-				l.running--
-				if l.running == 0 {
-					l.exists = true // the delayed CREATE lands
-				}
-				return []string{"count()"}, [][]driver.Value{{int64(1)}}, nil
-			}
-			return []string{"count()"}, [][]driver.Value{{int64(0)}}, nil
-		case queryLogSQL:
-			outcomeCalls = append(outcomeCalls, stubCall{q: q, args: args})
-			if l.logRow == "" {
-				return []string{"type"}, nil, nil
-			}
-			return []string{"type"}, [][]driver.Value{{l.logRow}}, nil
-		case visibilitySQL:
-			if l.exists {
-				return []string{"v"}, [][]driver.Value{{"0000-uuid"}}, nil
-			}
-			return []string{"v"}, nil, nil
+		if q != visibilitySQL {
+			return nil, nil, fmt.Errorf("unexpected query %q", q)
 		}
-		return nil, nil, fmt.Errorf("unexpected query %q", q)
+		require.Equal(t, []any{"_rudderstack", "_rudder_probe_0123456789abcdef"}, args)
+		if l.exists {
+			return []string{"v"}, [][]driver.Value{{"0000-uuid"}}, nil
+		}
+		return []string{"v"}, nil, nil
 	}, func(q string) error {
 		l.mu.Lock()
 		defer l.mu.Unlock()
@@ -246,38 +268,121 @@ func TestProbeCleanup_WaitsForUnknownCreate(t *testing.T) {
 	t.Cleanup(func() { sleep = orig })
 	cleanup := func(l *lateCreate) probeCleanup {
 		return probeCleanup{
-			db: db, ref: ref, createID: "retl-create", acquire: fixed(l.exec(t)),
+			db: db, ref: ref, createID: "retl-create", acquire: fixed(l.exec(t)), running: l.isRunning(t),
 			policy: sqlconnect.VisibilityPolicy{InitialBackoff: time.Millisecond, Deadline: 50 * time.Millisecond},
 		}
 	}
 
-	l := &lateCreate{running: 3, logRow: "QueryFinish"}
+	// The CREATE runs for three checks, then lands: not running with the table
+	// present proves it is over.
+	l := &lateCreate{running: 3, lands: true}
 	require.NoError(t, cleanup(l).run(context.Background()))
 	require.False(t, l.exists, "a CREATE that lands during the cleanup is dropped")
 	drop := slices.IndexFunc(l.log, func(q string) bool { return strings.HasPrefix(q, "DROP TABLE IF EXISTS ") })
-	finished := slices.Index(l.log, queryLogSQL)
-	require.True(t, finished >= 0 && drop > finished, "the DROP runs after the CREATE is known to be over: %q", l.log)
+	require.Equal(t, 4, runningChecks(l.log[:max(drop, 0)]), "the DROP waits until the running check sees the CREATE end: %q", l.log)
+	require.Equal(t, visibilitySQL, l.log[drop-1], "the table state is read before the DROP")
 
-	// The CREATE ended in failure: that also proves it is over.
-	l = &lateCreate{logRow: "ExceptionBeforeStart"}
-	require.NoError(t, cleanup(l).run(context.Background()))
-
-	// Never seen, or still running after every poll: the CREATE can still
-	// land. The wait is bounded, the DROP still runs, and the cleanup fails.
-	for name, l := range map[string]*lateCreate{"not found": {}, "running": {running: probeSettlePolls + 5}} {
+	// Absence, even on every poll, does not prove failure: the CREATE can
+	// still be in flight or running on another replica. Cleanup fails closed.
+	for name, l := range map[string]*lateCreate{"absent": {}, "running": {running: probeSettlePolls + 5}} {
 		err := cleanup(l).run(context.Background())
 		requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
 		requireStage(t, err, 4, "scratch_cleanup")
+		var cause *cherr.Error
+		require.ErrorAs(t, errors.Unwrap(errors.Unwrap(err)), &cause)
+		require.Equal(t, cherr.CodeOutcomeUnknown, cause.Code)
 		require.Contains(t, l.log, "DROP TABLE IF EXISTS `_rudderstack`.`_rudder_probe_0123456789abcdef` SYNC", name)
-		require.LessOrEqual(t, countOf(l.log, processesSQL), probeSettlePolls, name+": a bounded number of outcome reads")
+		require.Equal(t, probeSettlePolls, runningChecks(l.log), "bounded running checks: %s", name)
 	}
 
-	// The outcome read is refused: the DROP runs at once, and the outcome
+	// The running check is refused: the DROP runs at once, and the outcome
 	// stays open.
-	refused := scripted(t, failWith(&ch.Exception{Code: 497}), execOK, noRow)
-	err := probeCleanup{db: db, ref: ref, createID: "retl-create", acquire: fixed(refused)}.run(context.Background())
+	refused := scripted(t, execOK, noRow)
+	err := probeCleanup{
+		db: db, ref: ref, createID: "retl-create", acquire: fixed(refused),
+		running: func(context.Context, string) (bool, error) {
+			return false, bound("query running", "", &ch.Exception{Code: 497})
+		},
+	}.run(context.Background())
 	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
 	require.True(t, strings.HasPrefix(refused.lastExec, "DROP TABLE IF EXISTS "), refused.lastExec)
+}
+
+func TestProbeCleanup_AlreadyRunningCreateIsUnknown(t *testing.T) {
+	err216 := bound("create table", "", running216)
+	require.False(t, createEnded(err216), "216 must register cleanup for an unresolved CREATE")
+	orig := sleep
+	sleep = func(context.Context, time.Duration) error { return nil }
+	t.Cleanup(func() { sleep = orig })
+	l := &lateCreate{}
+	err := probeCleanup{
+		db: unitDB(t), ref: sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("_rudderstack")),
+		createID: "retl-create", createErr: err216, acquire: fixed(l.exec(t)), running: l.isRunning(t),
+	}.run(context.Background())
+	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
+	require.Equal(t, probeSettlePolls, runningChecks(l.log))
+}
+
+func TestProbeCleanup_AmbiguousCreateErrorPolls(t *testing.T) {
+	orig := sleep
+	sleep = func(context.Context, time.Duration) error { return nil }
+	t.Cleanup(func() { sleep = orig })
+	for _, code := range []int32{394, 159, 242, 210} {
+		t.Run(fmt.Sprint(code), func(t *testing.T) {
+			for name, l := range map[string]*lateCreate{
+				"lands later": {running: 2, lands: true},
+				"absent":      {},
+			} {
+				t.Run(name, func(t *testing.T) {
+					err := probeCleanup{
+						db: unitDB(t), ref: sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("_rudderstack")),
+						createID: "retl-create", createErr: bound("create table", "", &ch.Exception{Code: code}),
+						acquire: fixed(l.exec(t)), running: l.isRunning(t),
+					}.run(context.Background())
+					if l.lands {
+						require.NoError(t, err)
+						require.False(t, l.exists)
+						drop := slices.IndexFunc(l.log, func(q string) bool { return strings.HasPrefix(q, "DROP TABLE IF EXISTS ") })
+						require.Greater(t, drop, 0)
+						require.Equal(t, 3, runningChecks(l.log[:drop]))
+						require.Equal(t, visibilitySQL, l.log[drop-1])
+					} else {
+						requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
+						require.Equal(t, probeSettlePolls, runningChecks(l.log))
+						require.EqualValues(t, code, classify(err).ServerCode, "the failure keeps the CREATE's server code")
+						require.Contains(t, err.Error(), fmt.Sprintf("[server code %d]", code))
+					}
+				})
+			}
+		})
+	}
+}
+
+// A CREATE cut by a context error whose cleanup cannot settle must classify as a
+// cleanup failure: the probe table can still appear.
+func TestProbeCleanup_ContextCreateErrorKeepsCleanupCode(t *testing.T) {
+	orig := sleep
+	sleep = func(context.Context, time.Duration) error { return nil }
+	t.Cleanup(func() { sleep = orig })
+	for name, createErr := range map[string]error{
+		"canceled":          context.Canceled,
+		"deadline":          context.DeadlineExceeded,
+		"bound canceled":    bound("create table", "", context.Canceled),
+		"joined with a 394": errors.Join(context.Canceled, &ch.Exception{Code: 394}),
+	} {
+		t.Run(name, func(t *testing.T) {
+			l := &lateCreate{}
+			err := probeCleanup{
+				db: unitDB(t), ref: sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("_rudderstack")),
+				createID: "retl-create", createErr: createErr, acquire: fixed(l.exec(t)), running: l.isRunning(t),
+			}.run(context.Background())
+			require.Equal(t, cherr.CodeScratchCleanupFailed, classify(err).Code, "the unresolved cleanup is not hidden by the CREATE's context error")
+			requireStage(t, err, 4, "scratch_cleanup")
+			if ex, ok := errors.AsType[*ch.Exception](createErr); ok {
+				require.Equal(t, ex.Code, classify(err).ServerCode, "the failure keeps the CREATE's server code")
+			}
+		})
+	}
 }
 
 func TestProbeCleanup_OutcomeReadKeepsDropTime(t *testing.T) {
@@ -286,17 +391,11 @@ func TestProbeCleanup_OutcomeReadKeepsDropTime(t *testing.T) {
 	probeLookupTimeout = 20 * time.Millisecond
 	t.Cleanup(func() { probeLookupTimeout = orig })
 
-	// The outcome read stalls until its context ends. The DROP still runs,
+	// The running check stalls until its context ends. The DROP still runs,
 	// on a context with time left.
 	var dropped atomic.Bool
-	stalled := sql.OpenDB(stubConnector{
-		query: func(ctx context.Context, q string, _ []driver.NamedValue) (driver.Rows, error) {
-			if q == processesSQL {
-				<-ctx.Done()
-				return nil, ctx.Err()
-			}
-			return &stubRows{}, nil
-		},
+	pool := sql.OpenDB(stubConnector{
+		query: func(context.Context, string, []driver.NamedValue) (driver.Rows, error) { return &stubRows{}, nil },
 		exec: func(ctx context.Context, q string, _ []driver.NamedValue) (driver.Result, error) {
 			if ctx.Err() == nil && strings.HasPrefix(q, "DROP TABLE IF EXISTS ") {
 				dropped.Store(true)
@@ -304,15 +403,19 @@ func TestProbeCleanup_OutcomeReadKeepsDropTime(t *testing.T) {
 			return driver.RowsAffected(0), nil
 		},
 	})
-	t.Cleanup(func() { _ = stalled.Close() })
+	t.Cleanup(func() { _ = pool.Close() })
 	start := time.Now()
 	err := probeCleanup{
-		db: unitDB(t), ref: ref, createID: "retl-create", acquire: fixed(stalled),
+		db: unitDB(t), ref: ref, createID: "retl-create", acquire: fixed(pool),
+		running: func(ctx context.Context, _ string) (bool, error) {
+			<-ctx.Done()
+			return false, ctx.Err()
+		},
 		policy: sqlconnect.VisibilityPolicy{InitialBackoff: time.Millisecond, Deadline: time.Second},
 	}.run(context.Background())
 	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
 	require.True(t, dropped.Load(), "the DROP reached the server")
-	require.Less(t, time.Since(start), 10*time.Second, "the outcome wait has its own bound")
+	require.Less(t, time.Since(start), 10*time.Second, "the running check has its own bound")
 }
 
 func TestProbeCleanup_BadConnOnOutcomeRead(t *testing.T) {
@@ -320,13 +423,14 @@ func TestProbeCleanup_BadConnOnOutcomeRead(t *testing.T) {
 	orig := sleep
 	sleep = func(context.Context, time.Duration) error { return nil }
 	t.Cleanup(func() { sleep = orig })
-	// The outcome read loses its connection with driver.ErrBadConn. The DROP
-	// takes another connection and still runs.
+	// The table state read loses its connection with driver.ErrBadConn. The
+	// DROP takes another connection and still runs.
 	broken := scripted(t, failWith(driver.ErrBadConn))
 	good := scripted(t, execOK, noRow)
 	var acquired, released int
 	err := probeCleanup{
 		db: unitDB(t), ref: ref, createID: "retl-create",
+		running: func(context.Context, string) (bool, error) { return false, nil },
 		acquire: func(context.Context) (sqlconnect.QueryExecutor, func(), error) {
 			acquired++
 			if acquired == 1 {
@@ -335,7 +439,7 @@ func TestProbeCleanup_BadConnOnOutcomeRead(t *testing.T) {
 			return good, func() { released++ }, nil
 		},
 	}.run(context.Background())
-	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED") // the outcome read failed, so the outcome stays open
+	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED") // the table state read failed, so the outcome stays open
 	require.Equal(t, acquired, released, "each step releases its connection")
 	require.True(t, strings.HasPrefix(good.lastExec, "DROP TABLE IF EXISTS "), good.lastExec)
 }
@@ -394,10 +498,11 @@ func TestProbeCleanup_RefusedDropRunsOnce(t *testing.T) {
 	}
 }
 
-func countOf(list []string, s string) int {
+// runningChecks counts the running checks a test sent.
+func runningChecks(list []string) int {
 	n := 0
 	for _, v := range list {
-		if v == s {
+		if v == runningSQL {
 			n++
 		}
 	}
@@ -551,6 +656,30 @@ func TestValidation_RefusedCreateSendsNoDrop(t *testing.T) {
 	requireStage(t, err, 4, "scratch_write")
 	for _, q := range s.execs {
 		require.False(t, strings.HasPrefix(q, "DROP"), "a refused CREATE leaves the existing table alone: %s", q)
+	}
+}
+
+// A server refusal ends the CREATE before it runs. The stage reports the
+// refusal itself, and no cleanup wait or DROP follows.
+func TestValidation_RefusedCreateReportsItsOwnCode(t *testing.T) {
+	want := map[int32]string{
+		497: "CH_PERMISSION", 291: "CH_PERMISSION", 164: "CH_PERMISSION", 195: "CH_PERMISSION", 452: "CH_PERMISSION",
+		202: "CH_RESOURCE", 201: "CH_RESOURCE", 47: "CH_QUERY_INVALID", 36: "CH_UNKNOWN",
+	}
+	for code, registry := range want {
+		s := &validationStub{}
+		_, err := s.db(t, nil, func(q string) error {
+			if strings.HasPrefix(q, "CREATE TABLE ") {
+				return &ch.Exception{Code: code}
+			}
+			return nil
+		}).ValidateContext(workingCtx(context.Background()))
+		requireCode(t, err, registry)
+		requireStage(t, err, 4, "scratch_write")
+		require.EqualValues(t, code, classify(err).ServerCode)
+		for _, q := range s.execs {
+			require.False(t, strings.HasPrefix(q, "DROP"), "code %d: %s", code, q)
+		}
 	}
 }
 
@@ -939,4 +1068,26 @@ func unknownLastExec(t *testing.T) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.execs[len(s.execs)-1]
+}
+
+func TestCreateEnded(t *testing.T) {
+	t.Parallel()
+	// Refusals, limits and invalid statements end the CREATE, including codes
+	// that no registry class names.
+	for _, code := range []int32{62, 81, 57, 497, 291, 164, 195, 452, 202, 201, 47, 36} {
+		require.True(t, createEnded(bound("create table", "", &ch.Exception{Code: code})), "code %d", code)
+	}
+	// Codes that can leave a queued CREATE running, and non-server errors, keep cleanup registered.
+	for _, code := range []int32{
+		159, 160, 209, 95, 96, 198, 210, 279, 216, 242, 394,
+		3, 32, 49, 225, 236, 341, 425, 999, 1000, 1001, 1002,
+	} {
+		require.False(t, createEnded(&ch.Exception{Code: code}), "code %d", code)
+	}
+	for _, err := range []error{
+		driver.ErrBadConn, errors.New("eof"), context.DeadlineExceeded,
+		errors.Join(context.DeadlineExceeded, &ch.Exception{Code: 47}),
+	} {
+		require.False(t, createEnded(err), "%v", err)
+	}
 }

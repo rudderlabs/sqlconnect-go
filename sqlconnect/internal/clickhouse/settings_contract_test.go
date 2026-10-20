@@ -40,6 +40,8 @@ func p12UnionWant(seconds int) map[string]any {
 	m["max_replica_delay_for_distributed_queries"] = 1
 	m["fallback_to_stale_replicas_for_distributed_queries"] = 0
 	m["max_execution_time"] = seconds
+	// A profile that pins either stop setting fails stage 2 instead of every later stop.
+	m["replace_running_query"], m["replace_running_query_max_wait_ms"] = 1, 5000
 	return m
 }
 

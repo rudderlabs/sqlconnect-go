@@ -11,8 +11,6 @@ func TestScopedUserStatements_CustomerGrantSet(t *testing.T) {
 		"GRANT SELECT ON `customer_db`.* TO `rudder_retl`",
 		"GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE ON `_rudderstack`.* TO `rudder_retl`",
 		"GRANT ALTER DELETE ON `_rudderstack`.`sync_log` TO `rudder_retl`",
-		"GRANT SELECT ON system.processes TO `rudder_retl`",
-		"GRANT SELECT ON system.query_log TO `rudder_retl`",
 	}
 	head := []string{
 		"CREATE USER `rudder_retl` IDENTIFIED WITH sha256_password BY 'pw_Retl_123'",

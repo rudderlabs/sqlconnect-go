@@ -3,37 +3,78 @@ package clickhouse
 import (
 	"context"
 	"database/sql"
-	"errors"
-
-	ch "github.com/rudderlabs/clickhouse-go/v2"
+	"sync"
+	"time"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
-	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chctx"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 )
 
-var _ sqlconnect.QueryCanceller = (*DB)(nil)
+var _ sqlconnect.QueryController = (*DB)(nil)
 
-// Every statement here filters on user = currentUser(), so a connector never
-// stops or reads the queries of another user. ON CLUSTER is never sent: the
-// driver supports single-replica and Cloud services only.
+// A read under driverReadSettings sends readonly=2 and
+// cancel_http_readonly_queries_on_client_close. When its context ends, the
+// request closes and the server stops the read at its next input read, or at
+// max_execution_time. A CPU-bound read can run on for many seconds. A write
+// keeps running after its request closes, so StopQuery stops it. StopQuery
+// stops a read by its id too.
+//
+// The driver never reads system.processes or system.query_log and never sends
+// KILL QUERY: KILL needs SELECT ON system.processes even for the user's own
+// query, and those tables show the query text of every user. Both statements
+// below run under the target's query id instead. The stop replaces only a query
+// of the same user; another user's query under that id answers 216 and keeps
+// running. The check is not passive: it holds the id for one round trip, so a
+// statement that starts under that id during a check fails with 216. Callers
+// stop only after their own statement was sent. ON CLUSTER is never sent: the
+// driver supports single-replica and Cloud services only, and both statements
+// act on the replica that answers.
+// Query ids must be unique per execution: reusing one lets a stop reach a later
+// query.
 const (
-	killSQL      = "KILL QUERY WHERE query_id = ? AND user = currentUser() SYNC"
-	processesSQL = "SELECT count()\nFROM system.processes\nWHERE query_id = ? AND user = currentUser()"
-	queryLogSQL  = "SELECT type\nFROM system.query_log\nWHERE query_id = ?\n  AND user = currentUser()\n  AND query_kind = ?\n" +
-		"  AND type IN ('QueryFinish', 'ExceptionBeforeStart', 'ExceptionWhileProcessing')\n" +
-		"  AND event_date >= today() - 1\nORDER BY event_time_microseconds DESC\nLIMIT 1"
+	// runningSQL fails with 216 while a query with the same id runs.
+	runningSQL = "SELECT 1 AS running_check"
+	// stopSQL, sent with replace_running_query = 1, makes the server cancel the
+	// running query with the same id before it runs. The server waits at most
+	// replace_running_query_max_wait_ms (pinned to stopMaxWaitMS) and then fails with 216.
+	stopSQL = "SELECT 1 AS stop_own_query"
+	// codeAlreadyRunning is QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING.
+	// stopMaxWaitMS is the server default. A profile value of 0 would fail every stop
+	// with 216 although the target still ends.
+	stopMaxWaitMS        = 5000
+	codeAlreadyRunning   = 216
+	codeQueryCancelled   = 394
+	controlRetryInterval = 20 * time.Millisecond
 )
 
-// controlCtx keeps the caller's settings map, never the caller's query id. A
-// control statement under the target's id would collide with the target on
-// the server, and its own query_log row would count as the target's outcome.
-func (db *DB) controlCtx(ctx context.Context) context.Context {
-	fresh := clickhousequery.NewQueryID()
-	if chctx.Has(ctx) {
-		return ch.Context(ctx, ch.WithQueryID(fresh))
+var (
+	// stopTimeout bounds control calls, including lock waits, unless the
+	// caller's deadline is earlier.
+	stopTimeout = 30 * time.Second
+	// stopConfirmTries and stopConfirmInterval bound the running checks after
+	// the stop statement returned.
+	stopConfirmTries    = 3
+	stopConfirmInterval = 200 * time.Millisecond
+)
+
+// targetCtx sends the hello map under the target's query id. It replaces any
+// caller map. The hello map keeps a profile limit, offset or result filter
+// from hiding the one row the check reads back. It pins
+// replace_running_query to 0 for a check and to 1 for a stop, and pins
+// replace_running_query_max_wait_ms, overriding the user's profile defaults.
+func targetCtx(ctx context.Context, queryID string, replace bool) context.Context {
+	return clickhousequery.WithStatement(ctx, targetSettings(replace), queryID)
+}
+
+// targetSettings is the map that targetCtx sends.
+func targetSettings(replace bool) map[string]any {
+	m := helloSettings()
+	m["replace_running_query"], m["replace_running_query_max_wait_ms"] = 0, stopMaxWaitMS
+	if replace {
+		m["replace_running_query"] = 1
 	}
-	return clickhousequery.WithStatement(ctx, controlSettings(), fresh)
+	return m
 }
 
 // controlPool returns the control pool. A DB that a unit test builds by hand
@@ -45,69 +86,166 @@ func (db *DB) controlPool() *sql.DB {
 	return db.DB.DB
 }
 
-// KillQuery implements sqlconnect.QueryCanceller. It returns every kill row
-// and interprets none; only the caller decides what a kill_status means.
-func (db *DB) KillQuery(ctx context.Context, queryID string) (sqlconnect.KillResult, error) {
-	rows, err := db.controlPool().QueryContext(db.controlCtx(ctx), killSQL, queryID)
-	if err != nil {
-		return sqlconnect.KillResult{}, bound("kill query", "", err)
+// controlLocks is process-wide: two DB handles to one service must not race
+// each other's checks under the same target id.
+var controlLocks keyedMutex
+
+// keyedMutex serializes control calls per id. References include waiters,
+// so an entry is removed only after the last holder or waiter leaves. A
+// channel lets a caller's deadline also bound the wait for the lock.
+type keyedMutex struct {
+	mu      sync.Mutex
+	entries map[string]*targetLock
+}
+
+type targetLock struct {
+	token chan struct{}
+	refs  int
+}
+
+func (m *keyedMutex) lock(ctx context.Context, id string) (func(), error) {
+	m.mu.Lock()
+	if m.entries == nil {
+		m.entries = make(map[string]*targetLock)
 	}
-	defer func() { _ = rows.Close() }()
-	names, err := rows.Columns()
-	if err != nil {
-		return sqlconnect.KillResult{}, bound("kill query", "", err)
+	entry := m.entries[id]
+	if entry == nil {
+		entry = &targetLock{token: make(chan struct{}, 1)}
+		m.entries[id] = entry
 	}
-	var res sqlconnect.KillResult
-	for rows.Next() {
-		var r sqlconnect.KillRow
-		dest := make([]any, len(names))
-		for i, n := range names {
-			switch n {
-			case "query_id":
-				dest[i] = &r.QueryID
-			case "kill_status":
-				dest[i] = &r.KillStatus
-			default:
-				dest[i] = new(sqlconnect.NilAny)
+	entry.refs++
+	m.mu.Unlock()
+	releaseRef := func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		entry.refs--
+		if entry.refs == 0 {
+			delete(m.entries, id)
+		}
+	}
+	select {
+	case entry.token <- struct{}{}:
+		return func() { <-entry.token; releaseRef() }, nil
+	case <-ctx.Done():
+		releaseRef()
+		return nil, ctx.Err()
+	}
+}
+
+// alreadyRunning reports the server answer 216 for a statement sent under a
+// query id that a query of the same user still runs under.
+func alreadyRunning(err error) bool { return classify(err).ServerCode == codeAlreadyRunning }
+
+// queryRunning checks while the caller holds the target's control lock. The
+// check sees only the replica that answers.
+func (db *DB) queryRunning(ctx context.Context, queryID string) (bool, error) {
+	for attempt := range 2 {
+		var one uint8
+		err := db.controlPool().QueryRowContext(targetCtx(ctx, queryID, false), runningSQL).Scan(&one)
+		switch {
+		case err == nil:
+			return false, nil
+		case alreadyRunning(err):
+			return true, nil
+		case classify(err).ServerCode == codeQueryCancelled:
+			if attempt == 0 {
+				if err := sleep(ctx, controlRetryInterval); err != nil {
+					return false, bound("query running", "", err)
+				}
+				continue
+			}
+			e := wrap(cherr.CodeOutcomeUnknown, "", "the running check remained contended", err)
+			e.ServerCode = codeQueryCancelled
+			return false, e
+		default:
+			return false, bound("query running", "", err)
+		}
+	}
+	return false, cherr.New(cherr.CodeOutcomeUnknown, "", "the running check remained contended")
+}
+
+// StopQuery implements sqlconnect.QueryController. It checks first, so it
+// sends the stop statement only for a query that runs, then confirms. The
+// check, the stop and each confirm are separate requests, and on a
+// multi-replica service each can reach another replica. Every
+// step is bounded, and every failure is a classified error: a refused setting
+// (a readonly profile or a constraint) is CH_PERMISSION, and a query that
+// still runs after the stop is CH_OUTCOME_UNKNOWN.
+func (db *DB) StopQuery(ctx context.Context, queryID string) (sqlconnect.StopOutcome, error) {
+	stopped, err := db.stopQuery(ctx, queryID)
+	switch {
+	case err != nil:
+		return sqlconnect.StopError, err
+	case stopped:
+		return sqlconnect.StopLanded, nil
+	default:
+		return sqlconnect.StopMissed, nil
+	}
+}
+
+func (db *DB) stopQuery(ctx context.Context, queryID string) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, stopTimeout)
+	defer cancel()
+	if queryID == "" {
+		return false, cherr.New(cherr.CodeConfigInvalid, "queryID", "the query id is required")
+	}
+	unlock, err := controlLocks.lock(ctx, queryID)
+	if err != nil {
+		return false, bound("stop query", "", err)
+	}
+	defer unlock()
+	running, err := db.queryRunning(ctx, queryID)
+	if err != nil || !running {
+		return false, err
+	}
+	var one uint8
+	if err := db.controlPool().QueryRowContext(targetCtx(ctx, queryID, true), stopSQL).Scan(&one); err != nil {
+		if alreadyRunning(err) {
+			// The target did not stop within the server wait, or another
+			// user's query holds the id.
+			e := cherr.New(cherr.CodeOutcomeUnknown, "", "the query did not stop in time")
+			e.ServerCode = codeAlreadyRunning
+			return false, e
+		}
+		if classify(err).ServerCode == codeQueryCancelled {
+			e := wrap(cherr.CodeOutcomeUnknown, "", "the stop statement was cancelled by a contending query", err)
+			e.ServerCode = codeQueryCancelled
+			return false, e
+		}
+		return false, bound("stop query", "", err)
+	}
+	// The stop statement can stay registered under the id for a moment after
+	// its response, so a 216 right after it is retried a bounded number of times.
+	for i := range stopConfirmTries {
+		running, err = db.queryRunning(ctx, queryID)
+		if err != nil {
+			return false, err
+		}
+		if !running {
+			return true, nil
+		}
+		if i < stopConfirmTries-1 {
+			if err := sleep(ctx, stopConfirmInterval); err != nil {
+				return false, bound("stop query", "", err)
 			}
 		}
-		if err := rows.Scan(dest...); err != nil {
-			return sqlconnect.KillResult{}, bound("kill query", "", err)
-		}
-		res.Rows = append(res.Rows, r)
 	}
-	if err := rows.Err(); err != nil {
-		return sqlconnect.KillResult{}, bound("kill query", "", err)
-	}
-	return res, nil
+	return false, cherr.New(cherr.CodeOutcomeUnknown, "", "the query still runs after the stop")
 }
 
-// QueryOutcome implements sqlconnect.QueryCanceller.
-func (db *DB) QueryOutcome(ctx context.Context, queryID string, kind sqlconnect.QueryKind) (sqlconnect.QueryOutcome, error) {
-	return queryOutcome(func(q string, args ...any) *sql.Row {
-		return db.controlPool().QueryRowContext(db.controlCtx(ctx), q, args...)
-	}, queryID, kind)
-}
-
-// queryOutcome reads system.processes, then system.query_log, through row.
-func queryOutcome(row func(q string, args ...any) *sql.Row, queryID string, kind sqlconnect.QueryKind) (sqlconnect.QueryOutcome, error) {
-	var running uint64
-	if err := row(processesSQL, queryID).Scan(&running); err != nil {
-		return "", bound("query outcome", "", err)
+// checkRunning reports whether a query runs under queryID on the replica that
+// answers. The probe cleanup uses it to wait for a CREATE with an unknown
+// outcome. It takes the target's control lock.
+func (db *DB) checkRunning(ctx context.Context, queryID string) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, stopTimeout)
+	defer cancel()
+	if queryID == "" {
+		return false, cherr.New(cherr.CodeConfigInvalid, "queryID", "the query id is required")
 	}
-	if running > 0 {
-		return sqlconnect.QueryRunning, nil
+	unlock, err := controlLocks.lock(ctx, queryID)
+	if err != nil {
+		return false, bound("query running", "", err)
 	}
-	var typ string
-	err := row(queryLogSQL, queryID, string(kind)).Scan(&typ)
-	switch {
-	case errors.Is(err, sql.ErrNoRows):
-		return sqlconnect.QueryNotFound, nil
-	case err != nil:
-		return "", bound("query outcome", "", err)
-	case typ == "QueryFinish":
-		return sqlconnect.QueryFinished, nil
-	default:
-		return sqlconnect.QueryFailed, nil
-	}
+	defer unlock()
+	return db.queryRunning(ctx, queryID)
 }

@@ -106,8 +106,8 @@ func TestCP26_CloudReplicatedDefault(t *testing.T) {
 	}
 }
 
-// TestSQ28_CloudCancellation runs the kill and outcome lookups on Cloud, where
-// the answering replica can differ between requests.
+// TestSQ28_CloudCancellation stops a write on Cloud, where the answering
+// replica can differ between requests.
 func TestSQ28_CloudCancellation(t *testing.T) {
 	db, ctx := cloudDB(t, 0), context.Background()
 	scratch := scratchOf(t)
@@ -115,57 +115,26 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 	_, err := pinned(t, db).ExecContext(ctx, "CREATE TABLE "+db.QuoteTable(sink)+" (n UInt64) ENGINE = MergeTree ORDER BY n")
 	require.NoError(t, err)
 
-	t.Run("kill a running insert", func(t *testing.T) {
+	t.Run("stop a running insert", func(t *testing.T) {
 		id := clickhousequery.NewQueryID()
 		conn := pinned(t, db)
+		// Cleanups run last in, first out: the cancel ends a stuck insert
+		// before the connection cleanup waits for it.
+		insertCtx, cancel := context.WithCancel(ctx)
+		t.Cleanup(cancel)
 		done := make(chan error, 1)
 		go func() {
-			_, err := conn.ExecContext(stmtCtx(ctx, map[string]any{"max_block_size": 1}, id),
+			_, err := conn.ExecContext(stmtCtx(insertCtx, map[string]any{"max_block_size": 1}, id),
 				"INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(600) WHERE sleepEachRow(0.1) = 0")
 			done <- err
 		}()
 		require.Eventually(t, func() bool {
-			o, err := db.QueryOutcome(ctx, id, "Insert")
-			return err == nil && o == sqlconnect.QueryRunning
+			running, err := db.RunningForTest(ctx, id)
+			return err == nil && running
 		}, 2*time.Minute, time.Second)
-		var res sqlconnect.KillResult
-		require.Eventually(t, func() bool {
-			res, err = db.KillQuery(ctx, id)
-			return err == nil && len(res.Rows) == 1 && res.Rows[0].KillStatus == "finished"
-		}, 2*time.Minute, time.Second, "the kill reaches the replica that runs the insert")
-		werr := <-done
+		werr := stopUntilDone(ctx, t, db, id, done)
 		require.Error(t, werr)
-		require.EqualValues(t, 394, db.ClassifyError(werr).ServerCode, "the killed insert fails mid-stream with code 394")
-		require.Eventually(t, func() bool {
-			o, err := db.QueryOutcome(ctx, id, "Insert")
-			return err == nil && o == sqlconnect.QueryFailed
-		}, 2*time.Minute, 2*time.Second)
-	})
-
-	t.Run("finished", func(t *testing.T) {
-		id := clickhousequery.NewQueryID()
-		_, err := pinned(t, db).ExecContext(stmtCtx(ctx, map[string]any{}, id), "INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(10)")
-		require.NoError(t, err)
-		require.Eventually(t, func() bool {
-			o, err := db.QueryOutcome(ctx, id, "Insert")
-			return err == nil && o == sqlconnect.QueryFinished
-		}, 2*time.Minute, 2*time.Second)
-	})
-
-	t.Run("mid-stream kill", func(t *testing.T) {
-		id := clickhousequery.NewQueryID()
-		rows, err := db.QueryContext(stmtCtx(ctx, map[string]any{"max_block_size": 1}, id),
-			midStreamSQL)
-		require.NoError(t, err)
-		defer func() { _ = rows.Close() }()
-		require.True(t, rows.Next(), "the first block arrives before the kill")
-		require.Eventually(t, func() bool {
-			res, err := db.KillQuery(ctx, id)
-			return err == nil && len(res.Rows) == 1 && res.Rows[0].KillStatus == "finished"
-		}, 2*time.Minute, time.Second)
-		drain(rows)
-		require.EqualValues(t, 394, db.ClassifyError(rows.Err()).ServerCode, "the stream ends with code 394")
-		require.Equal(t, "CH_CANCELLED", db.ClassifyError(rows.Err()).Code)
+		require.EqualValues(t, 394, db.ClassifyError(werr).ServerCode, "the stopped insert fails mid-stream with code 394")
 	})
 
 	t.Run("mid-stream timeout", func(t *testing.T) {
@@ -178,6 +147,43 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 		require.EqualValues(t, 159, db.ClassifyError(rows.Err()).ServerCode, "the stream ends with code 159")
 		require.Equal(t, "CH_TIMEOUT", db.ClassifyError(rows.Err()).Code)
 	})
+}
+
+// stopUntilDone sends the stop once a second until the target ends, and
+// returns the target's error. A stop on a multi-replica service can answer
+// from a replica that does not run the target, so stopped=true does not prove
+// a cancel. Only the target's own 394 proves it.
+func stopUntilDone(ctx context.Context, t *testing.T, db *clickhouse.DB, id string, done <-chan error) error {
+	t.Helper()
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+	deadline := time.After(2 * time.Minute)
+	attempts := 0
+	for {
+		select {
+		case err := <-done:
+			t.Logf("the target ended after %d stop attempts", attempts)
+			return err
+		case <-deadline:
+			select {
+			case err := <-done:
+				t.Logf("the target ended after %d stop attempts", attempts)
+				return err
+			default:
+			}
+			t.Fatalf("the target did not end after %d stop attempts in 2 minutes", attempts)
+			return nil
+		case <-tick.C:
+			attempts++
+			_, err := db.StopQuery(ctx, id)
+			if err == nil {
+				continue
+			}
+			// A refused setting does not change between attempts.
+			require.NotEqual(t, "CH_PERMISSION", db.ClassifyError(err).Code, "the stop is refused at attempt %d: %v", attempts, err)
+			t.Logf("stop attempt %d: %v", attempts, err)
+		}
+	}
 }
 
 // midStreamSQL streams 1 MiB rows slowly. The server buffers about 1 MiB of

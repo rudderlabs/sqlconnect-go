@@ -11,7 +11,7 @@ var overflowModes = []string{
 // driverScratchSettings is the map for a statement that can write, when the
 // caller gave no map of its own. It pins every setting that can change a
 // result, so a user or profile default on the server cannot. Query logging
-// stays enabled so QueryOutcome can resolve a lost write response.
+// stays enabled for the customer's own audit; Cloud pins it to 1 anyway.
 func driverScratchSettings() map[string]any {
 	m := map[string]any{
 		"join_use_nulls": 1, "session_timezone": "UTC", "select_sequential_consistency": 1,
@@ -62,6 +62,10 @@ func stage2UnionSettings(budgetSeconds int) map[string]any {
 	m["max_replica_delay_for_distributed_queries"] = 1
 	m["fallback_to_stale_replicas_for_distributed_queries"] = 0
 	m["max_execution_time"] = budgetSeconds
+	// The stop settings ride on this read, so a profile that pins them to 0 fails stage 2
+	// with the setting named, instead of failing every later stop with 452. A second stage 2
+	// read with the running-check settings catches a pin to 1.
+	m["replace_running_query"], m["replace_running_query_max_wait_ms"] = 1, stopMaxWaitMS
 	return m
 }
 
