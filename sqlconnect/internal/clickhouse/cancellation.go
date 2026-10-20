@@ -13,10 +13,12 @@ import (
 
 var _ sqlconnect.QueryController = (*DB)(nil)
 
-// A read under driverReadSettings needs no stop: the map sends readonly=2 and
-// cancel_http_readonly_queries_on_client_close, so the server stops the read
-// when its context ends and the request closes. A write keeps running after its
-// request closes, so StopQuery stops it.
+// A read under driverReadSettings sends readonly=2 and
+// cancel_http_readonly_queries_on_client_close. When its context ends, the
+// request closes and the server stops the read at its next input read, or at
+// max_execution_time. A CPU-bound read can run on for many seconds. A write
+// keeps running after its request closes, so StopQuery stops it. StopQuery
+// stops a read by its id too.
 //
 // The driver never reads system.processes or system.query_log and never sends
 // KILL QUERY: KILL needs SELECT ON system.processes even for the user's own
@@ -35,9 +37,12 @@ const (
 	runningSQL = "SELECT 1 AS running_check"
 	// stopSQL, sent with replace_running_query = 1, makes the server cancel the
 	// running query with the same id before it runs. The server waits at most
-	// replace_running_query_max_wait_ms (default 5 s) and then fails with 216.
+	// replace_running_query_max_wait_ms (pinned to stopMaxWaitMS) and then fails with 216.
 	stopSQL = "SELECT 1 AS stop_own_query"
 	// codeAlreadyRunning is QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING.
+	// stopMaxWaitMS is the server default. A profile value of 0 would fail every stop
+	// with 216 although the target still ends.
+	stopMaxWaitMS        = 5000
 	codeAlreadyRunning   = 216
 	codeQueryCancelled   = 394
 	controlRetryInterval = 20 * time.Millisecond
@@ -56,11 +61,11 @@ var (
 // targetCtx sends the hello map under the target's query id. It replaces any
 // caller map. The hello map keeps a profile limit, offset or result filter
 // from hiding the one row the check reads back. It pins
-// replace_running_query to 0 for a check and to 1 for a stop, overriding the
-// user's profile default.
+// replace_running_query to 0 for a check and to 1 for a stop, and pins
+// replace_running_query_max_wait_ms, overriding the user's profile defaults.
 func targetCtx(ctx context.Context, queryID string, replace bool) context.Context {
 	m := helloSettings()
-	m["replace_running_query"] = 0
+	m["replace_running_query"], m["replace_running_query_max_wait_ms"] = 0, stopMaxWaitMS
 	if replace {
 		m["replace_running_query"] = 1
 	}

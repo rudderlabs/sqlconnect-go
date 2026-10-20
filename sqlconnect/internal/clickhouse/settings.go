@@ -62,6 +62,9 @@ func stage2UnionSettings(budgetSeconds int) map[string]any {
 	m["max_replica_delay_for_distributed_queries"] = 1
 	m["fallback_to_stale_replicas_for_distributed_queries"] = 0
 	m["max_execution_time"] = budgetSeconds
+	// The stop settings ride on this read, so a profile that pins either one fails stage 2
+	// with the setting named, instead of failing every later stop with 452.
+	m["replace_running_query"], m["replace_running_query_max_wait_ms"] = 1, stopMaxWaitMS
 	return m
 }
 
