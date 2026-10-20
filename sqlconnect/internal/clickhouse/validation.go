@@ -564,14 +564,14 @@ type probeCleanup struct {
 	// createID is the query id of a CREATE with an unknown outcome. That
 	// CREATE can still be in transit, so the DROP waits until it is over.
 	createID  string
-	createErr error // a definite server error proves that the CREATE ended
+	createErr error // the CREATE's own error; the failure keeps its server code
 	// acquire gives the connection for each step. In production it is the
 	// validation's own connection while that stays usable, so a busy pool
 	// cannot starve the cleanup, and a fresh pool connection after
 	// database/sql has closed it.
 	acquire func(ctx context.Context) (sqlconnect.QueryExecutor, func(), error)
 	policy  sqlconnect.VisibilityPolicy
-	// running replaces DB.QueryRunning in unit tests. The running check goes
+	// running replaces DB.checkRunning in unit tests. The running check goes
 	// to the control pool: it must run under createID, and acquire gives a
 	// connection that sends its own query ids.
 	running func(ctx context.Context, queryID string) (bool, error)
@@ -583,7 +583,9 @@ func (c probeCleanup) run(parent context.Context) error {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), probeCleanupTimeout)
 	defer cancel()
 	failed := func(err error) error {
-		return stageErr(4, "scratch_cleanup", wrap(cherr.CodeScratchCleanupFailed, c.ref.Name, "the probe table could not be removed", err))
+		e := wrap(cherr.CodeScratchCleanupFailed, c.ref.Name, "the probe table could not be removed", err)
+		e.ServerCode = classify(err).ServerCode
+		return stageErr(4, "scratch_cleanup", e)
 	}
 	stmt := "DROP TABLE " + c.db.QuoteTable(c.ref) + " SYNC"
 	if !c.created {
@@ -602,8 +604,11 @@ func (c probeCleanup) run(parent context.Context) error {
 		return failed(err)
 	}
 	if unresolved {
-		// The DROP ran, but the CREATE can still land after it.
-		return failed(cherr.New(cherr.CodeOutcomeUnknown, "", "the probe CREATE outcome is still unknown, so the probe table can still appear"))
+		// The DROP ran, but the CREATE can still land after it. The failure
+		// carries the server code of the CREATE's own error.
+		e := wrap(cherr.CodeOutcomeUnknown, "", "the probe CREATE outcome is still unknown, so the probe table can still appear", c.createErr)
+		e.ServerCode = classify(c.createErr).ServerCode
+		return failed(e)
 	}
 	return nil
 }
@@ -621,16 +626,11 @@ func (c probeCleanup) step(ctx context.Context, fn func(ex sqlconnect.QueryExecu
 }
 
 // createSettled waits for an unknown-outcome CREATE to end before the DROP.
-// Only refusals before the DDL queue prove it ended. Other server errors can
-// leave a queued CREATE running after the initiator stops waiting.
 // A table seen after the running check is false proves that it landed.
 // Absence does not prove failure: the CREATE may be in flight or on another
 // replica. Polls are bounded by probeSettlePolls, probeLookupTimeout and the
 // cleanup reserve. Without positive evidence it returns false.
 func (c probeCleanup) createSettled(ctx context.Context) bool {
-	if definiteCreateRefusal(c.createErr) {
-		return true
-	}
 	for i := range probeSettlePolls {
 		if dl, ok := ctx.Deadline(); ok && time.Until(dl) < probeCleanupReserve {
 			return false
@@ -674,7 +674,7 @@ func (c probeCleanup) isRunning(ctx context.Context) (bool, error) {
 	if c.running != nil {
 		return c.running(ctx, c.createID)
 	}
-	return c.db.QueryRunning(ctx, c.createID)
+	return c.db.checkRunning(ctx, c.createID)
 }
 
 // cleanupAcquire returns the probe cleanup's connection source: the
@@ -720,8 +720,8 @@ func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 	if _, cerr := ex.execAs(ctx, createID, "CREATE TABLE "+t+" (probe UInt8)\nENGINE = MergeTree\nORDER BY tuple()"); cerr != nil {
 		// An unknown outcome may have created the table, or may still create
 		// it: wait for the CREATE, then reconcile with DROP TABLE IF EXISTS.
-		// Only a refusal before the DDL queue needs no cleanup.
-		registered = !definiteCreateRefusal(cerr)
+		// A CREATE that the server ended needs no cleanup.
+		registered = !createEnded(cerr)
 		cleanup.createID = createID
 		cleanup.createErr = cerr
 		return fail(cerr)
@@ -746,23 +746,28 @@ func (db *DB) probe(ctx context.Context, ex driverExec) (err error) {
 	return nil
 }
 
-// definiteCreateRefusal reports a server refusal that never reaches the DDL
-// queue, so the CREATE cannot land later.
-func definiteCreateRefusal(err error) bool {
+// createEnded reports a server error that proves the CREATE ended and can
+// no longer create the table. A refusal, a limit or an invalid statement ends
+// it. A timeout, a cancel, a lost connection, a Keeper fault or an internal
+// error can leave the CREATE queued or running after the answer, so those keep
+// the cleanup.
+func createEnded(err error) bool {
 	ex, ok := errors.AsType[*ch.Exception](err)
 	if !ok {
 		return false
 	}
-	switch ex.Code {
-	case 62, 81, 57: // SYNTAX_ERROR, UNKNOWN_DATABASE, TABLE_ALREADY_EXISTS
-		return true
-	// The permission refusals: ACCESS_DENIED, DATABASE_ACCESS_DENIED, READONLY,
-	// IP_ADDRESS_NOT_ALLOWED, SETTING_CONSTRAINT_VIOLATION. The server raises
-	// them before the CREATE runs, and the stage must report CH_PERMISSION.
-	case 497, 291, 164, 195, 452:
-		return true
+	switch classify(ex).Code {
+	case cherr.CodeTimeout, cherr.CodeNetwork, cherr.CodeCancelled, cherr.CodeUnavailable, cherr.CodeOutcomeUnknown:
+		return false
 	}
-	return false
+	switch ex.Code {
+	// UNEXPECTED_END_OF_FILE, ATTEMPT_TO_READ_AFTER_EOF, LOGICAL_ERROR,
+	// UNFINISHED, SYSTEM_ERROR, KEEPER_EXCEPTION, POCO_EXCEPTION,
+	// STD_EXCEPTION, UNKNOWN_EXCEPTION.
+	case 3, 32, 49, 341, 425, 999, 1000, 1001, 1002:
+		return false
+	}
+	return true
 }
 
 // parseVersion reads the first three numeric parts of a server version.

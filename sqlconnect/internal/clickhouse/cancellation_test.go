@@ -54,7 +54,7 @@ func TestSQ28_RunningCheck(t *testing.T) {
 	}{"running": {running216, true}, "not running": {nil, false}} {
 		db, rec := controlServer(t, func(int, string) error { return c.err })
 		caller := clickhousequery.WithStatement(context.Background(), map[string]any{"max_threads": 8}, "retl-other")
-		got, err := db.QueryRunning(caller, "retl-x")
+		got, err := db.checkRunning(caller, "retl-x")
 		require.NoError(t, err, name)
 		require.Equal(t, c.want, got, name)
 		require.Equal(t, []string{runningSQL}, rec.queries(), name)
@@ -66,10 +66,10 @@ func TestSQ28_RunningCheck(t *testing.T) {
 	}
 	secret := "other-user-secret-text"
 	db, _ := controlServer(t, func(int, string) error { return &ch.Exception{Code: 497, Message: secret} })
-	_, err := db.QueryRunning(context.Background(), "retl-x")
+	_, err := db.checkRunning(context.Background(), "retl-x")
 	requireCode(t, err, "CH_PERMISSION")
 	require.NotContains(t, err.Error(), secret)
-	_, err = db.QueryRunning(context.Background(), "")
+	_, err = db.checkRunning(context.Background(), "")
 	requireCode(t, err, "CH_CONFIG_INVALID")
 }
 
@@ -87,7 +87,7 @@ func TestSQ28_StopQuery(t *testing.T) {
 	})
 	stopped, err := db.StopQuery(context.Background(), "retl-x")
 	require.NoError(t, err)
-	require.True(t, stopped)
+	require.Equal(t, sqlconnect.StopLanded, stopped)
 	require.Equal(t, []string{runningSQL, stopSQL, runningSQL}, rec.queries())
 	stop := rec.calls()[1]
 	require.Equal(t, "retl-x", queryIDOf(stop.ctx))
@@ -99,7 +99,7 @@ func TestSQ28_StopQuery(t *testing.T) {
 	db, rec = controlServer(t, func(int, string) error { return nil })
 	stopped, err = db.StopQuery(context.Background(), "retl-x")
 	require.NoError(t, err)
-	require.False(t, stopped)
+	require.Equal(t, sqlconnect.StopMissed, stopped)
 	require.Equal(t, []string{runningSQL}, rec.queries())
 
 	// The server refuses the setting: a readonly profile (164) or a constraint (452).
@@ -112,7 +112,7 @@ func TestSQ28_StopQuery(t *testing.T) {
 		})
 		stopped, err = db.StopQuery(context.Background(), "retl-x")
 		requireCode(t, err, "CH_PERMISSION")
-		require.False(t, stopped)
+		require.Equal(t, sqlconnect.StopError, stopped)
 		require.EqualValues(t, code, classify(err).ServerCode)
 	}
 
@@ -142,7 +142,7 @@ func TestSQ28_StopQueryContention(t *testing.T) {
 		return &ch.Exception{Code: 394, Message: "secret-server-text"}
 	})
 	stopped, err := db.StopQuery(context.Background(), "retl-x")
-	require.False(t, stopped)
+	require.Equal(t, sqlconnect.StopError, stopped)
 	requireCode(t, err, "CH_OUTCOME_UNKNOWN")
 	require.EqualValues(t, 394, classify(err).ServerCode)
 	require.NotContains(t, err.Error(), "secret-server-text")
@@ -193,7 +193,7 @@ func TestSQ28_ControlCallsSerializeTarget(t *testing.T) {
 	checkStarted, checkDone := make(chan struct{}), make(chan error, 1)
 	go func() {
 		close(checkStarted)
-		_, err := db.QueryRunning(ctx, "retl-x")
+		_, err := db.checkRunning(ctx, "retl-x")
 		checkDone <- err
 	}()
 	<-checkStarted
@@ -221,14 +221,14 @@ func TestSQ28_ControlLockOtherTargetsAndCancellation(t *testing.T) {
 	})
 	firstDone := make(chan error, 1)
 	go func() {
-		_, err := db.QueryRunning(context.Background(), "retl-x")
+		_, err := db.checkRunning(context.Background(), "retl-x")
 		firstDone <- err
 	}()
 	<-entered
 	defer func() { close(release); require.NoError(t, <-firstDone) }()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_, err := db.QueryRunning(ctx, "retl-other")
+	_, err := db.checkRunning(ctx, "retl-other")
 	require.NoError(t, err, "another id has its own lock")
 	waiting, cancelWait := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancelWait()
@@ -254,7 +254,7 @@ func TestSQ28_RunningCheckLockTimeout(t *testing.T) {
 	}
 	done := make(chan result, 1)
 	go func() {
-		running, err := db.QueryRunning(context.Background(), "retl-x")
+		running, err := db.checkRunning(context.Background(), "retl-x")
 		done <- result{running: running, err: err}
 	}()
 	select {
@@ -281,7 +281,7 @@ func TestSQ28_RunningCheckDeadline(t *testing.T) {
 			}
 			db, rec := controlServer(t, func(int, string) error { return nil })
 			before := time.Now()
-			running, err := db.QueryRunning(ctx, "retl-x")
+			running, err := db.checkRunning(ctx, "retl-x")
 			require.NoError(t, err)
 			require.False(t, running)
 			deadline, ok := rec.last().ctx.Deadline()
@@ -309,7 +309,7 @@ func TestSQ28_RunningCheckContention(t *testing.T) {
 				}
 				return second
 			})
-			running, err := db.QueryRunning(context.Background(), "retl-x")
+			running, err := db.checkRunning(context.Background(), "retl-x")
 			require.Len(t, rec.queries(), 2, "retry contention exactly once")
 			if second != nil && classify(second).ServerCode == 394 {
 				requireCode(t, err, "CH_OUTCOME_UNKNOWN")
@@ -321,38 +321,6 @@ func TestSQ28_RunningCheckContention(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestSQ28_DeprecatedMethodsUseTheNewPrimitives(t *testing.T) {
-	orig := sleep
-	sleep = func(context.Context, time.Duration) error { return nil }
-	t.Cleanup(func() { sleep = orig })
-	db, rec := controlServer(t, func(n int, _ string) error {
-		if n == 0 {
-			return running216
-		}
-		return nil
-	})
-	res, err := db.KillQuery(context.Background(), "retl-x")
-	require.NoError(t, err)
-	require.Equal(t, []sqlconnect.KillRow{{QueryID: "retl-x", KillStatus: "finished"}}, res.Rows)
-	require.Equal(t, []string{runningSQL, stopSQL, runningSQL}, rec.queries())
-
-	db, _ = controlServer(t, func(int, string) error { return nil })
-	res, err = db.KillQuery(context.Background(), "retl-x")
-	require.NoError(t, err)
-	require.Empty(t, res.Rows, "no query ran, so no row, as KILL QUERY answered")
-
-	for want, answer := range map[sqlconnect.QueryOutcome]error{sqlconnect.QueryRunning: running216, sqlconnect.QueryFailed: nil} {
-		db, rec := controlServer(t, func(int, string) error { return answer })
-		got, err := db.QueryOutcome(context.Background(), "retl-x", "Insert")
-		require.NoError(t, err)
-		require.Equal(t, want, got)
-		require.Equal(t, []string{runningSQL}, rec.queries())
-	}
-	db, _ = controlServer(t, func(int, string) error { return &ch.Exception{Code: 497} })
-	_, err = db.QueryOutcome(context.Background(), "retl-x", "Insert")
-	requireCode(t, err, "CH_PERMISSION")
 }
 
 // settingsOf reads the settings map the fork sends for ctx, as queryIDOf does
@@ -484,8 +452,8 @@ func TestControlPool_StopAndCheckSkipABusyMainPool(t *testing.T) {
 	defer cancel()
 	stopped, err := db.StopQuery(ctx, "retl-x")
 	require.NoError(t, err)
-	require.True(t, stopped)
-	running, err := db.QueryRunning(ctx, "retl-x")
+	require.Equal(t, sqlconnect.StopLanded, stopped)
+	running, err := db.checkRunning(ctx, "retl-x")
 	require.NoError(t, err)
 	require.False(t, running)
 }

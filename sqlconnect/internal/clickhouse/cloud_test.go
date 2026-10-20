@@ -129,13 +129,13 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 			done <- err
 		}()
 		require.Eventually(t, func() bool {
-			running, err := db.QueryRunning(ctx, id)
+			running, err := db.RunningForTest(ctx, id)
 			return err == nil && running
 		}, 2*time.Minute, time.Second)
 		werr := stopUntilDone(ctx, t, db, id, done)
 		require.Error(t, werr)
 		require.EqualValues(t, 394, db.ClassifyError(werr).ServerCode, "the stopped insert fails mid-stream with code 394")
-		running, err := db.QueryRunning(ctx, id)
+		running, err := db.RunningForTest(ctx, id)
 		require.NoError(t, err)
 		require.False(t, running)
 	})
@@ -144,7 +144,7 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 		id := clickhousequery.NewQueryID()
 		_, err := pinned(t, db).ExecContext(stmtCtx(ctx, map[string]any{}, id), "INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(10)")
 		require.NoError(t, err)
-		running, err := db.QueryRunning(ctx, id)
+		running, err := db.RunningForTest(ctx, id)
 		require.NoError(t, err)
 		require.False(t, running, "a finished insert does not run")
 	})

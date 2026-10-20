@@ -32,7 +32,6 @@ func TestClickHouseDB(t *testing.T) {
 					},
 					ExtraTests: func(t *testing.T, db sqlconnect.DB) {
 						require.True(t, is[sqlconnect.ValidationReporter](db) && is[sqlconnect.MaterializationAdmin](db) && is[sqlconnect.QueryController](db) &&
-							is[sqlconnect.QueryCanceller](db) && //nolint:staticcheck // rudder-sources still asserts the deprecated interface
 							is[sqlconnect.VisibilityChecker](db) && is[sqlconnect.ErrorClassifier](db), "the optional interfaces are implemented")
 					},
 				})

@@ -277,7 +277,7 @@ func TestProbeCleanup_WaitsForUnknownCreate(t *testing.T) {
 
 func TestProbeCleanup_AlreadyRunningCreateIsUnknown(t *testing.T) {
 	err216 := bound("create table", "", running216)
-	require.False(t, definiteCreateRefusal(err216), "216 must register cleanup for an unresolved CREATE")
+	require.False(t, createEnded(err216), "216 must register cleanup for an unresolved CREATE")
 	orig := sleep
 	sleep = func(context.Context, time.Duration) error { return nil }
 	t.Cleanup(func() { sleep = orig })
@@ -288,24 +288,6 @@ func TestProbeCleanup_AlreadyRunningCreateIsUnknown(t *testing.T) {
 	}.run(context.Background())
 	requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
 	require.Equal(t, probeSettlePolls, runningChecks(l.log))
-}
-
-func TestProbeCleanup_DefiniteCreateError(t *testing.T) {
-	ref := sqlconnect.NewRelationRef("_rudder_probe_0123456789abcdef", sqlconnect.WithSchema("_rudderstack"))
-	pool := scripted(t, execOK, noRow)
-	checks := 0
-	err := probeCleanup{
-		db: unitDB(t), ref: ref, createID: "retl-create",
-		createErr: bound("create table", "", &ch.Exception{Code: 62}),
-		acquire:   fixed(pool),
-		running: func(context.Context, string) (bool, error) {
-			checks++
-			return false, nil
-		},
-	}.run(context.Background())
-	require.NoError(t, err, "a definite CREATE error proves it ended; drop and verify absence")
-	require.Zero(t, checks)
-	require.True(t, strings.HasPrefix(pool.lastExec, "DROP TABLE IF EXISTS "))
 }
 
 func TestProbeCleanup_AmbiguousCreateErrorPolls(t *testing.T) {
@@ -334,6 +316,8 @@ func TestProbeCleanup_AmbiguousCreateErrorPolls(t *testing.T) {
 					} else {
 						requireCode(t, err, "CH_SCRATCH_CLEANUP_FAILED")
 						require.Equal(t, probeSettlePolls, runningChecks(l.log))
+						require.EqualValues(t, code, classify(err).ServerCode, "the failure keeps the CREATE's server code")
+						require.Contains(t, err.Error(), fmt.Sprintf("[server code %d]", code))
 					}
 				})
 			}
@@ -615,10 +599,14 @@ func TestValidation_RefusedCreateSendsNoDrop(t *testing.T) {
 	}
 }
 
-// A permission refusal stops the CREATE before it runs. The stage reports the
+// A server refusal ends the CREATE before it runs. The stage reports the
 // refusal itself, and no cleanup wait or DROP follows.
-func TestValidation_PermissionRefusedCreateReportsPermission(t *testing.T) {
-	for _, code := range []int32{497, 291, 164, 195, 452} {
+func TestValidation_RefusedCreateReportsItsOwnCode(t *testing.T) {
+	want := map[int32]string{
+		497: "CH_PERMISSION", 291: "CH_PERMISSION", 164: "CH_PERMISSION", 195: "CH_PERMISSION", 452: "CH_PERMISSION",
+		202: "CH_RESOURCE", 201: "CH_RESOURCE", 47: "CH_QUERY_INVALID", 36: "CH_UNKNOWN",
+	}
+	for code, registry := range want {
 		s := &validationStub{}
 		_, err := s.db(t, nil, func(q string) error {
 			if strings.HasPrefix(q, "CREATE TABLE ") {
@@ -626,8 +614,9 @@ func TestValidation_PermissionRefusedCreateReportsPermission(t *testing.T) {
 			}
 			return nil
 		}).ValidateContext(workingCtx(context.Background()))
-		requireCode(t, err, "CH_PERMISSION")
+		requireCode(t, err, registry)
 		requireStage(t, err, 4, "scratch_write")
+		require.EqualValues(t, code, classify(err).ServerCode)
 		for _, q := range s.execs {
 			require.False(t, strings.HasPrefix(q, "DROP"), "code %d: %s", code, q)
 		}
@@ -1021,13 +1010,20 @@ func unknownLastExec(t *testing.T) string {
 	return s.execs[len(s.execs)-1]
 }
 
-func TestDefiniteCreateRefusal(t *testing.T) {
+func TestCreateEnded(t *testing.T) {
 	t.Parallel()
-	for _, code := range []int32{62, 81, 57, 497, 291, 164, 195, 452} {
-		require.True(t, definiteCreateRefusal(&ch.Exception{Code: code}), "code %d", code)
+	// Refusals, limits and invalid statements end the CREATE, including codes
+	// that no registry class names.
+	for _, code := range []int32{62, 81, 57, 497, 291, 164, 195, 452, 202, 201, 47, 36} {
+		require.True(t, createEnded(bound("create table", "", &ch.Exception{Code: code})), "code %d", code)
 	}
 	// Codes that can leave a queued CREATE running, and non-server errors, keep cleanup registered.
-	for _, err := range []error{&ch.Exception{Code: 159}, &ch.Exception{Code: 341}, &ch.Exception{Code: 999}, &ch.Exception{Code: 394}, driver.ErrBadConn, errors.New("eof")} {
-		require.False(t, definiteCreateRefusal(err), "%v", err)
+	for _, err := range []error{
+		&ch.Exception{Code: 159}, &ch.Exception{Code: 209}, &ch.Exception{Code: 210}, &ch.Exception{Code: 216},
+		&ch.Exception{Code: 242}, &ch.Exception{Code: 341}, &ch.Exception{Code: 394}, &ch.Exception{Code: 999},
+		&ch.Exception{Code: 3}, &ch.Exception{Code: 425}, &ch.Exception{Code: 1001},
+		driver.ErrBadConn, errors.New("eof"), context.DeadlineExceeded,
+	} {
+		require.False(t, createEnded(err), "%v", err)
 	}
 }

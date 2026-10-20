@@ -2,61 +2,33 @@ package sqlconnect
 
 import "context"
 
-type KillRow struct {
-	QueryID    string
-	KillStatus string
-}
-
-type KillResult struct {
-	Rows []KillRow
-}
-
-type QueryOutcome string
+// StopOutcome is the result of [QueryController.StopQuery]. It has three
+// values only, so a caller can use it as a metric label.
+type StopOutcome string
 
 const (
-	QueryRunning  QueryOutcome = "running"
-	QueryFinished QueryOutcome = "finished"
-	QueryFailed   QueryOutcome = "failed"
-	QueryNotFound QueryOutcome = "not_found"
+	// StopLanded means the query ran on the answering replica at the first
+	// check and does not run there now. It may have ended on its own between
+	// the check and the stop.
+	StopLanded StopOutcome = "landed"
+	// StopMissed means no query ran under the id on the answering replica. The
+	// query has ended, or it runs on another replica of a multi-replica
+	// service. A caller that still waits for the answer of its statement
+	// knows that the stop missed it.
+	StopMissed StopOutcome = "missed"
+	// StopError means the stop failed. The error says why.
+	StopError StopOutcome = "error"
 )
 
-// QueryKind names the kind of a statement, such as "Insert", "Create",
-// "Rename", "Alter" or "Drop".
-type QueryKind string
-
-// QueryController checks and stops the connector's own queries by query id.
-// It reads no system table, so it needs no grant beyond the connector's own
-// login. Both methods act on the replica that answers. StopQuery never stops a
-// query of another user. Query ids must be unique per execution: reusing an id
-// lets a stop reach a later query.
+// QueryController stops the connector's own write by query id. It reads no
+// system table, so it needs no grant beyond the connector's own login. A read
+// needs no stop: cancelling its context closes the request, and the server
+// stops a read when its client goes away.
 type QueryController interface {
-	// QueryRunning reports whether a query runs under queryID. The server also
-	// reports an id that another user's query holds as taken, so true means the
-	// id is in use. The caller owns its query ids, so in practice true means
-	// its own query runs. Each check sees only the replica that answers. On a
-	// multi-replica service, false means "not running on the replica that answered".
-	QueryRunning(ctx context.Context, queryID string) (bool, error)
-	// StopQuery stops the connector's own query with queryID and confirms that
-	// it no longer runs on the answering replica. stopped=true means the target
-	// ran at the first check and does not run on the answering replica now; it
-	// may have finished on its own between the check and the stop. stopped=false
-	// means the first check found no running query. Callers must verify outcomes
-	// from their own tables. A query that does not stop in time returns an error.
-	StopQuery(ctx context.Context, queryID string) (stopped bool, err error)
-}
-
-// QueryCanceller is the earlier form of [QueryController].
-//
-// Deprecated: use [QueryController]. The ClickHouse driver implements both
-// methods on top of it: KillQuery stops the query and returns one row with
-// kill_status "finished" when it stopped a running query, and none when no
-// query ran. QueryOutcome returns [QueryRunning] while the query runs, and
-// [QueryFailed] once it does not run. QueryFailed then means only that the
-// statement has ended, with its outcome unproven. Callers must move to
-// [QueryController] plus verification from their own tables before they upgrade.
-type QueryCanceller interface {
-	KillQuery(ctx context.Context, queryID string) (KillResult, error)
-	// Deprecated: QueryFailed means only "ended, outcome unproven". Callers must
-	// move to QueryController plus their own verification before they upgrade.
-	QueryOutcome(ctx context.Context, queryID string, kind QueryKind) (QueryOutcome, error)
+	// StopQuery stops the connector's own query with queryID on the replica
+	// that answers. It never stops a query of another user. Query ids must be
+	// unique per execution: a reused id lets a stop reach a later query. The
+	// outcome is [StopError] exactly when err is not nil. Callers must verify
+	// what a stopped write left behind from their own tables.
+	StopQuery(ctx context.Context, queryID string) (StopOutcome, error)
 }
