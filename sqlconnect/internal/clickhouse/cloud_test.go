@@ -118,9 +118,13 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 	t.Run("stop a running insert", func(t *testing.T) {
 		id := clickhousequery.NewQueryID()
 		conn := pinned(t, db)
+		// Cleanups run last in, first out: the cancel ends a stuck insert
+		// before the connection cleanup waits for it.
+		insertCtx, cancel := context.WithCancel(ctx)
+		t.Cleanup(cancel)
 		done := make(chan error, 1)
 		go func() {
-			_, err := conn.ExecContext(stmtCtx(ctx, map[string]any{"max_block_size": 1}, id),
+			_, err := conn.ExecContext(stmtCtx(insertCtx, map[string]any{"max_block_size": 1}, id),
 				"INSERT INTO "+db.QuoteTable(sink)+" SELECT number FROM numbers(600) WHERE sleepEachRow(0.1) = 0")
 			done <- err
 		}()
@@ -148,13 +152,16 @@ func TestSQ28_CloudCancellation(t *testing.T) {
 	t.Run("mid-stream kill", func(t *testing.T) {
 		id := clickhousequery.NewQueryID()
 		streamCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
 		rows, err := db.QueryContext(stmtCtx(streamCtx, map[string]any{"max_block_size": 1}, id),
 			midStreamSQL)
 		require.NoError(t, err)
-		defer func() { _ = rows.Close() }()
 		// Close waits for a blocked Next, so the cancel runs first and unblocks
 		// the drain goroutine when the test fails early.
-		defer cancel()
+		defer func() {
+			cancel()
+			_ = rows.Close()
+		}()
 		require.True(t, rows.Next(), "the first block arrives before the kill")
 		done := make(chan error, 1)
 		go func() {
@@ -196,6 +203,7 @@ func stopUntilDone(ctx context.Context, t *testing.T, db *clickhouse.DB, id stri
 		case <-deadline:
 			select {
 			case err := <-done:
+				t.Logf("the target ended after %d stop attempts", attempts)
 				return err
 			default:
 			}
@@ -208,7 +216,7 @@ func stopUntilDone(ctx context.Context, t *testing.T, db *clickhouse.DB, id stri
 				continue
 			}
 			// A refused setting does not change between attempts.
-			require.NotEqual(t, "CH_PERMISSION", db.ClassifyError(err).Code, "the stop is refused: %v", err)
+			require.NotEqual(t, "CH_PERMISSION", db.ClassifyError(err).Code, "the stop is refused at attempt %d: %v", attempts, err)
 			t.Logf("stop attempt %d: %v", attempts, err)
 		}
 	}
