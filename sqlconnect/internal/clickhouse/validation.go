@@ -754,7 +754,12 @@ func definiteCreateRefusal(err error) bool {
 		return false
 	}
 	switch ex.Code {
-	case 62, 497, 81, 57: // SYNTAX_ERROR, ACCESS_DENIED, UNKNOWN_DATABASE, TABLE_ALREADY_EXISTS
+	case 62, 81, 57: // SYNTAX_ERROR, UNKNOWN_DATABASE, TABLE_ALREADY_EXISTS
+		return true
+	// The permission refusals: ACCESS_DENIED, DATABASE_ACCESS_DENIED, READONLY,
+	// IP_ADDRESS_NOT_ALLOWED, SETTING_CONSTRAINT_VIOLATION. The server raises
+	// them before the CREATE runs, and the stage must report CH_PERMISSION.
+	case 497, 291, 164, 195, 452:
 		return true
 	}
 	return false

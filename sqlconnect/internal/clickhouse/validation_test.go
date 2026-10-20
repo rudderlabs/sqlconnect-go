@@ -615,6 +615,25 @@ func TestValidation_RefusedCreateSendsNoDrop(t *testing.T) {
 	}
 }
 
+// A permission refusal stops the CREATE before it runs. The stage reports the
+// refusal itself, and no cleanup wait or DROP follows.
+func TestValidation_PermissionRefusedCreateReportsPermission(t *testing.T) {
+	for _, code := range []int32{497, 291, 164, 195, 452} {
+		s := &validationStub{}
+		_, err := s.db(t, nil, func(q string) error {
+			if strings.HasPrefix(q, "CREATE TABLE ") {
+				return &ch.Exception{Code: code}
+			}
+			return nil
+		}).ValidateContext(workingCtx(context.Background()))
+		requireCode(t, err, "CH_PERMISSION")
+		requireStage(t, err, 4, "scratch_write")
+		for _, q := range s.execs {
+			require.False(t, strings.HasPrefix(q, "DROP"), "code %d: %s", code, q)
+		}
+	}
+}
+
 func TestValidation_ProbeValueMismatch(t *testing.T) {
 	s := &validationStub{probeValue: int64(2)}
 	_, err := s.db(t, nil, nil).ValidateContext(workingCtx(context.Background()))
@@ -1004,7 +1023,7 @@ func unknownLastExec(t *testing.T) string {
 
 func TestDefiniteCreateRefusal(t *testing.T) {
 	t.Parallel()
-	for _, code := range []int32{62, 497, 81, 57} {
+	for _, code := range []int32{62, 81, 57, 497, 291, 164, 195, 452} {
 		require.True(t, definiteCreateRefusal(&ch.Exception{Code: code}), "code %d", code)
 	}
 	// Codes that can leave a queued CREATE running, and non-server errors, keep cleanup registered.
