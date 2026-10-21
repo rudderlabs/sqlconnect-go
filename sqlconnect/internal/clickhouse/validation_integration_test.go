@@ -138,6 +138,60 @@ func TestValidation_Grants(t *testing.T) {
 	require.NoError(t, err, "CHECK GRANT sees privileges through the inherited role")
 }
 
+func TestValidation_NarrowCustomerGrants(t *testing.T) {
+	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
+	srv.AdminExec(t, "CREATE DATABASE customer_db")
+	for _, table := range []string{"search_events", "search_users", "private_events"} {
+		srv.AdminExec(t, "CREATE TABLE customer_db."+table+" (id UInt8) ENGINE = MergeTree ORDER BY id")
+		srv.AdminExec(t, "INSERT INTO customer_db."+table+" VALUES (1)")
+	}
+	for _, tc := range []struct {
+		name, scope  string
+		want, denied []string
+	}{
+		{"prefix", "search_*", []string{"search_events", "search_users"}, []string{"private_events"}},
+		{"table", "search_events", []string{"search_events"}, []string{"private_events", "search_users"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			user := "narrow_" + tc.name
+			srv.CreateScopedUser(t, user, "pw_Narrow_123", "customer_db", "_rudderstack", false)
+			srv.AdminExec(t, "REVOKE SELECT ON customer_db.* FROM "+user)
+			srv.AdminExec(t, "GRANT SELECT ON customer_db."+tc.scope+" TO "+user)
+			db := openScoped(t, srv, user, "pw_Narrow_123")
+			ctx := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{
+				WorkingDatabase: "_rudderstack", SyncLogPruning: true,
+			})
+			res, err := db.ValidateContext(ctx)
+			require.NoError(t, err, "narrow customer SELECT and the working grants validate")
+			require.Len(t, filterOp(res.Warnings, "check_database_select"), 1)
+			require.False(t, res.GrantsChecked, "the fixture has no system grants")
+			require.Equal(t, []sqlconnect.ValidationWarning{{
+				Info:      sqlconnect.ErrorInfo{Category: "permission", Code: "CH_PERMISSION", ServerCode: 497},
+				Operation: "inspect_grants",
+			}}, filterOp(res.Warnings, "inspect_grants"))
+			tables, err := db.ListTables(ctx, sqlconnect.SchemaRef{Name: "customer_db"})
+			require.NoError(t, err)
+			var names []string
+			for _, table := range tables {
+				names = append(names, table.Name)
+			}
+			require.Equal(t, tc.want, names, "listing exposes only SELECT-granted tables")
+			for _, table := range tc.want {
+				count, err := db.GetRowCountForQuery(ctx, "SELECT id FROM customer_db."+table)
+				require.NoError(t, err)
+				require.Equal(t, 1, count)
+			}
+			for _, table := range tc.denied {
+				_, err := db.GetRowCountForQuery(ctx, "SELECT id FROM customer_db."+table)
+				requireCode(t, err, "CH_PERMISSION")
+				details, ok := clickhousequery.Describe(err)
+				require.True(t, ok)
+				require.EqualValues(t, 497, details.ServerCode)
+			}
+		})
+	}
+}
+
 func TestValidation_EngineAndCluster(t *testing.T) {
 	srv := chtest.Start(t, chtest.Options{Tag: "26.3"})
 	srv.AdminExec(t, "CREATE DATABASE s_mem ENGINE = Memory")
