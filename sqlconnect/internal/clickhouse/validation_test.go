@@ -586,6 +586,88 @@ func TestValidation_ScriptedPass(t *testing.T) {
 	requireStage(t, err, 3, "engine")
 }
 
+func TestValidation_NarrowSelectWarning(t *testing.T) {
+	// The customer holds SELECT on analytics.search_* only and no system grants: every
+	// CHECK GRANT on analytics answers 0 and every grant or role read is denied.
+	narrow := func(q string) (any, bool) {
+		switch {
+		case strings.HasPrefix(q, "CHECK GRANT ") && strings.Contains(q, "`analytics`"):
+			return int64(0), true
+		case q == currentRolesSQL, q == roleGrantsSQL, q == userGrantsSQL, q == roleGrantSQL:
+			return &ch.Exception{Code: 497}, true
+		}
+		return nil, false
+	}
+	wantGrants := []string{
+		"CHECK GRANT SELECT ON `_rudderstack`.*",
+		"CHECK GRANT INSERT ON `_rudderstack`.*",
+		"CHECK GRANT CREATE TABLE ON `_rudderstack`.*",
+		"CHECK GRANT DROP TABLE ON `_rudderstack`.*",
+		"CHECK GRANT ALTER DELETE ON `_rudderstack`.`sync_log`",
+		"CHECK GRANT SELECT ON `analytics`.*",
+	}
+	for _, pruning := range []bool{false, true} {
+		t.Run(fmt.Sprintf("pruning_%t", pruning), func(t *testing.T) {
+			stub := &validationStub{answer: narrow}
+			db := stub.db(t, nil, nil)
+			ctx := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{
+				WorkingDatabase: "_rudderstack", SyncLogPruning: pruning,
+			})
+			res, err := db.ValidateContext(ctx)
+			require.NoError(t, err, "narrow customer SELECT does not block validation")
+			require.Equal(t, []sqlconnect.ValidationWarning{{
+				Info:      sqlconnect.ErrorInfo{Category: "permission", Code: "CH_PERMISSION"},
+				Operation: "check_database_select",
+			}}, filterOp(res.Warnings, "check_database_select"))
+			require.False(t, res.GrantsChecked, "system grant inspection is optional")
+			require.Equal(t, []sqlconnect.ValidationWarning{{
+				Info:      sqlconnect.ErrorInfo{Category: "permission", Code: "CH_PERMISSION", ServerCode: 497},
+				Operation: "inspect_grants",
+			}}, filterOp(res.Warnings, "inspect_grants"))
+			queries := stub.queries()
+			var grants []string
+			for _, q := range queries {
+				if strings.HasPrefix(q, "CHECK GRANT ") {
+					grants = append(grants, q)
+				}
+			}
+			require.Equal(t, wantGrants, grants, "no other privilege on the customer database is checked")
+			require.Contains(t, queries, currentRolesSQL, "the role read ran and was denied")
+			for _, prefix := range []string{
+				"CREATE TABLE `_rudderstack`.`_rudder_probe_", "INSERT INTO `_rudderstack`.`_rudder_probe_",
+				"SELECT probe FROM `_rudderstack`.`_rudder_probe_", "DROP TABLE `_rudderstack`.`_rudder_probe_",
+			} {
+				require.True(t, slices.ContainsFunc(queries, func(q string) bool { return strings.HasPrefix(q, prefix) }), "the probe sent %s", prefix)
+			}
+			require.False(t, stub.created, "the scratch probe completes and is dropped")
+		})
+	}
+	t.Run("grants_readable", func(t *testing.T) {
+		// The same narrow SELECT, but the role and grant reads succeed.
+		stub := &validationStub{answer: func(q string) (any, bool) {
+			if strings.HasPrefix(q, "CHECK GRANT ") && strings.Contains(q, "`analytics`") {
+				return int64(0), true
+			}
+			return nil, false
+		}}
+		res, err := stub.db(t, nil, nil).ValidateContext(workingCtx(context.Background()))
+		require.NoError(t, err, "narrow customer SELECT does not block validation when grants are readable")
+		require.True(t, res.GrantsChecked)
+		require.Len(t, filterOp(res.Warnings, "check_database_select"), 1)
+	})
+	t.Run("probe_failure", func(t *testing.T) {
+		stub := &validationStub{answer: narrow}
+		_, err := stub.db(t, nil, func(q string) error {
+			if strings.HasPrefix(q, "INSERT INTO `_rudderstack`.`_rudder_probe_") {
+				return &ch.Exception{Code: 497}
+			}
+			return nil
+		}).ValidateContext(workingCtx(context.Background()))
+		requireStage(t, err, 4, "scratch_write")
+		requireCode(t, err, "CH_PERMISSION")
+	})
+}
+
 func TestValidation_RudderSchemaOverride(t *testing.T) {
 	stub := validationStub{rudderSchema: "custom_rudder"}
 	db := stub.db(t, nil, nil)
@@ -935,6 +1017,8 @@ type validationStub struct {
 	hostReads    int
 	rudderSchema string
 	probeValue   driver.Value // the probe read answer; nil answers 1
+	// answer, when set, answers a read that no override names, as an override value would.
+	answer func(q string) (any, bool)
 }
 
 func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail func(q string) error) *DB {
@@ -963,8 +1047,14 @@ func (s *validationStub) db(t *testing.T, overrides map[string]any, execFail fun
 		settings, err := p12SettingsAtErr(ctx)
 		_, deadline := ctx.Deadline()
 		s.reads = append(s.reads, stubRead{q: q, settings: settings, err: err, deadline: deadline})
-		if v, ok := overrides[q]; ok {
+		v, ok := overrides[q]
+		if !ok && s.answer != nil {
+			v, ok = s.answer(q)
+		}
+		if ok {
 			switch v := v.(type) {
+			case error:
+				return nil, nil, v
 			case []driver.Value:
 				return []string{"a", "b"}[:len(v)], [][]driver.Value{v}, nil
 			case hostSeq:
