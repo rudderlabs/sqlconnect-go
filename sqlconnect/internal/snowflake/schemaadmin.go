@@ -2,11 +2,10 @@ package snowflake
 
 import (
 	"context"
-	"errors"
-
-	"github.com/snowflakedb/gosnowflake"
+	"strconv"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/snowflakequery"
 )
 
 // SchemaExists overrides the base implementation to handle nonexistent catalog gracefully
@@ -38,13 +37,22 @@ const (
 	sfErrInsufficientPrivileges = 2003
 )
 
-func isObjectInaccessibleError(err error) bool {
-	if sfErr, ok := errors.AsType[*gosnowflake.SnowflakeError](err); ok {
-		switch sfErr.Number {
-		case sfErrObjectNotFound,
-			sfErrInsufficientPrivileges:
-			return true
-		}
+func classify(err error) sqlconnect.ErrorInfo {
+	details, ok := snowflakequery.Describe(err)
+	if !ok {
+		return sqlconnect.ErrorInfo{}
 	}
-	return false
+	info := sqlconnect.ErrorInfo{Code: strconv.Itoa(details.Number), ServerCode: int32(details.Number)}
+	switch details.Number {
+	case sfErrObjectNotFound:
+		info.Category = "not_found"
+	case sfErrInsufficientPrivileges:
+		info.Category = "permission"
+	}
+	return info
+}
+
+func isObjectInaccessibleError(err error) bool {
+	category := classify(err).Category
+	return category == "not_found" || category == "permission"
 }
