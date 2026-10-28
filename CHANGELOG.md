@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.35.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.35.0...v1.35.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **databricks:** exclude describe metadata from columns ([#603](https://github.com/rudderlabs/sqlconnect-go/issues/603)) ([1ad6327](https://github.com/rudderlabs/sqlconnect-go/commit/1ad63271393a14cd11c7a235f53917a1f4dfe388))
+
 ## [1.35.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.34.0...v1.35.0) (2026-10-20)
 
 
