@@ -120,7 +120,8 @@ func mssqlObjectNotFound(msErr mssql.Error) bool {
 	return false
 }
 
-// A failed job is also reported through its status, as *bigquery.Error or a MultiError of them.
+// Besides the HTTP error, the client can report *bigquery.Error, a bigquery.Error value or
+// a bigquery.MultiError whose members carry the same reason and message prefixes.
 func bigQueryJobObjectNotFound(jobErr *bigquery.Error) bool {
 	return jobErr.Reason == "notFound" && hasAnyPrefix(jobErr.Message, bigQueryMissingPrefixes)
 }
