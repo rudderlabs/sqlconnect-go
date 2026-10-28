@@ -12,7 +12,6 @@ import (
 // ListColumns returns a list of columns for the given table
 func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) ([]sqlconnect.ColumnRef, error) {
 	cols, err := db.DB.ListColumns(ctx, relation)
-	cols = tableColumns(cols)
 	if db.skipColumnNormalization {
 		return cols, err
 	}
@@ -20,17 +19,6 @@ func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) 
 		col.Name = db.NormaliseIdentifier(col.Name)
 		return col
 	}), err
-}
-
-// DESCRIBE TABLE appends metadata sections after the column rows. A section
-// starts with an untyped blank or # heading and may contain typed rows of its own.
-func tableColumns(cols []sqlconnect.ColumnRef) []sqlconnect.ColumnRef {
-	for i, col := range cols {
-		if col.RawType == "" && (col.Name == "" || strings.HasPrefix(col.Name, "#")) {
-			return cols[:i]
-		}
-	}
-	return cols
 }
 
 func (db *DB) ListColumnsForSqlQuery(ctx context.Context, sql string) ([]sqlconnect.ColumnRef, error) {
