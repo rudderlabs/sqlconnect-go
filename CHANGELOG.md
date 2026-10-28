@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.36.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.35.1...v1.36.0) (2026-10-28)
+
+
+### Features
+
+* **snowflake:** migrate driver to v2 and expose error details ([#602](https://github.com/rudderlabs/sqlconnect-go/issues/602)) ([dd3699a](https://github.com/rudderlabs/sqlconnect-go/commit/dd3699af6750a8d9fd213271527ad56af53650ae))
+
 ## [1.35.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.35.0...v1.35.1) (2026-10-28)
 
 
