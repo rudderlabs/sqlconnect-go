@@ -185,3 +185,10 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 	gotest.tools/gotestsum v1.8.2 // indirect
 )
+
+// Pinned to the rudderlabs/google-cloud-go fork, which carries the bigquery
+// WithMaxRetries support this release builds on, rebased onto the matching
+// upstream versions (cloud.google.com/go v0.123.0, bigquery v1.79.0).
+replace cloud.google.com/go => github.com/rudderlabs/google-cloud-go v0.123.0-rudder.5
+
+replace cloud.google.com/go/bigquery => github.com/rudderlabs/google-cloud-go/bigquery v1.79.0-rudder.1

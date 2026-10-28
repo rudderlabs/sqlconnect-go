@@ -11,10 +11,11 @@ import (
 )
 
 type bigQueryConnection struct {
-	ctx    context.Context
-	client *bigquery.Client
-	closed bool
-	bad    bool
+	ctx         context.Context
+	client      *bigquery.Client
+	closed      bool
+	bad         bool
+	retryConfig *RetryConfig
 }
 
 func (connection *bigQueryConnection) GetContext() context.Context {
