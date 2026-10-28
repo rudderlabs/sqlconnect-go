@@ -38,8 +38,12 @@ const (
 
 func isObjectInaccessibleError(err error) bool {
 	details, ok := snowflakequery.Describe(err)
-	if !ok {
-		return false
+	if ok {
+		switch details.Number {
+		case sfErrObjectNotFound,
+			sfErrInsufficientPrivileges:
+			return true
+		}
 	}
-	return details.Number == sfErrObjectNotFound || details.Number == sfErrInsufficientPrivileges
+	return false
 }

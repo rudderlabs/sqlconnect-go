@@ -40,7 +40,3 @@
 - `tableFunctionNames` in `sqlconnect/clickhousequery/queryguard.go` must cover every name in `sqlconnect/clickhousequery/testdata/table-functions-26.3.txt` after lower-casing and de-duplication. The file is the output of `SELECT name FROM system.table_functions` on the pinned 26.3 image, and includes mixed-case aliases. `TestQueryGuard_PinnedTableFunctionCatalog` checks coverage. It does not reject extra map entries. When the pinned image changes, regenerate the file from the new image and update the map in the same commit.
 - Before you add or flip a row in `sqlconnect/clickhousequery/testdata/audience-sql.json`, run the SQL through `EXPLAIN AST` on the pinned 26.3 server, for example with `clickhouse local`. Accepted rows must parse, and refused rows must be refused for the stated reason. This check is manual. `TestQueryGuard_SharedCorpus` in `sqlconnect/clickhousequery/queryguard_test.go` only checks the guard against the file.
 - Run `go test`, `make fmt` and `make lint` with `GOTOOLCHAIN=go1.26.0`, the version in `go.mod`.
-
-## INT-7456 — Snowflake server error compatibility
-
-- In `sqlconnect/internal/snowflake/schemaadmin.go::isObjectInaccessibleError`, retain server error numbers 2043 (object not found) and 2003 (insufficient privileges) during the gosnowflake/v2 migration, with focused regression coverage. These are Snowflake server numbers, not driver-defined constants; v2.3.0 still exposes `SnowflakeError.Number` and `SQLState`, so do not guess replacements or remove the existing handling.
