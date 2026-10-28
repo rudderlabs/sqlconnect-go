@@ -120,9 +120,6 @@ type DB struct {
 	*base.DB
 }
 
-// ClassifyError implements sqlconnect.ErrorClassifier.
-func (db *DB) ClassifyError(err error) sqlconnect.ErrorInfo { return classify(err) }
-
 func getColumnTypeMapper(config Config) func(base.ColumnType) string {
 	if config.UseLegacyMappings {
 		return legacyColumnTypeMapper

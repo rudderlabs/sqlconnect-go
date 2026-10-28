@@ -2,7 +2,6 @@ package snowflake
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/snowflakequery"
@@ -37,22 +36,10 @@ const (
 	sfErrInsufficientPrivileges = 2003
 )
 
-func classify(err error) sqlconnect.ErrorInfo {
+func isObjectInaccessibleError(err error) bool {
 	details, ok := snowflakequery.Describe(err)
 	if !ok {
-		return sqlconnect.ErrorInfo{}
+		return false
 	}
-	info := sqlconnect.ErrorInfo{Code: strconv.Itoa(details.Number), ServerCode: int32(details.Number)}
-	switch details.Number {
-	case sfErrObjectNotFound:
-		info.Category = "not_found"
-	case sfErrInsufficientPrivileges:
-		info.Category = "permission"
-	}
-	return info
-}
-
-func isObjectInaccessibleError(err error) bool {
-	category := classify(err).Category
-	return category == "not_found" || category == "permission"
+	return details.Number == sfErrObjectNotFound || details.Number == sfErrInsufficientPrivileges
 }
