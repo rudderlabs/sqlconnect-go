@@ -107,6 +107,7 @@
 - Do not add a Fabric-only `sqlconnect/config/config_test.go`; public Fabric rows
   in `sqlconnect/dialects_test.go` cover registration through the config import,
   while the live integration test exercises `NewDB`.
+
 ## ACT2-766 — Owner decisions for the ClickHouse driver
 
 <!-- session: 2026-10-01 -->
@@ -117,3 +118,9 @@
 - The account config accepts eight keys (`accountKeys` in `sqlconnect/internal/clickhouse/config.go`). `port` is optional and defaults to `DefaultPort`. `secure` is required and must be true, `skipVerify` must be false, and unknown keys fail. Plain HTTP and loopback are reachable only through `chpolicy.Policy.AllowPlainHTTP` and `AllowLoopback` in `sqlconnect/internal/chpolicy/chpolicy.go`, which only test code sets. Production code must never set them.
 - Keep the scope tight, simple and elegant: parity with the other warehouses wins ties, and speculative hardening goes. For this reason `max_memory_usage` is not in `driverReadSettings` (`sqlconnect/internal/clickhouse/settings.go`): a customer settings-profile constraint on it would fail validation stage 2. Do not add read settings that a customer profile can conflict with.
 - `MaxRunBudget` in `sqlconnect/clickhousequery/queryid.go` is 2 h. The DDL visibility wait in `sqlconnect/internal/clickhouse/visibility.go` starts at 250 ms, doubles up to 5 s, and stops after 60 s total (`defaultInitialBackoff`, `defaultMaxBackoff`, `defaultDeadline`). `sqlconnect.VisibilityPolicy` can override these defaults. Keep the values unless the spec changes.
+
+## INT-7456 — Snowflake error helper scope
+
+<!-- session: 2026-10-28 -->
+
+- Keep Snowflake error access on the stateless `sqlconnect/snowflakequery.Describe` helper. `sqlconnect/internal/snowflake.DB` has no current consumer for an optional `ClassifyError` method, so do not add that method or a classifier conversion solely for future use; `isObjectInaccessibleError` can compare the extracted 2043/2003 server numbers directly.
