@@ -6,17 +6,19 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 
+	"cloud.google.com/go/bigquery"
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
 	"github.com/go-sql-driver/mysql"
 	"github.com/lib/pq"
 	mssql "github.com/microsoft/go-mssqldb"
-	"github.com/snowflakedb/gosnowflake"
 	"github.com/trinodb/trino-go-client/trino"
 	"google.golang.org/api/googleapi"
 
 	redshiftdriver "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift/driver"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/snowflakequery"
 )
 
 const (
@@ -51,8 +53,8 @@ var (
 		"unexpected operation state ERROR_STATE: ",
 	}
 	// The Data API relays the server message and carries no SQLSTATE. The identifier
-	// is printed as is, so it may itself contain a double quote.
-	redshiftDataMissingObject = regexp.MustCompile(`^(?:ERROR: )?(?:relation|schema) ".+" does not exist`)
+	// is printed as is, so it may itself contain a double quote or a newline.
+	redshiftDataMissingObject = regexp.MustCompile(`(?s)^(?:ERROR: )?(?:relation|schema) ".+" does not exist(?:\n|$)`)
 )
 
 // IsObjectNotFound reports whether err, returned by a sqlconnect DB, says that
@@ -73,11 +75,20 @@ func IsObjectNotFound(err error) bool {
 	if myErr, ok := errors.AsType[*mysql.MySQLError](err); ok {
 		return myErr.Number == mysqlNoSuchTable || myErr.Number == mysqlUnknownDatabase
 	}
-	if sfErr, ok := errors.AsType[*gosnowflake.SnowflakeError](err); ok {
-		return sfErr.Number == snowflakeObjectNotFoundOrUnauthorized || sfErr.Number == snowflakeObjectNotFound
+	if details, ok := snowflakequery.Describe(err); ok {
+		return details.Number == snowflakeObjectNotFoundOrUnauthorized || details.Number == snowflakeObjectNotFound
 	}
 	if gErr, ok := errors.AsType[*googleapi.Error](err); ok {
 		return bigQueryObjectNotFound(gErr)
+	}
+	if jobErr, ok := errors.AsType[*bigquery.Error](err); ok {
+		return bigQueryJobObjectNotFound(jobErr)
+	}
+	if jobErr, ok := errors.AsType[bigquery.Error](err); ok {
+		return bigQueryJobObjectNotFound(&jobErr)
+	}
+	if multi, ok := errors.AsType[bigquery.MultiError](err); ok {
+		return slices.ContainsFunc(multi, IsObjectNotFound)
 	}
 	if tErr, ok := errors.AsType[*trino.ErrTrino](err); ok {
 		return trinoMissingObjectNames[tErr.ErrorName]
@@ -92,6 +103,11 @@ func IsObjectNotFound(err error) bool {
 		return msErr.Number == mssqlInvalidObjectName
 	}
 	return false
+}
+
+// A query that fails after the job was accepted reports the job's own error, not an HTTP one.
+func bigQueryJobObjectNotFound(jobErr *bigquery.Error) bool {
+	return jobErr.Reason == "notFound" && hasAnyPrefix(jobErr.Message, bigQueryMissingPrefixes)
 }
 
 func bigQueryObjectNotFound(gErr *googleapi.Error) bool {
