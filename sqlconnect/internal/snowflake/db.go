@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/samber/lo"
-	gosnowflake "github.com/snowflakedb/gosnowflake" // snowflake driver
+	gosnowflake "github.com/snowflakedb/gosnowflake/v2" // snowflake driver
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
