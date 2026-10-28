@@ -11,6 +11,7 @@ import (
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
 	"github.com/go-sql-driver/mysql"
 	"github.com/lib/pq"
+	mssql "github.com/microsoft/go-mssqldb"
 	"github.com/snowflakedb/gosnowflake"
 	"github.com/stretchr/testify/require"
 	"github.com/trinodb/trino-go-client/trino"
@@ -39,26 +40,30 @@ func TestIsObjectNotFound(t *testing.T) {
 
 	t.Run("a missing table, schema or database", func(t *testing.T) {
 		cases := map[string]error{
-			"postgres 42P01 undefined table":           &pq.Error{Code: "42P01", Message: `relation "s.t" does not exist`},
-			"postgres 3F000 invalid schema name":       &pq.Error{Code: "3F000", Message: `schema "s" does not exist`},
-			"postgres 3D000 invalid catalog name":      &pq.Error{Code: "3D000", Message: `database "d" does not exist`},
-			"mysql 1146 no such table":                 &mysql.MySQLError{Number: 1146, Message: "Table 'd.t' doesn't exist"},
-			"mysql 1049 unknown database":              &mysql.MySQLError{Number: 1049, Message: "Unknown database 'd'"},
-			"snowflake 2003 object":                    &gosnowflake.SnowflakeError{Number: 2003, SQLState: "42S02", Message: "SQL compilation error: Object 'T' does not exist or not authorized."},
-			"snowflake 2003 schema":                    &gosnowflake.SnowflakeError{Number: 2003, SQLState: "02000", Message: "SQL compilation error: Schema 'D.S' does not exist or not authorized."},
-			"snowflake 2043 object":                    &gosnowflake.SnowflakeError{Number: 2043, SQLState: "02000", Message: "SQL compilation error: Object does not exist, or operation cannot be performed."},
-			"bigquery 404 table":                       &googleapi.Error{Code: 404, Message: "Not found: Table p:d.t", Errors: []googleapi.ErrorItem{{Reason: "notFound"}}},
-			"bigquery 404 dataset":                     &googleapi.Error{Code: 404, Message: "Not found: Dataset p:d", Errors: []googleapi.ErrorItem{{Reason: "notFound"}}},
-			"trino TABLE_NOT_FOUND":                    &trino.ErrQueryFailed{Reason: &trino.ErrTrino{ErrorName: "TABLE_NOT_FOUND", ErrorCode: 46, Message: "line 1:15: Table 'c.s.t' does not exist"}},
-			"trino SCHEMA_NOT_FOUND":                   &trino.ErrQueryFailed{Reason: &trino.ErrTrino{ErrorName: "SCHEMA_NOT_FOUND", ErrorCode: 45, Message: "line 1:15: Schema 's' does not exist"}},
-			"trino CATALOG_NOT_FOUND":                  &trino.ErrQueryFailed{Reason: &trino.ErrTrino{ErrorName: "CATALOG_NOT_FOUND", ErrorCode: 44, Message: "line 1:15: Catalog 'c' not found"}},
-			"databricks 42P01 table":                   fakeDBExecErr{state: "42P01", msg: "databricks: execution error: [TABLE_OR_VIEW_NOT_FOUND] The table or view `t` cannot be found."},
-			"databricks 42704 with the schema class":   fakeDBExecErr{state: "42704", msg: "databricks: execution error: [SCHEMA_NOT_FOUND] The schema `s` cannot be found."},
-			"databricks synchronous rejection, table":  fakeDBExecErr{state: "", msg: "databricks: execution error: failed to execute query: [TABLE_OR_VIEW_NOT_FOUND] The table or view `t` cannot be found. SQLSTATE: 42P01"},
-			"databricks synchronous rejection, schema": fakeDBExecErr{state: "", msg: "databricks: execution error: failed to execute query: unexpected operation state ERROR_STATE: [SCHEMA_NOT_FOUND] The schema `s` cannot be found."},
-			"redshift data api relation":               dataAPIFailure(`ERROR: relation "s.t" does not exist`),
-			"redshift data api schema":                 dataAPIFailure(`ERROR: schema "s" does not exist`),
-			"redshift data api without the severity":   dataAPIFailure(`relation "s.t" does not exist`),
+			"postgres 42P01 undefined table":            &pq.Error{Code: "42P01", Message: `relation "s.t" does not exist`},
+			"postgres 3F000 invalid schema name":        &pq.Error{Code: "3F000", Message: `schema "s" does not exist`},
+			"postgres 3D000 invalid catalog name":       &pq.Error{Code: "3D000", Message: `database "d" does not exist`},
+			"mysql 1146 no such table":                  &mysql.MySQLError{Number: 1146, Message: "Table 'd.t' doesn't exist"},
+			"mysql 1049 unknown database":               &mysql.MySQLError{Number: 1049, Message: "Unknown database 'd'"},
+			"snowflake 2003 object":                     &gosnowflake.SnowflakeError{Number: 2003, SQLState: "42S02", Message: "SQL compilation error: Object 'T' does not exist or not authorized."},
+			"snowflake 2003 schema":                     &gosnowflake.SnowflakeError{Number: 2003, SQLState: "02000", Message: "SQL compilation error: Schema 'D.S' does not exist or not authorized."},
+			"snowflake 2043 object":                     &gosnowflake.SnowflakeError{Number: 2043, SQLState: "02000", Message: "SQL compilation error: Object does not exist, or operation cannot be performed."},
+			"bigquery 404 table":                        &googleapi.Error{Code: 404, Message: "Not found: Table p:d.t", Errors: []googleapi.ErrorItem{{Reason: "notFound"}}},
+			"bigquery 404 dataset":                      &googleapi.Error{Code: 404, Message: "Not found: Dataset p:d", Errors: []googleapi.ErrorItem{{Reason: "notFound"}}},
+			"trino TABLE_NOT_FOUND":                     &trino.ErrQueryFailed{Reason: &trino.ErrTrino{ErrorName: "TABLE_NOT_FOUND", ErrorCode: 46, Message: "line 1:15: Table 'c.s.t' does not exist"}},
+			"trino SCHEMA_NOT_FOUND":                    &trino.ErrQueryFailed{Reason: &trino.ErrTrino{ErrorName: "SCHEMA_NOT_FOUND", ErrorCode: 45, Message: "line 1:15: Schema 's' does not exist"}},
+			"trino CATALOG_NOT_FOUND":                   &trino.ErrQueryFailed{Reason: &trino.ErrTrino{ErrorName: "CATALOG_NOT_FOUND", ErrorCode: 44, Message: "line 1:15: Catalog 'c' not found"}},
+			"databricks 42P01 table":                    fakeDBExecErr{state: "42P01", msg: "databricks: execution error: [TABLE_OR_VIEW_NOT_FOUND] The table or view `t` cannot be found."},
+			"databricks 42704 with the schema class":    fakeDBExecErr{state: "42704", msg: "databricks: execution error: [SCHEMA_NOT_FOUND] The schema `s` cannot be found."},
+			"databricks synchronous rejection, table":   fakeDBExecErr{state: "", msg: "databricks: execution error: failed to execute query: [TABLE_OR_VIEW_NOT_FOUND] The table or view `t` cannot be found. SQLSTATE: 42P01"},
+			"databricks synchronous rejection, schema":  fakeDBExecErr{state: "", msg: "databricks: execution error: failed to execute query: unexpected operation state ERROR_STATE: [SCHEMA_NOT_FOUND] The schema `s` cannot be found."},
+			"redshift data api relation":                dataAPIFailure(`ERROR: relation "s.t" does not exist`),
+			"redshift data api schema":                  dataAPIFailure(`ERROR: schema "s" does not exist`),
+			"redshift data api without the severity":    dataAPIFailure(`relation "s.t" does not exist`),
+			"redshift data api quoted identifier":       dataAPIFailure(`ERROR: relation "s.a"b" does not exist`),
+			"databricks 42704 with the catalog class":   fakeDBExecErr{state: "42704", msg: "databricks: execution error: [CATALOG_NOT_FOUND] The catalog `c` cannot be found."},
+			"databricks synchronous rejection, catalog": fakeDBExecErr{state: "", msg: "databricks: execution error: failed to execute query: [CATALOG_NOT_FOUND] The catalog `c` cannot be found."},
+			"fabric 208 invalid object name":            mssql.Error{Number: 208, Message: "Invalid object name 's.t'."},
 		}
 		for name, err := range cases {
 			t.Run(name, func(t *testing.T) {
@@ -93,6 +98,8 @@ func TestIsObjectNotFound(t *testing.T) {
 			"redshift data api column":                              dataAPIFailure(`ERROR: column "c" does not exist`),
 			"redshift data api phrase not at the start":             dataAPIFailure(`ERROR: syntax error at or near "relation "t" does not exist"`),
 			"redshift data api aborted":                             &redshiftdriver.StatementError{Status: types.StatusStringAborted, Message: "Query cancelled by user"},
+			"fabric 229 permission denied":                          mssql.Error{Number: 229, Message: "The SELECT permission was denied on the object 't', database 'd', schema 's'."},
+			"fabric 207 invalid column":                             mssql.Error{Number: 207, Message: "Invalid column name 'c'."},
 			"clickhouse keeps its own code":                         cherr.New(cherr.CodeObjectNotFound, "", "the table or database does not exist"),
 			"network":                                               &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")},
 			"deadline":                                              context.DeadlineExceeded,

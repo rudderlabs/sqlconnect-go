@@ -11,6 +11,7 @@ import (
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
 	"github.com/go-sql-driver/mysql"
 	"github.com/lib/pq"
+	mssql "github.com/microsoft/go-mssqldb"
 	"github.com/snowflakedb/gosnowflake"
 	"github.com/trinodb/trino-go-client/trino"
 	"google.golang.org/api/googleapi"
@@ -33,7 +34,11 @@ const (
 	databricksUndefinedTable  = "42P01"
 	databricksUndefinedObject = "42704"
 	databricksSchemaNotFound  = "[SCHEMA_NOT_FOUND]"
+	databricksCatalogNotFound = "[CATALOG_NOT_FOUND]"
 	databricksTableNotFound   = "[TABLE_OR_VIEW_NOT_FOUND]"
+
+	// "Invalid object name": SQL Server answers the same for an object the login cannot see.
+	mssqlInvalidObjectName = 208
 )
 
 var (
@@ -45,16 +50,18 @@ var (
 		"failed to execute query: ",
 		"unexpected operation state ERROR_STATE: ",
 	}
-	// The Data API relays the server message and carries no SQLSTATE.
-	redshiftDataMissingObject = regexp.MustCompile(`^(?:ERROR: )?(?:relation|schema) "[^"]+" does not exist`)
+	// The Data API relays the server message and carries no SQLSTATE. The identifier
+	// is printed as is, so it may itself contain a double quote.
+	redshiftDataMissingObject = regexp.MustCompile(`^(?:ERROR: )?(?:relation|schema) ".+" does not exist`)
 )
 
 // IsObjectNotFound reports whether err, returned by a sqlconnect DB, says that
-// the table or view, schema or database a statement addressed does not exist.
-// A missing column or function and a permission failure are not reported,
-// except where the engine does not tell them apart: Snowflake answers "does not
-// exist or not authorized" for both. ClickHouse errors carry their own codes and
-// are not inspected here; see clickhousequery.Describe.
+// the table or view, schema, database or catalog a statement addressed does not
+// exist. A missing column or function and a permission failure are not
+// reported, except where the engine does not tell them apart: Snowflake answers
+// "does not exist or not authorized" (2003) and SQL Server "Invalid object name"
+// (208) for an object the role cannot see as well. ClickHouse errors carry their
+// own codes and are not inspected here; see clickhousequery.Describe.
 func IsObjectNotFound(err error) bool {
 	if pqErr, ok := errors.AsType[*pq.Error](err); ok {
 		switch pqErr.Code {
@@ -80,6 +87,9 @@ func IsObjectNotFound(err error) bool {
 	}
 	if stmtErr, ok := errors.AsType[*redshiftdriver.StatementError](err); ok {
 		return redshiftDataMissingObject.MatchString(stmtErr.Message)
+	}
+	if msErr, ok := errors.AsType[mssql.Error](err); ok {
+		return msErr.Number == mssqlInvalidObjectName
 	}
 	return false
 }
@@ -107,9 +117,9 @@ func databricksObjectNotFound(dbErr dbsqlerr.DBExecutionError) bool {
 	case databricksUndefinedTable:
 		return true
 	case databricksUndefinedObject:
-		return class == databricksSchemaNotFound
+		return class == databricksSchemaNotFound || class == databricksCatalogNotFound
 	case "":
-		return class == databricksTableNotFound || class == databricksSchemaNotFound
+		return class == databricksTableNotFound || class == databricksSchemaNotFound || class == databricksCatalogNotFound
 	}
 	return false
 }
