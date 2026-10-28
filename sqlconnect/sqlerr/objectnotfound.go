@@ -53,8 +53,9 @@ var (
 		"unexpected operation state ERROR_STATE: ",
 	}
 	// The Data API relays the server message and carries no SQLSTATE. The identifier
-	// is printed as is, so it may itself contain a double quote or a newline.
-	redshiftDataMissingObject = regexp.MustCompile(`(?s)^(?:ERROR: )?(?:relation|schema) ".+" does not exist(?:\n|$)`)
+	// is printed as is, so it may itself contain a double quote or a newline; the
+	// phrase has to end the message.
+	redshiftDataMissingObject = regexp.MustCompile(`(?s)^(?:ERROR: )?(?:relation|schema) ".+" does not exist\n?$`)
 )
 
 // IsObjectNotFound reports whether err, returned by a sqlconnect DB, says that
@@ -100,12 +101,26 @@ func IsObjectNotFound(err error) bool {
 		return redshiftDataMissingObject.MatchString(stmtErr.Message)
 	}
 	if msErr, ok := errors.AsType[mssql.Error](err); ok {
-		return msErr.Number == mssqlInvalidObjectName
+		return mssqlObjectNotFound(msErr)
 	}
 	return false
 }
 
-// A query that fails after the job was accepted reports the job's own error, not an HTTP one.
+// SQL Server can answer one statement with several diagnostics; go-mssqldb keeps
+// the last in Number and all of them in All.
+func mssqlObjectNotFound(msErr mssql.Error) bool {
+	if msErr.Number == mssqlInvalidObjectName {
+		return true
+	}
+	for _, diagnostic := range msErr.All {
+		if diagnostic.Number == mssqlInvalidObjectName {
+			return true
+		}
+	}
+	return false
+}
+
+// A failed job is also reported through its status, as *bigquery.Error or a MultiError of them.
 func bigQueryJobObjectNotFound(jobErr *bigquery.Error) bool {
 	return jobErr.Reason == "notFound" && hasAnyPrefix(jobErr.Message, bigQueryMissingPrefixes)
 }
