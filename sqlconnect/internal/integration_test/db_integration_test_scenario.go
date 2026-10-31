@@ -22,6 +22,7 @@ import (
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/op"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/sqlerr"
 	sqlconnectutil "github.com/rudderlabs/sqlconnect-go/sqlconnect/util"
 )
 
@@ -630,6 +631,31 @@ func TestDatabaseScenarios(t *testing.T, warehouse string, configJSON json.RawMe
 		t.Run("create view", func(t *testing.T) {
 			_, err := db.ExecContext(ctx, fmt.Sprintf("CREATE VIEW %s AS SELECT * FROM %s", db.QuoteTable(view), db.QuoteTable(table)))
 			require.NoError(t, err, "it should be able to create a view")
+		})
+
+		t.Run("missing object is classified", func(t *testing.T) {
+			queryMissing := func(t *testing.T, relation sqlconnect.RelationRef) {
+				t.Helper()
+				rows, err := db.QueryContext(ctx, "SELECT 1 FROM "+db.QuoteTable(relation))
+				if err == nil {
+					for rows.Next() {
+					}
+					err = rows.Err()
+					_ = rows.Close()
+				}
+				require.Error(t, err, "it should fail to read %s", relation)
+				if classifier, ok := db.(sqlconnect.ErrorClassifier); ok {
+					require.Equal(t, "not_found", classifier.ClassifyError(err).Category, "%v", err)
+					return
+				}
+				require.True(t, sqlerr.IsObjectNotFound(err), "%v", err)
+			}
+			t.Run("table", func(t *testing.T) {
+				queryMissing(t, sqlconnect.NewRelationRef(formatfn("missing_table"), sqlconnect.WithSchema(schema.Name)))
+			})
+			t.Run("schema", func(t *testing.T) {
+				queryMissing(t, sqlconnect.NewRelationRef(table.Name, sqlconnect.WithSchema(GenerateTestSchema(formatfn))))
+			})
 		})
 
 		t.Run("table exists in catalog", func(t *testing.T) {

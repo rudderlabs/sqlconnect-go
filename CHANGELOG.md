@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.37.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.36.0...v1.37.0) (2026-10-31)
+
+
+### Features
+
+* **sqlerr:** report a missing table, schema or database for every driver ([#604](https://github.com/rudderlabs/sqlconnect-go/issues/604)) ([90c93a8](https://github.com/rudderlabs/sqlconnect-go/commit/90c93a83069936f7b92eb40047450de174b1ad13))
+
 ## [1.36.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.35.1...v1.36.0) (2026-10-28)
 
 
