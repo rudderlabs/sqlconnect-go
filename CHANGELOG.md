@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.37.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.37.0...v1.37.1) (2026-10-31)
+
+
+### Miscellaneous
+
+* **ci:** move the PR title check to check-pr-title v2.0.3 ([#608](https://github.com/rudderlabs/sqlconnect-go/issues/608)) ([214e4be](https://github.com/rudderlabs/sqlconnect-go/commit/214e4be056c68fa1b651ace7ce355be38d8046ab))
+
 ## [1.37.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.36.0...v1.37.0) (2026-10-31)
 
 
