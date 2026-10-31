@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
-	"slices"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
@@ -85,12 +84,6 @@ func IsObjectNotFound(err error) bool {
 	if jobErr, ok := errors.AsType[*bigquery.Error](err); ok {
 		return bigQueryJobObjectNotFound(jobErr)
 	}
-	if jobErr, ok := errors.AsType[bigquery.Error](err); ok {
-		return bigQueryJobObjectNotFound(&jobErr)
-	}
-	if multi, ok := errors.AsType[bigquery.MultiError](err); ok {
-		return slices.ContainsFunc(multi, IsObjectNotFound)
-	}
 	if tErr, ok := errors.AsType[*trino.ErrTrino](err); ok {
 		return trinoMissingObjectNames[tErr.ErrorName]
 	}
@@ -120,8 +113,8 @@ func mssqlObjectNotFound(msErr mssql.Error) bool {
 	return false
 }
 
-// Besides the HTTP error, the client can report *bigquery.Error, a bigquery.Error value or
-// a bigquery.MultiError whose members carry the same reason and message prefixes.
+// A finished job reports its failure as *bigquery.Error, with the same reason and
+// message prefixes as the HTTP error.
 func bigQueryJobObjectNotFound(jobErr *bigquery.Error) bool {
 	return jobErr.Reason == "notFound" && hasAnyPrefix(jobErr.Message, bigQueryMissingPrefixes)
 }

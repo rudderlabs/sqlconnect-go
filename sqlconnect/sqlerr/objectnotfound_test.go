@@ -67,8 +67,6 @@ func TestIsObjectNotFound(t *testing.T) {
 			"fabric 208 invalid object name":                mssql.Error{Number: 208, Message: "Invalid object name 's.t'."},
 			"redshift data api identifier with a newline":   dataAPIFailure("ERROR: relation \"a\nb\" does not exist"),
 			"bigquery job error table":                      &bigquery.Error{Reason: "notFound", Message: "Not found: Table p:d.t was not found in location US"},
-			"bigquery job error dataset by value":           bigquery.Error{Reason: "notFound", Message: "Not found: Dataset p:d was not found in location US"},
-			"bigquery multi error":                          bigquery.MultiError{&bigquery.Error{Reason: "notFound", Message: "Not found: Table p:d.t"}},
 			"fabric 208 followed by the termination notice": mssql.Error{Number: 3621, Message: "The statement has been terminated.", All: []mssql.Error{{Number: 208, Message: "Invalid object name 's.t'."}, {Number: 3621, Message: "The statement has been terminated."}}},
 		}
 		for name, err := range cases {
@@ -109,7 +107,6 @@ func TestIsObjectNotFound(t *testing.T) {
 			"redshift data api already exists, quoted phrase":                        dataAPIFailure(`ERROR: relation "a" does not exist" already exists`),
 			"bigquery job error access denied":                                       &bigquery.Error{Reason: "accessDenied", Message: "Access Denied: Table p:d.t"},
 			"bigquery job error not found job":                                       &bigquery.Error{Reason: "notFound", Message: "Not found: Job p:US.j"},
-			"bigquery multi error without a missing object":                          bigquery.MultiError{&bigquery.Error{Reason: "invalidQuery", Message: "Syntax error"}},
 			"fabric diagnostics without 208":                                         mssql.Error{Number: 3621, Message: "The statement has been terminated.", All: []mssql.Error{{Number: 229, Message: "The SELECT permission was denied on the object 't'."}, {Number: 3621, Message: "The statement has been terminated."}}},
 			"redshift data api already exists, phrase and newline in the identifier": dataAPIFailure("ERROR: relation \"a\" does not exist\nb\" already exists"),
 			"clickhouse keeps its own code":                                          cherr.New(cherr.CodeObjectNotFound, "", "the table or database does not exist"),
