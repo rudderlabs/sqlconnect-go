@@ -154,3 +154,15 @@ func main() {
     statements := sqlconnectutil.SplitStatements("SELECT * FROM table; SELECT * FROM table;")
 }
 ```
+
+**IsObjectNotFound**: Reports whether a query error says that the table, schema, database or catalog it addressed does not exist, for every driver except ClickHouse, whose errors carry their own codes (`clickhousequery.Describe`). Snowflake (2003) and SQL Server (208) use the same error for an object the role cannot see, so on those two a true result can also be a permission problem
+```go
+import "github.com/rudderlabs/sqlconnect-go/sqlconnect/sqlerr"
+
+func main() {
+    _, err := db.QueryContext(ctx, "SELECT 1 FROM missing_schema.missing_table")
+    if sqlerr.IsObjectNotFound(err) {
+        // the table, its schema or the database is not there for this connection
+    }
+}
+```

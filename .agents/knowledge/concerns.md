@@ -60,3 +60,8 @@
 - `readRoleClosure` in `sqlconnect/internal/clickhouse/validation.go` walks the role closure with a queue and a visited set. Nothing bounds the role count or the accumulated grant rows. Add a total role-count bound if a customer role graph grows large.
 - The ClickHouse Cloud test (`TestSQ24_CloudSmoke` in `sqlconnect/internal/clickhouse/cloud_test.go`) has build tag `clickhouse_cloud`. It needs `CLICKHOUSE_CLOUD_CONFIG` and runs only through `make test-clickhouse-cloud`. No CI job runs it.
 - A typed decimal path inside a JSON column keeps its value but loses its scale, so trailing zeros disappear (`jsonNumbers` and `normalizeJSONValue` in `sqlconnect/internal/clickhouse/mappings.go`; `TestJSONColumn` in `sqlconnect/internal/clickhouse/mappings_integration_test.go`). No integration case covers a generic `Decimal(P,S)` column yet.
+## PRO-5968 — Not-found checks that still read message text
+
+<!-- session: 2026-10-28 -->
+
+- `sqlconnect/internal/redshift/schemaadmin.go::ListSchemas` decides whether to retry by matching `schemaDoesNotExistRegex` against `err.Error()`. Both shapes it sees are typed now: `*pq.Error` with SQLSTATE `3F000` on password auth and `*driver.StatementError` on the Data API, so the retry test can stop reading text. The schema admins keep their own checks for different reasons: the Databricks `isObjectInaccessibleError` also accepts SQLSTATE `42501` (insufficient privileges), the Trino `isCatalogNotFoundError` checks only catalog code `44`, and the Snowflake `isObjectInaccessibleError` accepts the same `2003` and `2043` pair as `sqlerr.IsObjectNotFound`; only the Snowflake one could call the shared function as is.
