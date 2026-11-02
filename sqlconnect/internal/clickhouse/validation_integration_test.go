@@ -163,7 +163,10 @@ func TestValidation_NarrowCustomerGrants(t *testing.T) {
 			})
 			res, err := db.ValidateContext(ctx)
 			require.NoError(t, err, "narrow customer SELECT and the working grants validate")
-			require.Len(t, filterOp(res.Warnings, "check_database_select"), 1)
+			require.Equal(t, []sqlconnect.ValidationWarning{{
+				Info:      sqlconnect.ErrorInfo{Category: "permission", Code: "CH_PERMISSION"},
+				Operation: "check_database_select",
+			}}, filterOp(res.Warnings, "check_database_select"))
 			require.False(t, res.GrantsChecked, "the fixture has no system grants")
 			require.Equal(t, []sqlconnect.ValidationWarning{{
 				Info:      sqlconnect.ErrorInfo{Category: "permission", Code: "CH_PERMISSION", ServerCode: 497},
