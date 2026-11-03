@@ -71,6 +71,9 @@ jobs:
           TRINO_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.TRINO_TEST_ENVIRONMENT_CREDENTIALS }}
           SNOWFLAKE_TEST_AUTH_KEYPAIR_ENCRYPTED_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_AUTH_KEYPAIR_ENCRYPTED_CREDENTIALS }}
           SNOWFLAKE_TEST_AUTH_KEYPAIR_UNENCRYPTED_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_AUTH_KEYPAIR_UNENCRYPTED_CREDENTIALS }}
+      - name: Snowflake transport race regression
+        if: matrix.package == 'sqlconnect/internal/snowflake'
+        run: go test -race -count=1 -run '^TestConcurrentConnectionOpensKeepEgressGuard$' ./sqlconnect/internal/snowflake
       - name: ClickHouse evidence run
         if: matrix.package == 'sqlconnect/internal/clickhouse'
         shell: bash
