@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.37.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.37.1...v1.37.2) (2026-11-04)
+
+
+### Miscellaneous
+
+* bump andybalholm/brotli to v1.2.7 ([#601](https://github.com/rudderlabs/sqlconnect-go/issues/601)) ([3908168](https://github.com/rudderlabs/sqlconnect-go/commit/39081685ba98c426815f89fa2e951a2ee53d24de))
+
 ## [1.37.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.37.0...v1.37.1) (2026-11-04)
 
 
