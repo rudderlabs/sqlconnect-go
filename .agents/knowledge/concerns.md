@@ -65,3 +65,7 @@
 <!-- session: 2026-10-28 -->
 
 - `sqlconnect/internal/redshift/schemaadmin.go::ListSchemas` decides whether to retry by matching `schemaDoesNotExistRegex` against `err.Error()`. Both shapes it sees are typed now: `*pq.Error` with SQLSTATE `3F000` on password auth and `*driver.StatementError` on the Data API, so the retry test can stop reading text. The schema admins keep their own checks for different reasons: the Databricks `isObjectInaccessibleError` also accepts SQLSTATE `42501` (insufficient privileges), the Trino `isCatalogNotFoundError` checks only catalog code `44`, and the Snowflake `isObjectInaccessibleError` accepts the same `2003` and `2043` pair as `sqlerr.IsObjectNotFound`; only the Snowflake one could call the shared function as is.
+
+## RUD-3451 — Opaque Snowflake transport and driver diagnostics
+
+- In gosnowflake/v2.3.0, `connectivity_diagnosis.go::createDiagnosticTransport` unconditionally asserts the custom transporter is a `*http.Transport`, so the opaque egress-guarded wrapper is incompatible with that opt-in diagnostics path. `sqlconnect/internal/snowflake/config.go::ConnectionString` does not enable `ConnectionDiagnosticsEnabled`, and the driver's `castToTransport` helper is confined to its tests. Do not enable the diagnostics mode without revisiting this boundary: it builds its own unguarded dialer and invokes `os.Exit(0)` (`sqlconnect/internal/snowflake/transport.go`, `sqlconnect/internal/snowflake/config.go`).
