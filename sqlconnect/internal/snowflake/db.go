@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
 )
 
 const (
@@ -36,7 +37,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	sfConfig.Transporter = newGuardedTransport()
+	sfConfig.Transporter = opaqueTransport{util.GuardedHTTPTransport(false)}
 	db := sql.OpenDB(gosnowflake.NewConnector(gosnowflake.SnowflakeDriver{}, *sfConfig))
 
 	return &DB{
