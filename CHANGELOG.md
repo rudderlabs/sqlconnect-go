@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.37.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.37.0...v1.37.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **snowflake:** prevent driver mutation of shared HTTP transport ([#610](https://github.com/rudderlabs/sqlconnect-go/issues/610)) ([88ace8b](https://github.com/rudderlabs/sqlconnect-go/commit/88ace8b139ee92aaa582d02312f2b49df12ae891))
+
+
+### Miscellaneous
+
+* **ci:** move the PR title check to check-pr-title v2.0.3 ([#608](https://github.com/rudderlabs/sqlconnect-go/issues/608)) ([214e4be](https://github.com/rudderlabs/sqlconnect-go/commit/214e4be056c68fa1b651ace7ce355be38d8046ab))
+* **clickhouse:** pin validation for table-level and prefix SELECT ([#596](https://github.com/rudderlabs/sqlconnect-go/issues/596)) ([ad2afbb](https://github.com/rudderlabs/sqlconnect-go/commit/ad2afbb490f3d2b8c4dec7def7fb29bbdcd2eae0))
+
 ## [1.37.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.36.0...v1.37.0) (2026-10-31)
 
 
