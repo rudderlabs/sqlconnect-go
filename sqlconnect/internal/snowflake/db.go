@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/samber/lo"
-	gosnowflake "github.com/snowflakedb/gosnowflake" // snowflake driver
+	gosnowflake "github.com/snowflakedb/gosnowflake/v2" // snowflake driver
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
@@ -37,7 +37,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	sfConfig.Transporter = util.GuardedHTTPTransport(false)
+	sfConfig.Transporter = opaqueTransport{util.GuardedHTTPTransport(false)}
 	db := sql.OpenDB(gosnowflake.NewConnector(gosnowflake.SnowflakeDriver{}, *sfConfig))
 
 	return &DB{

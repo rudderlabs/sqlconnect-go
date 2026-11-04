@@ -230,14 +230,8 @@ func (c *redshiftConnection) executeStatement(ctx context.Context, params *redsh
 	if err != nil {
 		return nil, nil, err
 	}
-	if describeOutput.Status == types.StatusStringAborted {
-		return nil, nil, fmt.Errorf("query aborted: %s", *describeOutput.Error)
-	}
-	if describeOutput.Status == types.StatusStringFailed {
-		return nil, nil, fmt.Errorf("query failed: %s", *describeOutput.Error)
-	}
-	if describeOutput.Status != types.StatusStringFinished {
-		return nil, nil, fmt.Errorf("query status is not finished: %s", describeOutput.Status)
+	if err := statementFailure(describeOutput); err != nil {
+		return nil, nil, err
 	}
 	if !*describeOutput.HasResultSet {
 		return nil, describeOutput, nil
@@ -263,14 +257,8 @@ func (c *redshiftConnection) batchExecuteStatement(ctx context.Context, params *
 	if err != nil {
 		return nil, nil, err
 	}
-	if describeOutput.Status == types.StatusStringAborted {
-		return nil, nil, fmt.Errorf("query aborted: %s", *describeOutput.Error)
-	}
-	if describeOutput.Status == types.StatusStringFailed {
-		return nil, nil, fmt.Errorf("query failed: %s", *describeOutput.Error)
-	}
-	if describeOutput.Status != types.StatusStringFinished {
-		return nil, nil, fmt.Errorf("query status is not finished: %s", describeOutput.Status)
+	if err := statementFailure(describeOutput); err != nil {
+		return nil, nil, err
 	}
 	ps := make([]*redshiftdata.GetStatementResultPaginator, len(params.Sqls))
 	for i, st := range describeOutput.SubStatements {
@@ -286,6 +274,17 @@ func (c *redshiftConnection) batchExecuteStatement(ctx context.Context, params *
 
 func isFinishedStatus(status types.StatusString) bool {
 	return status == types.StatusStringFinished || status == types.StatusStringFailed || status == types.StatusStringAborted
+}
+
+func statementFailure(output *redshiftdata.DescribeStatementOutput) error {
+	switch output.Status {
+	case types.StatusStringFinished:
+		return nil
+	case types.StatusStringFailed, types.StatusStringAborted:
+		return &StatementError{Status: output.Status, Message: aws.ToString(output.Error)}
+	default:
+		return fmt.Errorf("query status is not finished: %s", output.Status)
+	}
 }
 
 // wait for the query to finish using an exponential backoff

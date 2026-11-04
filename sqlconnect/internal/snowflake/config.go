@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/snowflakedb/gosnowflake"
+	"github.com/snowflakedb/gosnowflake/v2"
 	"github.com/youmark/pkcs8"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/util"
@@ -65,7 +65,7 @@ func (c Config) ConnectionString() (dsn string, err error) {
 		Host:               c.Host,
 		Port:               c.Port,
 		Application:        c.Application,
-		LoginTimeout:       c.LoginTimeout, //nolint:staticcheck // SA1019: gosnowflake v1.19.0 has no replacement for the login timeout
+		LoginTimeout:       c.LoginTimeout, //nolint:staticcheck // SA1019: deprecated in v2 pending timeout reorganization; still bounds auth retries
 		Params:             make(map[string]*string),
 		PasscodeInPassword: c.PasscodeInPassword,
 		Passcode:           c.Passcode,

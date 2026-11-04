@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.37.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.37.0...v1.37.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **snowflake:** prevent driver mutation of shared HTTP transport ([#610](https://github.com/rudderlabs/sqlconnect-go/issues/610)) ([88ace8b](https://github.com/rudderlabs/sqlconnect-go/commit/88ace8b139ee92aaa582d02312f2b49df12ae891))
+
+
+### Miscellaneous
+
+* **ci:** move the PR title check to check-pr-title v2.0.3 ([#608](https://github.com/rudderlabs/sqlconnect-go/issues/608)) ([214e4be](https://github.com/rudderlabs/sqlconnect-go/commit/214e4be056c68fa1b651ace7ce355be38d8046ab))
+* **clickhouse:** pin validation for table-level and prefix SELECT ([#596](https://github.com/rudderlabs/sqlconnect-go/issues/596)) ([ad2afbb](https://github.com/rudderlabs/sqlconnect-go/commit/ad2afbb490f3d2b8c4dec7def7fb29bbdcd2eae0))
+
+## [1.37.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.36.0...v1.37.0) (2026-10-31)
+
+
+### Features
+
+* **sqlerr:** report a missing table, schema or database for every driver ([#604](https://github.com/rudderlabs/sqlconnect-go/issues/604)) ([90c93a8](https://github.com/rudderlabs/sqlconnect-go/commit/90c93a83069936f7b92eb40047450de174b1ad13))
+
+## [1.36.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.35.1...v1.36.0) (2026-10-28)
+
+
+### Features
+
+* **snowflake:** migrate driver to v2 and expose error details ([#602](https://github.com/rudderlabs/sqlconnect-go/issues/602)) ([dd3699a](https://github.com/rudderlabs/sqlconnect-go/commit/dd3699af6750a8d9fd213271527ad56af53650ae))
+
+## [1.35.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.35.0...v1.35.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **databricks:** exclude describe metadata from columns ([#603](https://github.com/rudderlabs/sqlconnect-go/issues/603)) ([1ad6327](https://github.com/rudderlabs/sqlconnect-go/commit/1ad63271393a14cd11c7a235f53917a1f4dfe388))
+
 ## [1.35.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.34.0...v1.35.0) (2026-10-20)
 
 

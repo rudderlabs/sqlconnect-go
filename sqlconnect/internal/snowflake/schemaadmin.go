@@ -2,11 +2,9 @@ package snowflake
 
 import (
 	"context"
-	"errors"
-
-	"github.com/snowflakedb/gosnowflake"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/snowflakequery"
 )
 
 // SchemaExists overrides the base implementation to handle nonexistent catalog gracefully
@@ -39,8 +37,9 @@ const (
 )
 
 func isObjectInaccessibleError(err error) bool {
-	if sfErr, ok := errors.AsType[*gosnowflake.SnowflakeError](err); ok {
-		switch sfErr.Number {
+	details, ok := snowflakequery.Describe(err)
+	if ok {
+		switch details.Number {
 		case sfErrObjectNotFound,
 			sfErrInsufficientPrivileges:
 			return true

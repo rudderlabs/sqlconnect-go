@@ -40,3 +40,8 @@
 - `tableFunctionNames` in `sqlconnect/clickhousequery/queryguard.go` must cover every name in `sqlconnect/clickhousequery/testdata/table-functions-26.3.txt` after lower-casing and de-duplication. The file is the output of `SELECT name FROM system.table_functions` on the pinned 26.3 image, and includes mixed-case aliases. `TestQueryGuard_PinnedTableFunctionCatalog` checks coverage. It does not reject extra map entries. When the pinned image changes, regenerate the file from the new image and update the map in the same commit.
 - Before you add or flip a row in `sqlconnect/clickhousequery/testdata/audience-sql.json`, run the SQL through `EXPLAIN AST` on the pinned 26.3 server, for example with `clickhouse local`. Accepted rows must parse, and refused rows must be refused for the stated reason. This check is manual. `TestQueryGuard_SharedCorpus` in `sqlconnect/clickhousequery/queryguard_test.go` only checks the guard against the file.
 - Run `go test`, `make fmt` and `make lint` with `GOTOOLCHAIN=go1.26.0`, the version in `go.mod`.
+## PRO-5968 — Toolchain since go.mod moved to 1.27
+
+<!-- session: 2026-10-28 -->
+
+- `go.mod` says `go 1.27.1`, so the ACT2-766 note about `GOTOOLCHAIN=go1.26.0` is stale: with a local go1.26 and `GOTOOLCHAIN=auto` the 1.27 toolchain is downloaded on first use and `go test`, `make fmt` and `make lint` run as CI does. The `generated files` job runs `make fmt`, whose `go fix ./...` under 1.27 rewrites `var x *T; errors.As(err, &x)` into `errors.AsType[*T](err)`; write `errors.AsType` directly in new code or that job fails on the formatting diff.

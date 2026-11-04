@@ -586,6 +586,36 @@ func TestValidation_ScriptedPass(t *testing.T) {
 	requireStage(t, err, 3, "engine")
 }
 
+func TestValidation_ChecksOnlyTheSetupGrants(t *testing.T) {
+	// A customer may hold SELECT on some tables only, so no other privilege on the customer
+	// database is checked. The integration test pins the warning such a grant raises.
+	wantGrants := []string{
+		"CHECK GRANT SELECT ON `_rudderstack`.*",
+		"CHECK GRANT INSERT ON `_rudderstack`.*",
+		"CHECK GRANT CREATE TABLE ON `_rudderstack`.*",
+		"CHECK GRANT DROP TABLE ON `_rudderstack`.*",
+		"CHECK GRANT ALTER DELETE ON `_rudderstack`.`sync_log`",
+		"CHECK GRANT SELECT ON `analytics`.*",
+	}
+	for _, pruning := range []bool{false, true} {
+		t.Run(fmt.Sprintf("pruning_%t", pruning), func(t *testing.T) {
+			stub := &validationStub{}
+			ctx := sqlconnect.WithValidationOptions(context.Background(), sqlconnect.ValidationOptions{
+				WorkingDatabase: "_rudderstack", SyncLogPruning: pruning,
+			})
+			_, err := stub.db(t, nil, nil).ValidateContext(ctx)
+			require.NoError(t, err)
+			var grants []string
+			for _, q := range stub.queries() {
+				if strings.HasPrefix(q, "CHECK GRANT ") {
+					grants = append(grants, q)
+				}
+			}
+			require.Equal(t, wantGrants, grants)
+		})
+	}
+}
+
 func TestValidation_RudderSchemaOverride(t *testing.T) {
 	stub := validationStub{rudderSchema: "custom_rudder"}
 	db := stub.db(t, nil, nil)
