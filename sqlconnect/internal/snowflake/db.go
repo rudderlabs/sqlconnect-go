@@ -37,7 +37,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	sfConfig.Transporter = util.GuardedHTTPTransport(false)
+	sfConfig.Transporter = opaqueTransport{util.GuardedHTTPTransport(false)}
 	db := sql.OpenDB(gosnowflake.NewConnector(gosnowflake.SnowflakeDriver{}, *sfConfig))
 
 	return &DB{
