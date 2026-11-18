@@ -3,6 +3,7 @@ package maxcompute
 import (
 	"encoding/base64"
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
@@ -41,16 +42,22 @@ func canonicalType(databaseTypeName string) string {
 
 func columnTypeMapper(c base.ColumnType) string { return canonicalType(c.DatabaseTypeName()) }
 
-// jsonRowMapper shapes a scanned value for JSON: DECIMAL digits as a JSON
-// number, JSON and complex columns as raw JSON, BINARY as base64.
+// jsonRowMapper shapes a scanned value for JSON: DECIMAL as a float64, JSON and complex columns as raw JSON, BINARY as base64.
 func jsonRowMapper(databaseTypeName string, value any) any {
 	if value == nil {
 		return nil
 	}
 	switch baseTypeName(databaseTypeName) {
 	case "DECIMAL":
+		// A float, as Snowflake, BigQuery, Databricks, Redshift, Postgres and
+		// Trino map DECIMAL/NUMERIC: payloads match across warehouses. Digits
+		// beyond float64 precision (15 to 17) are lost; Scan into a string for
+		// the exact value.
 		if s, ok := value.(string); ok {
-			return json.Number(s)
+			if f, err := strconv.ParseFloat(s, 64); err == nil {
+				return f
+			}
+			return s
 		}
 	case "JSON", "ARRAY", "MAP", "STRUCT":
 		if b, ok := value.([]byte); ok {

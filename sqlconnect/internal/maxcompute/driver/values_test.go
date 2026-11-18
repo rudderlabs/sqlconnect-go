@@ -42,6 +42,7 @@ func TestConvertValue(t *testing.T) {
 		{data.Int(3), int64(3)},
 		{data.BigInt(4), int64(4)},
 		{data.Double(1.1), 1.1},
+		{data.Float(1.1), 1.1},
 		{data.NewDecimal(38, 18, "12345678901234567890.123456789012345678"), "12345678901234567890.123456789012345678"},
 		{data.String("s"), "s"},
 		{vc, "v"},

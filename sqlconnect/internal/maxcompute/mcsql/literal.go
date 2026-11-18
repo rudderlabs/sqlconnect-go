@@ -15,15 +15,28 @@ var (
 	// ErrUnsupportedValue is returned for a value the renderer cannot render
 	// safely. The error never prints the value.
 	ErrUnsupportedValue = errors.New("unsupported bind value")
-	// ErrTimeValue is returned for a time.Time: without a time-zone hint a
-	// string cast to TIMESTAMP is read in the project's zone, so no literal form
-	// is exact yet (LLD section 5, open for v1.1).
-	ErrTimeValue = errors.New("time.Time bind values are not supported: format the value as text")
+	// ErrTimeValue is returned for a bare time.Time: without a time-zone hint
+	// a string cast to TIMESTAMP is read in the project's zone, so the caller
+	// must say which column type the value is for.
+	ErrTimeValue = errors.New("a time.Time bind value must say its column type: wrap it in TimestampNTZ or TimestampInstant")
+	// ErrTimePrecision is returned for a TimestampInstant below milliseconds,
+	// which the exact epoch form cannot hold.
+	ErrTimePrecision = errors.New("a TimestampInstant holds milliseconds at most")
 	// ErrInvalidUTF8 is returned for a string that is not valid UTF-8.
 	ErrInvalidUTF8 = errors.New("string bind value is not valid UTF-8")
 	// ErrNonFinite is returned for NaN and the infinities.
 	ErrNonFinite = errors.New("non-finite float bind value")
 )
+
+// TimestampNTZ is a time for a TIMESTAMP_NTZ column. It renders as the UTC
+// wall time cast to TIMESTAMP_NTZ, exact to the nanosecond in every project
+// time zone (findings 16).
+type TimestampNTZ time.Time
+
+// TimestampInstant is an instant for a TIMESTAMP or DATETIME column. It renders
+// as FROM_UTC_TIMESTAMP(<epoch ms>L, 'UTC'), exact in every project time zone
+// but at millisecond precision; a finer value is refused, not truncated.
+type TimestampInstant time.Time
 
 // RenderLiteral renders v as a MaxCompute SQL literal. MaxCompute has no
 // server-side binds, so every bind argument and every literal a caller builds
@@ -38,8 +51,9 @@ var (
 //   - floats: the shortest exact form, with .0 or an exponent so it stays DOUBLE
 //   - bool: TRUE or FALSE
 //   - []byte: UNHEX('…')
+//   - TimestampNTZ, TimestampInstant: see their types
 //
-// Anything else, time.Time included, is refused; nothing is rendered with %v.
+// Anything else, a bare time.Time included, is refused; nothing is rendered with %v.
 func RenderLiteral(v any) (string, error) {
 	switch x := v.(type) {
 	case nil:
@@ -80,6 +94,14 @@ func RenderLiteral(v any) (string, error) {
 			return "NULL", nil
 		}
 		return "UNHEX('" + strings.ToUpper(hex.EncodeToString(x)) + "')", nil
+	case TimestampNTZ:
+		return "CAST('" + time.Time(x).UTC().Format("2006-01-02 15:04:05.999999999") + "' AS TIMESTAMP_NTZ)", nil
+	case TimestampInstant:
+		t := time.Time(x)
+		if t.Nanosecond()%int(time.Millisecond) != 0 {
+			return "", ErrTimePrecision
+		}
+		return fmt.Sprintf("FROM_UTC_TIMESTAMP(%dL, 'UTC')", t.UnixMilli()), nil
 	case time.Time, *time.Time:
 		return "", ErrTimeValue
 	default:

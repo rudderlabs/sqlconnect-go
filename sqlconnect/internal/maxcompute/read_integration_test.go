@@ -151,8 +151,17 @@ func TestIntegrationRead(t *testing.T) {
 		var s sql.NullString
 		err := db.QueryRowContext(ctx, `SELECT CAST('中文中文' AS VARCHAR(5)) AS v`).Scan(&s)
 		require.ErrorContains(t, err, "longer in bytes than its declared length")
+		require.ErrorContains(t, err, "cast the column to STRING")
+		require.ErrorContains(t, err, "(column v)")
+		// Arabic letters are 2 bytes each in UTF-8.
+		err = db.QueryRowContext(ctx, `SELECT CAST('مرحبا' AS VARCHAR(5)) AS greeting`).Scan(&s)
+		require.ErrorContains(t, err, "(column greeting)")
+		err = db.QueryRowContext(ctx, `SELECT CAST('مرحبا' AS CHAR(5)) AS c`).Scan(&s)
+		require.ErrorContains(t, err, "longer in bytes than its declared length")
 		require.NoError(t, db.QueryRowContext(ctx, `SELECT CAST('中文' AS VARCHAR(6)) AS v`).Scan(&s))
 		require.Equal(t, "中文", s.String)
+		require.NoError(t, db.QueryRowContext(ctx, `SELECT CAST('مرحبا' AS STRING) AS v`).Scan(&s))
+		require.Equal(t, "مرحبا", s.String)
 	})
 
 	t.Run("bind arguments round trip", func(t *testing.T) {
@@ -192,6 +201,24 @@ func TestIntegrationRead(t *testing.T) {
 		require.Equal(t, 1.0, out[8])
 		require.Equal(t, true, out[9])
 		require.Equal(t, []byte{0, 1, 0xff}, out[10])
+	})
+
+	t.Run("time wrappers are exact without a time-zone hint", func(t *testing.T) {
+		ns := time.Date(2026, 11, 18, 10, 0, 0, 123456789, time.UTC)
+		ms := time.UnixMilli(1763460000123).UTC()
+		var ntz, inst time.Time
+		var same bool
+		require.NoError(t, db.QueryRowContext(ctx, "SELECT ?, ?, ? = CAST('2026-11-18 10:00:00.123456789' AS TIMESTAMP_NTZ)",
+			maxcomputequery.TimestampNTZ(ns), maxcomputequery.TimestampInstant(ms), maxcomputequery.TimestampNTZ(ns)).Scan(&ntz, &inst, &same))
+		require.Equal(t, ns, ntz)
+		require.Equal(t, ms, inst)
+		require.True(t, same)
+		rows, err := db.QueryContext(ctx, "SELECT ?", ns)
+		if err == nil {
+			_ = rows.Close()
+			require.NoError(t, rows.Err())
+		}
+		require.ErrorIs(t, err, maxcomputequery.ErrTimeValue)
 	})
 
 	t.Run("a script that ends in a SELECT returns its rows", func(t *testing.T) {

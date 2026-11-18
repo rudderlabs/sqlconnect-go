@@ -45,6 +45,9 @@ func TestRenderLiteral(t *testing.T) {
 		{float32(0.1), "0.1"},
 		{[]byte{0x00, 0xab}, "UNHEX('00AB')"},
 		{[]byte(nil), "NULL"},
+		{TimestampNTZ(time.Date(2026, 11, 18, 15, 30, 0, 123456789, time.FixedZone("x", 5*3600+1800))), "CAST('2026-11-18 10:00:00.123456789' AS TIMESTAMP_NTZ)"},
+		{TimestampNTZ(time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)), "CAST('2026-11-18 10:00:00' AS TIMESTAMP_NTZ)"},
+		{TimestampInstant(time.UnixMilli(1763460000123)), "FROM_UTC_TIMESTAMP(1763460000123L, 'UTC')"},
 	}
 	for _, c := range cases {
 		got, err := RenderLiteral(c.in)
@@ -62,6 +65,7 @@ func TestRenderLiteral(t *testing.T) {
 		{uint64(math.MaxUint64), ErrUnsupportedValue},
 		{time.Now(), ErrTimeValue},
 		{"\xff", ErrInvalidUTF8},
+		{TimestampInstant(time.Unix(0, 1)), ErrTimePrecision},
 		{struct{ Secret string }{"SENTINEL"}, ErrUnsupportedValue},
 		{[]string{"a"}, ErrUnsupportedValue},
 	} {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcerr"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcsql"
 )
 
 type conn struct {
@@ -49,7 +50,7 @@ func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
 	case nil, string, bool, []byte,
 		int, int8, int16, int32, int64,
 		uint, uint8, uint16, uint32, uint64,
-		float32, float64:
+		float32, float64, mcsql.TimestampNTZ, mcsql.TimestampInstant:
 		return nil
 	}
 	return driver.ErrSkip

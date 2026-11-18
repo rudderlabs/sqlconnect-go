@@ -32,6 +32,10 @@ func classifyText(text string) classification {
 	case strings.Contains(text, "ODPS-0121145"):
 		// A runtime overflow is reported inside an 0130071 plan failure.
 		c.category, c.code = CategoryData, "ODPS-0121145"
+	case strings.HasPrefix(code, "ODPS-0121"):
+		// Other runtime data errors, such as 0121011 for an invalid regular
+		// expression built from row values: a rerun fails the same way.
+		c.category = CategoryData
 	case code == "ODPS-0130131":
 		c.category = CategoryNotFound
 	case code == "ODPS-0130013", code == "ODPS-0420095":

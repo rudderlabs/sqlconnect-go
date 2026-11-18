@@ -43,7 +43,10 @@ func convertValue(v data.Data) (any, error) {
 	case data.BigInt:
 		return int64(x), nil
 	case data.Float:
-		return float64(x), nil
+		// The shortest float32 form, so FLOAT 1.1 reads 1.1 and not
+		// 1.100000023841858, as ClickHouse's Float32 does.
+		f, _ := strconv.ParseFloat(strconv.FormatFloat(float64(x), 'g', -1, 32), 64)
+		return f, nil
 	case data.Double:
 		return float64(x), nil
 	case *data.Decimal:

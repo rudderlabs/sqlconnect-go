@@ -78,7 +78,7 @@ func TestMappings(t *testing.T) {
 	} {
 		require.Equal(t, want, canonicalType(raw), raw)
 	}
-	require.Equal(t, json.Number("1.10"), jsonRowMapper("DECIMAL(10,2)", "1.10"))
+	require.Equal(t, 1.1, jsonRowMapper("DECIMAL(10,2)", "1.10"))
 	require.Equal(t, "AAE=", jsonRowMapper("BINARY", []byte{0, 1}))
 	require.Equal(t, json.RawMessage(`{"a":1}`), jsonRowMapper("STRUCT<`a`:INT>", []byte(`{"a":1}`)))
 	require.Nil(t, jsonRowMapper("STRING", nil))

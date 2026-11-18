@@ -64,6 +64,7 @@ func TestClassifyAndRedact(t *testing.T) {
 		{"job: union", errors.New("ODPS-0130241:[1,32] Illegal union operation - type mismatch for column 0 of UNION"), CategorySemantic, "ODPS-0130241", false},
 		{"job: exists", errors.New("ODPS-0130211:[1,14] Table or view already exists - table or view p.s.t is already defined"), CategoryAlreadyExists, "ODPS-0130211", false},
 		{"job: overflow", errors.New("ODPS-0130071:[0,0] Semantic analysis exception - physical plan generation failed: SQL Runtime Unretryable Error: ODPS-0121145:Data overflow - 1 / 0"), CategoryData, "ODPS-0121145", false},
+		{"job: runtime regex", errors.New("ODPS-0121011: Invalid regular expression pattern - in function REGEXP_REPLACE, regular expression call failed"), CategoryData, "ODPS-0121011", false},
 		{"job: cancelled", errors.New("ODPS-0424171: Instance is cancelled - 20261118124958506g4yzs7rdtm84"), CategoryCancelled, "ODPS-0424171", false},
 		{"job: internal", errors.New("ODPS-0010000:System internal error - Null data task in Plan"), CategoryUnknown, "ODPS-0010000", true},
 		{"job: debug tail", errors.New("ODPS-0420111: Project not found - 'p'.\nDebugingInfo amF2YS5sYW5nLlJ1bnRpbWVFeGNlcHRpb246IE9EUFMtMDQyMDExMTog"), CategoryProjectNotFound, "ODPS-0420111", false},
