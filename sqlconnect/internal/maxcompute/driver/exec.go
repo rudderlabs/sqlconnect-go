@@ -115,6 +115,9 @@ func (c *Connector) submit(ctx context.Context, text string) (*odps.Instance, er
 		return s.inst, nil
 	case <-ctx.Done():
 		terminateWait := c.cfg.TerminateWait
+		// The SDK's own submit retries HTTP 409 for up to 180 s without exposing
+		// the instance id, so a job whose submit finally fails cannot be
+		// terminated here; the caller already sees OutcomeUnknown.
 		go func() {
 			if s := <-done; s.err == nil && s.inst != nil {
 				stop(context.Background(), s.inst, terminateWait, c.cfg.PollInitial)
@@ -262,11 +265,8 @@ func stopInstance(ctx context.Context, inst *odps.Instance, wait, interval time.
 	defer cancel()
 	err := call(ctx, inst.Terminate)
 	if err != nil {
-		if httpErr, ok := httpError(err); ok {
-			switch httpErr.StatusCode {
-			case http.StatusConflict, http.StatusNotFound:
-				return sqlconnect.StopMissed, nil
-			}
+		if alreadyEnded(err) {
+			return sqlconnect.StopMissed, nil
 		}
 		return sqlconnect.StopError, mcerr.FromSDK(err).WithInstance(inst.Id())
 	}
@@ -288,6 +288,27 @@ func stopInstance(ctx context.Context, inst *odps.Instance, wait, interval time.
 			return sqlconnect.StopError, mcerr.Local(mcerr.CategoryUnknown, "the terminated job did not end in time").WithInstance(inst.Id())
 		}
 	}
+}
+
+// alreadyEnded reports a Terminate answer that means the job is not running:
+// HTTP 409 InvalidStateSetting "from [Terminated] to [Terminated]", or HTTP 404
+// for an instance that does not exist. Any other 409 is a failed terminate.
+func alreadyEnded(err error) bool {
+	httpErr, ok := httpError(err)
+	if !ok {
+		return false
+	}
+	msg := httpErr.ErrorMessage
+	if msg == nil {
+		msg = restclient.NewErrorMessage(httpErr.Body)
+	}
+	switch httpErr.StatusCode {
+	case http.StatusConflict:
+		return msg != nil && msg.ErrorCode == "InvalidStateSetting" && strings.Contains(msg.Message, "[Terminated] to [Terminated]")
+	case http.StatusNotFound:
+		return true
+	}
+	return false
 }
 
 func httpError(err error) (restclient.HttpError, bool) {

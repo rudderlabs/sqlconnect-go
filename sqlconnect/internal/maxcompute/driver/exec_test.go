@@ -181,6 +181,13 @@ func TestStopInstance(t *testing.T) {
 	require.NoError(t, err, "a second terminate is a no-op")
 	require.Equal(t, sqlconnect.StopMissed, outcome)
 
+	f.set(func(f *fakeODPS) {
+		f.terminateBody = `<?xml version="1.0" encoding="UTF-8"?><Error><Code>ConcurrentModification</Code><Message><![CDATA[busy]]></Message></Error>`
+	})
+	outcome, err = StopInstance(context.Background(), f.client(), "inst1", time.Second)
+	require.Error(t, err, "another 409 is a failed terminate")
+	require.Equal(t, sqlconnect.StopError, outcome)
+
 	outcome, err = StopInstance(context.Background(), f.client(), "", time.Second)
 	require.Error(t, err)
 	require.Equal(t, sqlconnect.StopError, outcome)

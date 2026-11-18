@@ -37,6 +37,8 @@ type fakeODPS struct {
 	syncResult string
 	// terminateStatus answers terminate calls; 0 means 200.
 	terminateStatus int
+	// terminateBody is the error body of a refused terminate.
+	terminateBody string
 	// pollFailures makes the first n polls fail at the transport.
 	pollFailures int
 	// pollDelay delays each poll answer.
@@ -136,7 +138,11 @@ func (f *fakeODPS) serve(w http.ResponseWriter, r *http.Request) {
 		f.terminates++
 		if f.terminateStatus != 0 {
 			w.WriteHeader(f.terminateStatus)
-			_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>InvalidStateSetting</Code><Message><![CDATA[Status can not be set from [Terminated] to [Terminated]]]></Message></Error>`)
+			body := f.terminateBody
+			if body == "" {
+				body = `<?xml version="1.0" encoding="UTF-8"?><Error><Code>InvalidStateSetting</Code><Message><![CDATA[Status can not be set from [Terminated] to [Terminated]]]></Message></Error>`
+			}
+			_, _ = io.WriteString(w, body)
 			return
 		}
 		f.terminated = true
