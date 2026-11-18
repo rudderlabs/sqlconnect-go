@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/url"
 	"reflect"
-	"strings"
+	"regexp"
 	"sync"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps"
@@ -44,21 +44,23 @@ func (c *Connector) tunnel(ctx context.Context) (*tunnel.Tunnel, error) {
 	return c.tun, nil
 }
 
-// checkTunnelEndpoint accepts only an https endpoint on an Alibaba Cloud host:
-// the tunnel endpoint comes from the server, and every download request is
-// signed with the account's key.
+// checkTunnelEndpoint accepts only an https MaxCompute host with no port,
+// user or path, such as https://dt.us-west-1.maxcompute.aliyun.com: the tunnel
+// endpoint comes from the server, and every download request is signed with
+// the account's key.
 func checkTunnelEndpoint(endpoint string) error {
 	u, err := url.Parse(endpoint)
 	bad := mcerr.Local(mcerr.CategoryBadEndpoint, "the project returned an unexpected tunnel endpoint")
-	if err != nil || u.Scheme != "https" || u.User != nil {
+	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" {
 		return bad
 	}
-	host := u.Hostname()
-	if !strings.HasSuffix(host, ".aliyun.com") && !strings.HasSuffix(host, ".aliyuncs.com") {
+	if !tunnelHostPattern.MatchString(u.Host) {
 		return bad
 	}
 	return nil
 }
+
+var tunnelHostPattern = regexp.MustCompile(`^[a-z0-9-]+(\.[a-z0-9-]+)*\.maxcompute\.aliyun\.com$`)
 
 // openRows opens an Instance Tunnel download session for the job's result.
 // It never sets EnableLimit, which caps a result at 10,000 rows.
@@ -165,12 +167,12 @@ func (r *rows) readRange(session *tunnel.InstanceResultDownloadSession, start, n
 			return false
 		}
 	}
-	reader, err := session.OpenRecordReader(start, n, 0, nil)
+	reader, err := r.open(session, start, n)
 	if err != nil {
-		send(item{err: mcerr.FromSDK(err).WithInstance(r.instanceID)})
+		send(item{err: err})
 		return
 	}
-	if !r.track(reader) {
+	if reader == nil || !r.track(reader) {
 		return
 	}
 	got := 0
@@ -190,6 +192,35 @@ func (r *rows) readRange(session *tunnel.InstanceResultDownloadSession, start, n
 		if !send(item{record: rec}) {
 			return
 		}
+	}
+}
+
+// open opens a range reader. The open is an HTTP request without a timeout, so
+// it runs aside: when the rows stop first, open returns nil and the reader that
+// may still arrive is closed.
+func (r *rows) open(session *tunnel.InstanceResultDownloadSession, start, n int) (*tunnel.RecordProtocReader, error) {
+	type opened struct {
+		reader *tunnel.RecordProtocReader
+		err    error
+	}
+	done := make(chan opened, 1)
+	go func() {
+		reader, err := session.OpenRecordReader(start, n, 0, nil)
+		done <- opened{reader, err}
+	}()
+	select {
+	case o := <-done:
+		if o.err != nil {
+			return nil, r.readError(o.err)
+		}
+		return o.reader, nil
+	case <-r.done:
+		go func() {
+			if o := <-done; o.reader != nil {
+				_ = o.reader.Close()
+			}
+		}()
+		return nil, nil //nolint:nilnil // the rows stopped; there is nothing to read
 	}
 }
 

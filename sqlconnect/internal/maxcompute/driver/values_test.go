@@ -90,9 +90,13 @@ func TestConvertComplex(t *testing.T) {
 }
 
 func TestCheckTunnelEndpoint(t *testing.T) {
-	require.NoError(t, checkTunnelEndpoint("https://dt.me-east-1.maxcompute.aliyun.com"))
-	require.NoError(t, checkTunnelEndpoint("https://dt.cn-shanghai-intranet.maxcompute.aliyun-inc.aliyuncs.com"))
-	for _, bad := range []string{"http://dt.me-east-1.maxcompute.aliyun.com", "https://evil.example.com", "https://u:p@dt.aliyun.com", "https://aliyun.com.evil.io", "::"} {
+	require.NoError(t, checkTunnelEndpoint("https://dt.us-west-1.maxcompute.aliyun.com"))
+	require.NoError(t, checkTunnelEndpoint("https://dt.me-east-1.maxcompute.aliyun.com/"))
+	for _, bad := range []string{
+		"http://dt.me-east-1.maxcompute.aliyun.com", "https://evil.example.com", "https://u:p@dt.maxcompute.aliyun.com",
+		"https://maxcompute.aliyun.com.evil.io", "https://bucket.oss-cn-hangzhou.aliyuncs.com", "https://dt.x.maxcompute.aliyun.com:8443",
+		"https://dt.x.maxcompute.aliyun.com/other", "https://DT.X.maxcompute.aliyun.com", "::",
+	} {
 		require.Error(t, checkTunnelEndpoint(bad), bad)
 	}
 }
