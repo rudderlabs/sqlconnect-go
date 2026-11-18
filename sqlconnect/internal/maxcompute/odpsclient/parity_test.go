@@ -35,6 +35,29 @@ func TestParityWithDestination(t *testing.T) {
 	}
 }
 
+// notCopied are the destination declarations the source deliberately does not
+// copy: the destination's own statement loop and readback, which the driver
+// replaces with its context-aware poll loop and Instance Tunnel reads.
+var notCopied = map[string]bool{
+	"odpsQueryTimeout": true, "RunSQL": true, "odpsTaskFailure": true, "Query": true, "odpsQueryHints": true,
+}
+
+// TestParityNoNewDestinationCode fails when the destination gains a
+// declaration that the source neither copies nor lists in notCopied, so a new
+// redaction pattern or helper there is not missed here.
+func TestParityNoNewDestinationCode(t *testing.T) {
+	for _, pair := range []struct{ ours, theirs string }{
+		{"odps.go", "testdata/destination/odps.go.txt"},
+		{"odps_credentials.go", "testdata/destination/odps_credentials.go.txt"},
+	} {
+		ours := declarations(t, pair.ours)
+		for name := range declarations(t, pair.theirs) {
+			_, copied := ours[name]
+			require.Truef(t, copied || notCopied[name], "the destination's %s declares %s: copy it into %s or list it in notCopied", pair.theirs, name, pair.ours)
+		}
+	}
+}
+
 // TestParityCoversThePatterns pins the redaction patterns by name, so a pattern
 // moved out of odps.go is noticed rather than silently dropped from the parity check.
 func TestParityCoversThePatterns(t *testing.T) {

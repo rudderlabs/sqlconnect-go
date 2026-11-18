@@ -51,6 +51,11 @@ type Config struct {
 // Parse parses and validates the given JSON. Unknown keys fail the parse. No
 // error names a value, because a mistyped key can carry a pasted secret.
 func (c *Config) Parse(configJSON json.RawMessage) error {
+	// encoding/json matches keys case-insensitively and lets a duplicate key
+	// overwrite an earlier one, so the exact key set is checked first.
+	if err := checkKeys(configJSON); err != nil {
+		return err
+	}
 	dec := json.NewDecoder(bytes.NewReader(configJSON))
 	dec.DisallowUnknownFields()
 	var parsed Config
@@ -64,6 +69,39 @@ func (c *Config) Parse(configJSON json.RawMessage) error {
 		return err
 	}
 	*c = parsed
+	return nil
+}
+
+// configKeys are the exact keys of the account contract.
+var configKeys = map[string]bool{
+	"endpoint": true, "project": true, "accessKeyId": true, "accessKeySecret": true,
+	"schema": true, "roleArn": true, "externalId": true,
+}
+
+// checkKeys refuses a top-level key that is not spelled exactly as in the
+// contract, and a key that appears twice.
+func checkKeys(configJSON json.RawMessage) error {
+	invalid := errors.New("maxcompute: invalid config: it must be a JSON object with the keys endpoint, project, accessKeyId, accessKeySecret and optionally schema, each once")
+	dec := json.NewDecoder(bytes.NewReader(configJSON))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return invalid
+	}
+	seen := map[string]bool{}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return invalid
+		}
+		key, ok := tok.(string)
+		if !ok || !configKeys[key] || seen[key] {
+			return invalid
+		}
+		seen[key] = true
+		var skip json.RawMessage
+		if err := dec.Decode(&skip); err != nil {
+			return invalid
+		}
+	}
 	return nil
 }
 
