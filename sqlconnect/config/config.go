@@ -5,6 +5,7 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/clickhouse"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/databricks"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/fabric"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/mysql"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/postgres"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift"
@@ -17,6 +18,7 @@ type (
 	ClickHouse   = clickhouse.Config
 	Databricks   = databricks.Config
 	Fabric       = fabric.Config
+	MaxCompute   = maxcompute.Config
 	Mysql        = mysql.Config
 	Postgres     = postgres.Config
 	Redshift     = redshift.PostgresConfig
