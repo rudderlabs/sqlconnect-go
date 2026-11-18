@@ -53,6 +53,7 @@ const (
 	keyScript ctxKey = iota + 1
 	keyHints
 	keyInstanceID
+	keyRowCount
 )
 
 // WithScript marks ctx so that the next statement runs as one script job
@@ -90,6 +91,18 @@ func WithHints(ctx context.Context, hints map[string]string) (context.Context, e
 // stop it with StopQuery.
 func WithInstanceIDHandler(ctx context.Context, fn func(instanceID string)) context.Context {
 	return context.WithValue(ctx, keyInstanceID, fn)
+}
+
+// WithRowCountHandler returns a context that calls fn with the number of rows
+// the server reports for a query's result, when the result is opened. A caller
+// compares it with the rows it consumed: a silent cut must fail the run.
+func WithRowCountHandler(ctx context.Context, fn func(rows int64)) context.Context {
+	return context.WithValue(ctx, keyRowCount, fn)
+}
+
+func rowCountHandler(ctx context.Context) func(int64) {
+	v, _ := ctx.Value(keyRowCount).(func(int64))
+	return v
 }
 
 func isScript(ctx context.Context) bool {

@@ -19,7 +19,26 @@ var (
 	_ driver.Pinger             = (*conn)(nil)
 	_ driver.ExecerContext      = (*conn)(nil)
 	_ driver.NamedValueChecker  = (*conn)(nil)
+	_ driver.QueryerContext     = (*conn)(nil)
 )
+
+// QueryContext runs one statement, or one script that ends in a SELECT, as one
+// job and streams its rows through the Instance Tunnel.
+func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	text, err := bind(query, args)
+	if err != nil {
+		return nil, err
+	}
+	text, err = prepareText(ctx, text)
+	if err != nil {
+		return nil, err
+	}
+	inst, err := c.connector.run(ctx, text)
+	if err != nil {
+		return nil, err
+	}
+	return c.connector.openRows(ctx, inst)
+}
 
 // CheckNamedValue passes the values the literal renderer handles through
 // unchanged, and lets database/sql convert anything else (a driver.Valuer, a

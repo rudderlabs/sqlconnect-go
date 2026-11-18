@@ -45,3 +45,10 @@ func WithInstanceIDHandler(ctx context.Context, fn func(instanceID string)) cont
 
 // FixedHints returns a copy of the hints the driver sends on every job.
 func FixedHints() map[string]string { return driver.FixedHints() }
+
+// WithRowCountHandler calls fn with the number of rows the server reports for
+// a query's result when the result is opened, so the caller can compare it
+// with the rows it consumed.
+func WithRowCountHandler(ctx context.Context, fn func(rows int64)) context.Context {
+	return driver.WithRowCountHandler(ctx, fn)
+}

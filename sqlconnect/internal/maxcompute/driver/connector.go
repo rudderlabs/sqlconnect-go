@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps"
+	"github.com/aliyun/aliyun-odps-go-sdk/odps/tunnel"
 )
 
 // Config configures a [Connector].
@@ -25,6 +27,14 @@ type Config struct {
 	// PollRetries is the number of consecutive transport failures a poll
 	// survives. The poll is retried, never the job. Default 5.
 	PollRetries int
+
+	// RangeThreshold is the result size above which ReadParallelism readers
+	// read consecutive ranges of one download session. Default 200,000.
+	RangeThreshold int
+	// ReadParallelism is the number of ranged readers. Default 4.
+	ReadParallelism int
+	// RangeBufferRows bounds the records each ranged reader buffers. Default 10,000.
+	RangeBufferRows int
 }
 
 func (c *Config) applyDefaults() {
@@ -39,6 +49,15 @@ func (c *Config) applyDefaults() {
 	}
 	if c.PollRetries <= 0 {
 		c.PollRetries = 5
+	}
+	if c.RangeThreshold <= 0 {
+		c.RangeThreshold = 200_000
+	}
+	if c.ReadParallelism <= 0 {
+		c.ReadParallelism = 4
+	}
+	if c.RangeBufferRows <= 0 {
+		c.RangeBufferRows = 10_000
 	}
 }
 
@@ -55,6 +74,9 @@ func NewConnector(cfg Config) (driver.Connector, error) {
 // no session, so a connection holds no server state.
 type Connector struct {
 	cfg Config
+
+	tunnelMu sync.Mutex
+	tun      *tunnel.Tunnel
 }
 
 // Connect returns a new connection.
