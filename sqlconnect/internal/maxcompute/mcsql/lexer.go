@@ -18,7 +18,7 @@ const (
 	String
 	// Quoted is a backtick-quoted identifier. MaxCompute has no escape inside it.
 	Quoted
-	// LineComment is a -- comment up to the end of the line.
+	// LineComment is a -- comment up to the end of the line, \n or \r.
 	LineComment
 	// BlockComment is a /* … */ comment.
 	BlockComment
@@ -79,7 +79,9 @@ func Scan(sql string) ([]Token, error) {
 			emit(Quoted, i, i+1+end+1)
 			i = i + 1 + end + 1
 		case c == '-' && i+1 < len(sql) && sql[i+1] == '-':
-			end := strings.IndexByte(sql[i:], '\n')
+			// A line comment also ends at \r: ending it early can only make the
+			// driver see more code than the server does, which refuses more.
+			end := strings.IndexAny(sql[i:], "\n\r")
 			if end < 0 {
 				end = len(sql)
 			} else {

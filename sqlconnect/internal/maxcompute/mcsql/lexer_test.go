@@ -25,6 +25,7 @@ func TestScan(t *testing.T) {
 	require.Equal(t, []Kind{Word, String, String}, kinds(t, `select 'it''s'`), "'' is two adjacent literals")
 	require.Equal(t, []Kind{Word, Quoted}, kinds(t, "select `a;?'b`"))
 	require.Equal(t, []Kind{Word, Word, LineComment, Word}, kinds(t, "select a -- x; ? 'y\nfrom"))
+	require.Equal(t, []Kind{Word, Word, LineComment, Word}, kinds(t, "select a -- x\rfrom"), "\r ends a line comment")
 	require.Equal(t, []Kind{Word, BlockComment, Word}, kinds(t, "select /* ; ? ' */ a"))
 	require.Equal(t, []Kind{Word, Hint, Word}, kinds(t, "select /*+ mapjoin(a) */ a"))
 	require.Equal(t, []Kind{Punct, Word, Punct, Punct, Word}, kinds(t, "@v := select"))

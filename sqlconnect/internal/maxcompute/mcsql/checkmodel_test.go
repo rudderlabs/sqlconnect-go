@@ -62,6 +62,8 @@ func TestCheckModelSQL(t *testing.T) {
 		"SELECT `unterminated",
 		"SELECT /* unterminated",
 		"SELECT 'it\\'s' ; DROP TABLE t",
+		"SELECT 1; -- hide\rDROP TABLE sensitive;",
+		"SELECT 1 -- hide\rUNION ALL SELECT 2; DROP TABLE t",
 	}
 	for _, sql := range refuse {
 		err := CheckModelSQL(sql)
