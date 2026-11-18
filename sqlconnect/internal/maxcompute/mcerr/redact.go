@@ -4,6 +4,8 @@ import (
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/odpsclient"
 )
 
 // The source's redaction beyond the destination's SafeError patterns: STS
@@ -43,6 +45,9 @@ func Redact(text string) string {
 	text = keyIDFoundPattern.ReplaceAllString(text, "${1}[credential]")
 	text = contextIDPattern.ReplaceAllString(text, "${1}[redacted]")
 	text = principalPattern.ReplaceAllString(text, "[principal]")
+	// The destination's patterns run last: they rewrite "accessKeyId=…",
+	// which the echo patterns above key on.
+	text = odpsclient.Scrub(text)
 	if utf8.RuneCountInString(text) > maxMessageRunes {
 		text = string([]rune(text)[:maxMessageRunes])
 	}

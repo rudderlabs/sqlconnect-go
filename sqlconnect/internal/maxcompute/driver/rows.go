@@ -311,7 +311,7 @@ func (r *rows) Next(dest []driver.Value) error {
 			v, err := convertValue(it.record[i])
 			if err != nil {
 				if e, ok := errors.AsType[*mcerr.Error](err); ok {
-					return &mcerr.Error{Category: e.Category, Message: e.Message + " (column " + r.names[i] + ")", InstanceID: r.instanceID}
+					return mcerr.Local(e.Category, e.Message+" (column "+r.names[i]+")").WithInstance(r.instanceID)
 				}
 				return err
 			}

@@ -89,7 +89,7 @@ func TestRedact(t *testing.T) {
 	for in, want := range map[string]string{
 		"accessKeyId not found: " + fakeSTSID:                  "accessKeyId not found: [credential]",
 		"AccessKeyId '" + fakePlainID + "' is invalid.":        "AccessKeyId '[credential]' is invalid.",
-		"accessKeyId=<redacted> found: " + fakePlainID:         "accessKeyId=<redacted> found: [credential]",
+		"accessKeyId=<redacted> found: " + fakePlainID:         "[credential] found: [credential]",
 		"token " + fakeSTSID + " expired":                      "token [credential] expired",
 		"Deny as default. Context ID:" + fakeContextID + ".":   "Deny as default. Context ID:[redacted].",
 		"principal " + fakePrincipal + " denied":               "principal [principal] denied",
@@ -113,4 +113,18 @@ func TestContextAndSubmit(t *testing.T) {
 	require.True(t, lost.OutcomeUnknown, "a lost response may have created the job")
 	require.False(t, lost.Retryable)
 	require.EqualValues(t, 130131, ServerCode("ODPS-0130131"))
+
+	timeout := FromSDK(&url.Error{Op: "Get", URL: "https://x", Err: timeoutErr{}})
+	require.Contains(t, timeout.Message, "timed out", "a timeout keeps its diagnostic")
+
+	local := Local(CategoryRefused, "invalid relation name https://x/"+fakeSTSID+" "+strings.Repeat("a", 600))
+	require.NotContains(t, local.Error(), fakeSTSID)
+	require.NotContains(t, local.Error(), "https://")
+	require.LessOrEqual(t, len([]rune(local.Message)), 512)
 }
+
+type timeoutErr struct{}
+
+func (timeoutErr) Error() string   { return "i/o timeout" }
+func (timeoutErr) Timeout() bool   { return true }
+func (timeoutErr) Temporary() bool { return true }

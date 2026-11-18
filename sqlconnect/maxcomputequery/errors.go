@@ -45,7 +45,7 @@ func Describe(err error) (Details, bool) {
 		return Details{}, false
 	}
 	return Details{
-		Category: e.Category, Code: e.Code, Message: e.Message, InstanceID: e.InstanceID,
+		Category: e.Category, Code: e.Code, Message: mcerr.Redact(e.Message), InstanceID: e.InstanceID,
 		Retryable: e.Retryable, OutcomeUnknown: e.OutcomeUnknown,
 	}, true
 }

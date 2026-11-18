@@ -56,7 +56,7 @@ type Error struct {
 func (e *Error) Error() string {
 	msg := "maxcompute: " + e.Category
 	if e.Message != "" {
-		msg += ": " + e.Message
+		msg += ": " + Redact(e.Message)
 	}
 	if e.InstanceID != "" {
 		msg += " (instance " + e.InstanceID + ")"
@@ -78,12 +78,12 @@ func (e *Error) WithInstance(id string) *Error {
 
 // Local returns an error the driver raises itself, with a fixed message.
 func Local(category, message string) *Error {
-	return &Error{Category: category, Message: message}
+	return &Error{Category: category, Message: Redact(message)}
 }
 
 // LocalWrap is Local with a cause for errors.Is, such as a sentinel.
 func LocalWrap(category, message string, cause error) *Error {
-	return &Error{Category: category, Message: message, cause: cause}
+	return &Error{Category: category, Message: Redact(message), cause: cause}
 }
 
 // Context returns the error of a statement stopped by its context. status
@@ -125,7 +125,8 @@ func safe(err error) string {
 		cut.Message = cutDebugInfo(cut.Message)
 		httpErr.ErrorMessage = &cut
 		err = httpErr
-	} else if !ok {
+	} else if !ok && !IsTransport(err) {
+		// A transport error keeps its type, so SafeError can report a timeout.
 		err = errors.New(cutDebugInfo(err.Error()))
 	}
 	return Redact(odpsclient.SafeError(err).Error())
