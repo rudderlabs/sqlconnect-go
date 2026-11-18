@@ -19,6 +19,7 @@ import (
 	"google.golang.org/api/googleapi"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcerr"
 	redshiftdriver "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift/driver"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/sqlerr"
 )
@@ -67,6 +68,8 @@ func TestIsObjectNotFound(t *testing.T) {
 			"fabric 208 invalid object name":                mssql.Error{Number: 208, Message: "Invalid object name 's.t'."},
 			"redshift data api identifier with a newline":   dataAPIFailure("ERROR: relation \"a\nb\" does not exist"),
 			"bigquery job error table":                      &bigquery.Error{Reason: "notFound", Message: "Not found: Table p:d.t was not found in location US"},
+			"maxcompute table in SQL":                       mcerr.FromJob("ODPS-0130131:[1,15] Table not found - table p.s.t cannot be resolved"),
+			"maxcompute project":                            mcerr.FromJob("ODPS-0420111: Project not found - 'p'."),
 			"fabric 208 followed by the termination notice": mssql.Error{Number: 3621, Message: "The statement has been terminated.", All: []mssql.Error{{Number: 208, Message: "Invalid object name 's.t'."}, {Number: 3621, Message: "The statement has been terminated."}}},
 		}
 		for name, err := range cases {
@@ -109,6 +112,8 @@ func TestIsObjectNotFound(t *testing.T) {
 			"bigquery job error not found job":                                       &bigquery.Error{Reason: "notFound", Message: "Not found: Job p:US.j"},
 			"fabric diagnostics without 208":                                         mssql.Error{Number: 3621, Message: "The statement has been terminated.", All: []mssql.Error{{Number: 229, Message: "The SELECT permission was denied on the object 't'."}, {Number: 3621, Message: "The statement has been terminated."}}},
 			"redshift data api already exists, phrase and newline in the identifier": dataAPIFailure("ERROR: relation \"a\" does not exist\nb\" already exists"),
+			"maxcompute permission":                                                  mcerr.FromJob("ODPS-0130013:Authorization exception - You have NO privilege 'odps:Select'"),
+			"maxcompute column":                                                      mcerr.FromJob("ODPS-0130071:[1,8] Semantic analysis exception - column nope cannot be resolved"),
 			"clickhouse keeps its own code":                                          cherr.New(cherr.CodeObjectNotFound, "", "the table or database does not exist"),
 			"network":                                                                &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("connection refused")},
 			"deadline":                                                               context.DeadlineExceeded,

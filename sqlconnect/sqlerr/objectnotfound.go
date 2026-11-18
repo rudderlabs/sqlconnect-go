@@ -16,6 +16,7 @@ import (
 	"github.com/trinodb/trino-go-client/trino"
 	"google.golang.org/api/googleapi"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcerr"
 	redshiftdriver "github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift/driver"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/snowflakequery"
 )
@@ -95,6 +96,10 @@ func IsObjectNotFound(err error) bool {
 	}
 	if msErr, ok := errors.AsType[mssql.Error](err); ok {
 		return mssqlObjectNotFound(msErr)
+	}
+	if category, _, ok := mcerr.Info(err); ok {
+		// ODPS-0130131 (table or schema in SQL) and 0420111 (schema or project over REST).
+		return category == mcerr.CategoryNotFound || category == mcerr.CategoryProjectNotFound
 	}
 	return false
 }

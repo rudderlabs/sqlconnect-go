@@ -108,9 +108,27 @@ func FromSDK(err error) *Error {
 		return Context(err, "", "")
 	}
 	if IsTransport(err) {
-		return &Error{Category: CategoryNetwork, Message: odpsclient.SafeError(err).Error(), Retryable: true}
+		return &Error{Category: CategoryNetwork, Message: safe(err), Retryable: true}
 	}
-	return &Error{Category: CategoryUnknown, Message: odpsclient.SafeError(err).Error()}
+	if httpErr, ok := asHTTPError(err); ok {
+		c := classifyHTTP(httpErr)
+		return &Error{Category: c.category, Code: c.code, Message: safe(err), Retryable: c.retryable}
+	}
+	return FromJob(err.Error())
+}
+
+// safe is the destination's SafeError followed by the source's redaction.
+// The DebugingInfo tail is cut first, so SafeError never parses it.
+func safe(err error) string {
+	if httpErr, ok := asHTTPError(err); ok && httpErr.ErrorMessage != nil {
+		cut := *httpErr.ErrorMessage
+		cut.Message = cutDebugInfo(cut.Message)
+		httpErr.ErrorMessage = &cut
+		err = httpErr
+	} else if !ok {
+		err = errors.New(cutDebugInfo(err.Error()))
+	}
+	return Redact(odpsclient.SafeError(err).Error())
 }
 
 // FromSubmit classifies an error of the call that creates a job. A transport
@@ -126,7 +144,8 @@ func FromSubmit(err error) *Error {
 
 // FromJob classifies the text of a failed job.
 func FromJob(text string) *Error {
-	return &Error{Category: CategoryUnknown, Message: odpsclient.SafeError(errors.New(text)).Error()}
+	c := classifyText(text)
+	return &Error{Category: c.category, Code: c.code, Message: safe(errors.New(text)), Retryable: c.retryable}
 }
 
 // IsTransport reports whether err is a network failure.
@@ -149,6 +168,15 @@ func notSent(err error) bool {
 		return true
 	}
 	return errors.Is(err, syscall.ECONNREFUSED)
+}
+
+// Info returns the sqlconnect classification of err.
+func Info(err error) (category, code string, ok bool) {
+	e, isErr := errors.AsType[*Error](err)
+	if !isErr {
+		return "", "", false
+	}
+	return e.Category, e.Code, true
 }
 
 // Errorf is a convenience for local errors with formatted, caller-controlled text.
