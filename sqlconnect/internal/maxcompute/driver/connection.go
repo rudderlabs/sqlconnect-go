@@ -5,7 +5,7 @@ import (
 	"database/sql/driver"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
-	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/odpsclient"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcerr"
 )
 
 type conn struct {
@@ -17,13 +17,33 @@ var (
 	_ driver.ConnBeginTx        = (*conn)(nil)
 	_ driver.ConnPrepareContext = (*conn)(nil)
 	_ driver.Pinger             = (*conn)(nil)
+	_ driver.ExecerContext      = (*conn)(nil)
 )
+
+// ExecContext runs one statement, or one script under [WithScript], as one
+// job and waits for it to succeed.
+func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	if len(args) > 0 {
+		return nil, mcerr.Local(mcerr.CategoryRefused, "bind arguments are not supported yet")
+	}
+	text, err := prepareText(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := c.connector.run(ctx, text); err != nil {
+		return nil, err
+	}
+	return result{}, nil
+}
 
 // Ping loads the project: a real REST call that fails on a wrong endpoint,
 // project, region or credential.
 func (c *conn) Ping(ctx context.Context) error {
 	client := c.connector.cfg.Client
-	return odpsclient.SafeError(call(ctx, func() error { return client.Project(client.DefaultProjectName()).Load() }))
+	if err := call(ctx, func() error { return client.Project(client.DefaultProjectName()).Load() }); err != nil {
+		return mcerr.FromSDK(err)
+	}
+	return nil
 }
 
 // Prepare is not supported: MaxCompute has no server-side statements.

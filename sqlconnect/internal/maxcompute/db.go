@@ -3,9 +3,12 @@
 package maxcompute
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"time"
+
+	"github.com/aliyun/aliyun-odps-go-sdk/odps"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
@@ -27,6 +30,19 @@ const (
 type DB struct {
 	*base.DB
 	config Config
+	client *odps.Odps
+}
+
+var _ sqlconnect.QueryController = (*DB)(nil)
+
+// terminateWait bounds StopQuery's wait for a terminated job to end.
+const terminateWait = 30 * time.Second
+
+// StopQuery terminates the job whose instance id is queryID and waits for it
+// to end. A job that already ended, a second stop included, is StopMissed.
+// Instance ids come from maxcomputequery.WithInstanceIDHandler.
+func (db *DB) StopQuery(ctx context.Context, queryID string) (sqlconnect.StopOutcome, error) {
+	return driver.StopInstance(ctx, db.client, queryID, terminateWait)
 }
 
 // NewDB creates a MaxCompute database from its JSON config. It makes no
@@ -49,6 +65,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	return &DB{
 		DB:     base.NewDB(sql.OpenDB(connector), sshtunnel.NoTunnelCloser),
 		config: config,
+		client: client,
 	}, nil
 }
 
