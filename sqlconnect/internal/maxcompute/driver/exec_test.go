@@ -2,10 +2,12 @@ package driver
 
 import (
 	"context"
+	"database/sql/driver"
 	"errors"
 	"testing"
 	"time"
 
+	"github.com/aliyun/aliyun-odps-go-sdk/odps/data"
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
@@ -218,4 +220,50 @@ func TestExecBindsArguments(t *testing.T) {
 	_, err = db.ExecContext(context.Background(), "SELECT 1 FROM `\x00refused identifier\x00`")
 	require.ErrorIs(t, err, ErrRefusedIdentifier)
 	require.Len(t, f.snapshot().submits, 1, "refusals create no job")
+}
+
+func TestExecRefusesSetOfProtectedSettings(t *testing.T) {
+	f := newFakeODPS(t)
+	db := f.db(t)
+	for _, sql := range []string{
+		"SET odps.sql.type.system.odps2=false",
+		"set ODPS.SQL.TIMEZONE = UTC",
+		"SET odps.sql.allow.fullscan=true; SELECT 1",
+		"SELECT 1; SET odps.default.schema=other;",
+		"/* x */ SET odps.sql.validate.orderby.limit=true",
+	} {
+		_, err := db.ExecContext(WithScript(context.Background()), sql)
+		require.ErrorIs(t, err, ErrProtectedSet, sql)
+	}
+	require.Empty(t, f.snapshot().submits, "no job is created")
+	_, err := db.ExecContext(WithScript(context.Background()), "SET odps.sql.mapper.split.size=64; SELECT 1")
+	require.NoError(t, err, "other settings are the caller's business")
+}
+
+func TestStopOutcomeOnTheError(t *testing.T) {
+	f := newFakeODPS(t)
+	f.set(func(f *fakeODPS) { f.statuses = []string{"Running"} })
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, err := f.db(t).ExecContext(ctx, "SELECT 1")
+	var e *mcerr.Error
+	require.ErrorAs(t, err, &e)
+	require.Equal(t, string(sqlconnect.StopLanded), e.Stop)
+	require.Equal(t, "inst1", e.InstanceID)
+
+	cctx, ccancel := context.WithCancel(context.Background())
+	ccancel()
+	_, err = f.db(t).ExecContext(cctx, "SELECT 1")
+	require.ErrorIs(t, err, context.Canceled, "database/sql refuses a cancelled context before the driver sees it")
+}
+
+func TestShortRecordIsAnError(t *testing.T) {
+	r := newRows(nil, "inst1")
+	ch := make(chan item, 1)
+	ch <- item{record: data.Record{data.BigInt(1)}}
+	close(ch)
+	r.ranges = []chan item{ch}
+	r.want = 1
+	err := r.Next(make([]driver.Value, 2))
+	require.ErrorContains(t, err, "1 values for 2 columns")
 }

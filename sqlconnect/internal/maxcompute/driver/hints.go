@@ -5,6 +5,9 @@ import (
 	"errors"
 	"maps"
 	"regexp"
+	"strings"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcsql"
 )
 
 // The hint keys the driver owns. This file is the one owner of the hint list.
@@ -15,6 +18,7 @@ const (
 	HintValidateOrderBy = "odps.sql.validate.orderby.limit"
 	HintDefaultSchema   = "odps.default.schema"
 	HintAllowFullScan   = "odps.sql.allow.fullscan"
+	HintTimeZone        = "odps.sql.timezone"
 	HintSubmitMode      = "odps.sql.submit.mode"
 	submitModeScript    = "script"
 )
@@ -46,6 +50,42 @@ var (
 	// ErrHintValue is returned for a per-call hint with an invalid value.
 	ErrHintValue = errors.New("maxcompute: invalid hint value")
 )
+
+// protectedKeys are the settings a SET statement in the SQL text may not
+// change: the fixed hints, the default schema, the time zone, the submit mode
+// and the full-scan switch. A SET in a script would otherwise override them
+// for the rest of the job.
+var protectedKeys = map[string]bool{
+	HintTypeSystemODPS2: true, HintDecimalODPS2: true, HintNamespaceSchema: true, HintValidateOrderBy: true,
+	HintDefaultSchema: true, HintTimeZone: true, HintSubmitMode: true, HintAllowFullScan: true,
+}
+
+// ErrProtectedSet is returned for a SET statement on a setting the driver owns.
+var ErrProtectedSet = errors.New("maxcompute: a SET statement may not change a setting the driver sends on every job")
+
+// checkSet refuses a statement of the form SET <key> = … whose key is protected.
+func checkSet(statement []mcsql.Token) error {
+	var code []mcsql.Token
+	for _, t := range statement {
+		if !t.IsComment() {
+			code = append(code, t)
+		}
+	}
+	if len(code) == 0 || code[0].Kind != mcsql.Word || !strings.EqualFold(code[0].Text, "SET") {
+		return nil
+	}
+	var key strings.Builder
+	for _, t := range code[1:] {
+		if t.Kind == mcsql.Punct && t.Text == "=" {
+			break
+		}
+		key.WriteString(strings.Trim(t.Text, "`"))
+	}
+	if protectedKeys[strings.ToLower(key.String())] {
+		return ErrProtectedSet
+	}
+	return nil
+}
 
 type ctxKey int
 

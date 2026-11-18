@@ -61,6 +61,11 @@ func prepareText(ctx context.Context, query string) (string, error) {
 	if len(statements) > 1 && !isScript(ctx) {
 		return "", mcerr.LocalWrap(mcerr.CategoryRefused, "the text holds several statements; a script needs WithScript", ErrMultipleStatements)
 	}
+	for _, s := range statements {
+		if err := checkSet(s); err != nil {
+			return "", mcerr.LocalWrap(mcerr.CategoryRefused, err.Error(), err)
+		}
+	}
 	return mcsql.Terminate(query, tokens), nil
 }
 
@@ -89,7 +94,9 @@ type submitted struct {
 // background.
 func (c *Connector) submit(ctx context.Context, text string) (*odps.Instance, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, mcerr.Context(err, "", "not submitted")
+		e := mcerr.Context(err, "", "not submitted")
+		e.Stop = string(sqlconnect.StopMissed)
+		return nil, e
 	}
 	opt := options.NewSQLTaskOptions()
 	opt.Hints = jobHints(ctx, c.cfg.DefaultSchema)
@@ -120,11 +127,12 @@ func (c *Connector) submit(ctx context.Context, text string) (*odps.Instance, er
 		// terminated here; the caller already sees OutcomeUnknown.
 		go func() {
 			if s := <-done; s.err == nil && s.inst != nil {
-				stop(context.Background(), s.inst, terminateWait, c.cfg.PollInitial)
+				_, _ = stopInstance(context.Background(), s.inst, terminateWait, c.cfg.PollInitial)
 			}
 		}()
-		e := mcerr.Context(ctx.Err(), "", "abandoned during submit; a created job is terminated")
+		e := mcerr.Context(ctx.Err(), "", "abandoned during submit; a created job is terminated, best effort")
 		e.OutcomeUnknown = true
+		e.Stop = string(sqlconnect.StopError)
 		return nil, e
 	}
 }
@@ -186,7 +194,7 @@ func (c *Connector) wait(ctx context.Context, inst *odps.Instance) error {
 			return err
 		})
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return mcerr.Context(ctxErr, id, stop(context.Background(), inst, c.cfg.TerminateWait, c.cfg.PollInitial))
+			return c.stopped(ctxErr, inst)
 		}
 		if err != nil {
 			if mcerr.IsTransport(err) && failures < c.cfg.PollRetries {
@@ -204,7 +212,7 @@ func (c *Connector) wait(ctx context.Context, inst *odps.Instance) error {
 			return c.failure(ctx, inst)
 		}
 		if !sleep(ctx, interval) {
-			return mcerr.Context(ctx.Err(), id, stop(context.Background(), inst, c.cfg.TerminateWait, c.cfg.PollInitial))
+			return c.stopped(ctx.Err(), inst)
 		}
 		interval = min(interval+c.cfg.PollInitial, c.cfg.PollMax)
 	}
@@ -241,18 +249,20 @@ func sleep(ctx context.Context, d time.Duration) bool {
 	}
 }
 
-// stop terminates the job and polls until it ends or wait passes. It returns
-// how the job ended, for the error text.
-func stop(ctx context.Context, inst *odps.Instance, wait, interval time.Duration) string {
-	outcome, _ := stopInstance(ctx, inst, wait, interval)
+// stopped terminates the job of a statement whose context ended, and returns
+// the statement's error with the stop outcome.
+func (c *Connector) stopped(ctxErr error, inst *odps.Instance) error {
+	outcome, _ := stopInstance(context.Background(), inst, c.cfg.TerminateWait, c.cfg.PollInitial)
+	status := "may still run: the terminate was not confirmed"
 	switch outcome {
 	case sqlconnect.StopLanded:
-		return "terminated"
+		status = "terminated"
 	case sqlconnect.StopMissed:
-		return "had already ended"
-	default:
-		return "may still run: the terminate was not confirmed"
+		status = "had already ended (the server refused a terminate of a terminated job)"
 	}
+	e := mcerr.Context(ctxErr, inst.Id(), status)
+	e.Stop = string(outcome)
+	return e
 }
 
 // stopInstance terminates inst and waits up to wait for it to end.

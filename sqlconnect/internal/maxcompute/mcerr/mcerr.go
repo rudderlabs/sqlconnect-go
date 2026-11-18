@@ -49,6 +49,9 @@ type Error struct {
 	// OutcomeUnknown reports that the submit failed after the server may have
 	// created the job: the caller must not assume the statement did not run.
 	OutcomeUnknown bool
+	// Stop is how a stop of the job ended when its context ended: landed,
+	// missed or error (sqlconnect.StopOutcome values); empty when no stop ran.
+	Stop string
 
 	cause error // a context error or a local sentinel; never an SDK error
 }

@@ -3,6 +3,7 @@ package maxcomputequery
 import (
 	"errors"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcerr"
 )
 
@@ -36,6 +37,17 @@ type Details struct {
 	// OutcomeUnknown reports that the job may have been created although the
 	// submit failed; the caller must not assume the statement did not run.
 	OutcomeUnknown bool
+}
+
+// StopInfo reports the stop of a statement whose context ended: the job's
+// instance id (empty when no job was created) and how the stop ended. ok is
+// false for any other error.
+func StopInfo(err error) (instanceID string, outcome sqlconnect.StopOutcome, ok bool) {
+	e, isErr := errors.AsType[*mcerr.Error](err)
+	if !isErr || e.Stop == "" {
+		return "", "", false
+	}
+	return e.InstanceID, sqlconnect.StopOutcome(e.Stop), true
 }
 
 // Describe returns the details of the first MaxCompute driver error in err's chain.

@@ -82,7 +82,8 @@ func TestConfigStringHidesSecret(t *testing.T) {
 		require.NotContains(t, s, testSecret)
 		require.NotContains(t, s, testKeyID)
 		require.Contains(t, s, "LTAI")
-		require.Contains(t, s, "customer_project")
+		require.NotContains(t, s, "customer_project", "a pasted secret in project would pass its pattern")
+		require.Contains(t, s, "cust…(16)")
 	}
 }
 

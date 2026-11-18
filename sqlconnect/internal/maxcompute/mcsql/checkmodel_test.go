@@ -63,6 +63,10 @@ func TestCheckModelSQL(t *testing.T) {
 		"SELECT /* unterminated",
 		"SELECT 'it\\'s' ; DROP TABLE t",
 		"SELECT 1; -- hide\rDROP TABLE sensitive;",
+		"SELECT 1 -- x\r; DROP TABLE t",
+		"WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x",
+		"FROM t INSERT OVERWRITE TABLE t2 SELECT *",
+		"SELECT a FROM t WHERE b=@v",
 		"SELECT 1 -- hide\rUNION ALL SELECT 2; DROP TABLE t",
 	}
 	for _, sql := range refuse {

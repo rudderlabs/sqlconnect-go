@@ -25,7 +25,10 @@ const HintAllowFullScan = driver.HintAllowFullScan
 // WithScript marks ctx so that the next statement runs as one script job
 // (odps.sql.submit.mode=script). The caller passes the whole script as one
 // string with semicolons between statements, and follows MaxCompute's script
-// rules; the driver does not rewrite it. A script applies all or nothing.
+// rules; the driver does not rewrite it. A script that fails to compile
+// applies nothing, but one that fails at run time keeps its DROP and CREATE
+// statements and rolls back only its DML (findings 16): drop and create only
+// tables the call fully rebuilds.
 func WithScript(ctx context.Context) context.Context { return driver.WithScript(ctx) }
 
 // WithHints adds per-call hints. Only odps.sql.allow.fullscan ("true" or

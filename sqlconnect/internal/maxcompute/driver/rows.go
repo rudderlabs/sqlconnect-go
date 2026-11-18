@@ -44,6 +44,9 @@ func (c *Connector) tunnel(ctx context.Context) (*tunnel.Tunnel, error) {
 	return c.tun, nil
 }
 
+// The check deliberately refuses private and VPC tunnel endpoints in v1, as
+// the LLD says: the account endpoint is the public one.
+//
 // checkTunnelEndpoint accepts only an https MaxCompute host with no port,
 // user or path, such as https://dt.us-west-1.maxcompute.aliyun.com: the tunnel
 // endpoint comes from the server, and every download request is signed with
@@ -305,8 +308,7 @@ func (r *rows) Next(dest []driver.Value) error {
 		}
 		for i := range dest {
 			if i >= len(it.record) {
-				dest[i] = nil
-				continue
+				return mcerr.Local(mcerr.CategoryData, fmt.Sprintf("a record holds %d values for %d columns", len(it.record), len(dest))).WithInstance(r.instanceID)
 			}
 			v, err := convertValue(it.record[i])
 			if err != nil {

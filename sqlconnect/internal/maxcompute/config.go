@@ -137,14 +137,19 @@ func (c Config) Region() string {
 	return c.region
 }
 
-// String prints the endpoint, the project and the first characters of the
-// AccessKey id. It never prints the secret.
+// String prints the endpoint and the first characters of the project, the
+// schema and the AccessKey id, never a whole field value: a secret pasted into
+// project or schema can pass their patterns. It never prints the secret.
 func (c Config) String() string {
-	id := c.AccessKeyID
-	if len(id) > 4 {
-		id = id[:4]
+	return fmt.Sprintf("maxcompute{endpoint=%s project=%s schema=%s accessKeyId=%s}", c.Endpoint, prefix(c.Project), prefix(c.Schema), prefix(c.AccessKeyID))
+}
+
+// prefix keeps the first 4 characters of v and the length.
+func prefix(v string) string {
+	if len(v) <= 4 {
+		return fmt.Sprintf("%s(%d)", strings.Repeat("*", len(v)), len(v))
 	}
-	return fmt.Sprintf("maxcompute{endpoint=%s project=%s schema=%s accessKeyId=%s…}", c.Endpoint, c.Project, c.Schema, id)
+	return fmt.Sprintf("%s…(%d)", v[:4], len(v))
 }
 
 // GoString keeps %#v from printing the secret.
