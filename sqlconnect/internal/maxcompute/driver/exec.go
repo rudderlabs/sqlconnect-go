@@ -2,8 +2,10 @@ package driver
 
 import (
 	"context"
+	"database/sql/driver"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps"
@@ -19,8 +21,35 @@ import (
 // caller did not mark as a script.
 var ErrMultipleStatements = errors.New("maxcompute: several statements need WithScript")
 
+// ErrRefusedIdentifier is returned for a statement that holds a NUL byte,
+// which is how the dialect marks a name it refused to quote.
+var ErrRefusedIdentifier = errors.New("maxcompute: the statement holds a refused identifier or a NUL byte")
+
+// bind renders the bind arguments into the statement text: MaxCompute has no
+// server-side binds.
+func bind(query string, args []driver.NamedValue) (string, error) {
+	if len(args) == 0 {
+		return query, nil
+	}
+	values := make([]any, len(args))
+	for i, a := range args {
+		if a.Name != "" {
+			return "", mcerr.Local(mcerr.CategoryRefused, "named bind arguments are not supported; use ?")
+		}
+		values[i] = a.Value
+	}
+	text, err := mcsql.Bind(query, values)
+	if err != nil {
+		return "", mcerr.LocalWrap(mcerr.CategoryRefused, err.Error(), err)
+	}
+	return text, nil
+}
+
 // prepareText checks the statement text and adds the terminator the server needs.
 func prepareText(ctx context.Context, query string) (string, error) {
+	if strings.IndexByte(query, 0) >= 0 {
+		return "", mcerr.LocalWrap(mcerr.CategoryRefused, ErrRefusedIdentifier.Error(), ErrRefusedIdentifier)
+	}
 	tokens, err := mcsql.Scan(query)
 	if err != nil {
 		return "", mcerr.LocalWrap(mcerr.CategorySyntax, "the statement cannot be scanned: "+err.Error(), err)

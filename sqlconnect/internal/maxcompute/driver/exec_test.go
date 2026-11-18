@@ -194,6 +194,21 @@ func TestUnsupported(t *testing.T) {
 	_, err = db.Prepare("SELECT 1")
 	require.True(t, errors.Is(err, sqlconnect.ErrNotSupported))
 	require.Error(t, db.Ping(), "ping loads the project, which the fake does not serve")
-	_, err = db.ExecContext(context.Background(), "SELECT ?", 1)
+}
+
+func TestExecBindsArguments(t *testing.T) {
+	f := newFakeODPS(t)
+	db := f.db(t)
+	type named string
+	_, err := db.ExecContext(context.Background(), "INSERT INTO t VALUES (?, ?, ?, ?, '?')", "it's \\", -3, nil, named("x"))
+	require.NoError(t, err)
+	require.Equal(t, `INSERT INTO t VALUES ('it\'s \\', (-3), NULL, 'x', '?');`, f.snapshot().submits[0].Query)
+
+	_, err = db.ExecContext(context.Background(), "SELECT ?", time.Now())
+	require.Error(t, err, "time.Time is refused in v1")
+	_, err = db.ExecContext(context.Background(), "SELECT ?, ?", 1)
 	require.Error(t, err)
+	_, err = db.ExecContext(context.Background(), "SELECT 1 FROM `\x00refused identifier\x00`")
+	require.ErrorIs(t, err, ErrRefusedIdentifier)
+	require.Len(t, f.snapshot().submits, 1, "refusals create no job")
 }

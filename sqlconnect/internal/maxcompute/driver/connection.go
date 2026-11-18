@@ -18,15 +18,32 @@ var (
 	_ driver.ConnPrepareContext = (*conn)(nil)
 	_ driver.Pinger             = (*conn)(nil)
 	_ driver.ExecerContext      = (*conn)(nil)
+	_ driver.NamedValueChecker  = (*conn)(nil)
 )
+
+// CheckNamedValue passes the values the literal renderer handles through
+// unchanged, and lets database/sql convert anything else (a driver.Valuer, a
+// named string or integer type) with its default converter. The renderer
+// refuses what remains, such as a time.Time.
+func (c *conn) CheckNamedValue(nv *driver.NamedValue) error {
+	switch nv.Value.(type) {
+	case nil, string, bool, []byte,
+		int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64:
+		return nil
+	}
+	return driver.ErrSkip
+}
 
 // ExecContext runs one statement, or one script under [WithScript], as one
 // job and waits for it to succeed.
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	if len(args) > 0 {
-		return nil, mcerr.Local(mcerr.CategoryRefused, "bind arguments are not supported yet")
+	text, err := bind(query, args)
+	if err != nil {
+		return nil, err
 	}
-	text, err := prepareText(ctx, query)
+	text, err = prepareText(ctx, text)
 	if err != nil {
 		return nil, err
 	}
