@@ -1,11 +1,15 @@
 package maxcompute_test
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute"
 )
 
@@ -31,6 +35,33 @@ func testDB(t *testing.T) *maxcompute.DB {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 	return db
+}
+
+// runID is unique per test run. Every object these tests create in the shared
+// project carries the prefix rs_retl_probe_sc_<runID>_. A schema name is never
+// reused: a re-created schema can make IF EXISTS and even a CTAS lie for
+// minutes (HLD OQ8).
+var runID = func() string {
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}()
+
+func objectName(name string) string { return "rs_retl_probe_sc_" + runID + "_" + name }
+
+// testSchema creates a fresh schema for the test and drops it, with
+// everything in it, when the test ends.
+func testSchema(t *testing.T, db *maxcompute.DB, name string) string {
+	t.Helper()
+	schema := objectName(name)
+	ctx := context.Background()
+	require.NoError(t, db.CreateSchema(ctx, sqlconnect.SchemaRef{Name: schema}))
+	t.Cleanup(func() {
+		if err := db.DropSchema(context.Background(), sqlconnect.SchemaRef{Name: schema}); err != nil {
+			t.Logf("dropping schema %s: %v", schema, err)
+		}
+	})
+	return schema
 }
 
 // slowQuery runs for about 35 seconds on the dev project (36M rows took 19 s)

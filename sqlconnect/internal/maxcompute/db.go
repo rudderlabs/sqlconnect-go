@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps"
@@ -13,6 +14,7 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/base"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/driver"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcsql"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/odpsclient"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/sshtunnel"
 )
@@ -63,7 +65,19 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 		return nil, err
 	}
 	return &DB{
-		DB:     base.NewDB(sql.OpenDB(connector), sshtunnel.NoTunnelCloser),
+		DB: base.NewDB(
+			sql.OpenDB(connector),
+			sshtunnel.NoTunnelCloser,
+			base.WithDialect(newDialect(mcsql.Normalise(config.Project))),
+			base.WithColumnTypeMapper(columnTypeMapper),
+			base.WithJsonRowMapper(jsonRowMapper),
+			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
+				cmds.CreateTestTable = func(table base.QuotedIdentifier) string {
+					return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (c1 INT, c2 VARCHAR(255)) LIFECYCLE 1", table)
+				}
+				return cmds
+			}),
+		),
 		config: config,
 		client: client,
 	}, nil

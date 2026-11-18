@@ -1,0 +1,221 @@
+package maxcompute
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+
+	"github.com/aliyun/aliyun-odps-go-sdk/odps"
+	"github.com/aliyun/aliyun-odps-go-sdk/odps/restclient"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcerr"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcsql"
+)
+
+// ListTables lists the schema's tables and views through the REST API, with
+// a literal name prefix (_ is not a wildcard). A listing does not carry the
+// table type, so views come from a second listing filtered by type.
+func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef, opts ...sqlconnect.Option) ([]sqlconnect.RelationRef, error) {
+	listOpts, err := sqlconnect.NewTableListOptions(opts...)
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, mcerr.Context(err, "", "")
+	}
+	if db.otherCatalog(listOpts.Catalog) {
+		return nil, nil
+	}
+	name := mcsql.Normalise(schema.Name)
+	if err := mcsql.CheckName(name); err != nil {
+		return nil, mcerr.Local(mcerr.CategoryRefused, err.Error())
+	}
+	var filters []odps.TFilterFunc
+	if listOpts.Prefix != "" {
+		filters = append(filters, odps.TableFilter.NamePrefix(mcsql.Normalise(listOpts.Prefix)))
+	}
+	names, err := db.listTableNames(ctx, name, filters...)
+	if err != nil {
+		if exists, existsErr := db.SchemaExists(ctx, schema); existsErr == nil && !exists {
+			return nil, mcerr.Local(mcerr.CategoryNotFound, "schema "+name+" not found")
+		}
+		return nil, wrap("listing tables in "+name, err)
+	}
+	views := map[string]bool{}
+	for _, viewType := range []odps.TableType{odps.VirtualView, odps.MaterializedView} {
+		viewNames, err := db.listTableNames(ctx, name, append(filters, odps.TableFilter.Type(viewType))...)
+		if err != nil {
+			return nil, wrap("listing views in "+name, err)
+		}
+		for _, v := range viewNames {
+			views[v] = true
+		}
+	}
+	refs := make([]sqlconnect.RelationRef, 0, len(names))
+	for _, n := range names {
+		refOpts := []sqlconnect.Option{sqlconnect.WithSchema(schema.Name)}
+		if listOpts.Catalog != "" {
+			refOpts = append(refOpts, sqlconnect.WithCatalog(listOpts.Catalog))
+		}
+		if views[n] {
+			refOpts = append(refOpts, sqlconnect.WithRelationType(sqlconnect.ViewRelation))
+		}
+		refs = append(refs, sqlconnect.NewRelationRef(n, refOpts...))
+	}
+	return refs, nil
+}
+
+func (db *DB) listTableNames(ctx context.Context, schema string, filters ...odps.TFilterFunc) ([]string, error) {
+	var names []string
+	var listErr error
+	err := call(ctx, func() error {
+		odps.NewTables(db.client, db.config.Project, schema).List(func(t *odps.Table, err error) {
+			if err != nil {
+				listErr = err
+				return
+			}
+			names = append(names, t.Name())
+		}, filters...)
+		return listErr
+	})
+	return names, err
+}
+
+// TableExists loads the table; a missing table is false, not an error.
+func (db *DB) TableExists(ctx context.Context, relation sqlconnect.RelationRef) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, mcerr.Context(err, "", "")
+	}
+	if db.otherCatalog(relation.Catalog) {
+		return false, nil
+	}
+	table, err := db.table(relation)
+	if err != nil {
+		return false, nil //nolint:nilerr // a name MaxCompute cannot hold names no table
+	}
+	err = call(ctx, table.Load)
+	if err == nil {
+		return true, nil
+	}
+	if httpStatus(err) == http.StatusNotFound {
+		return false, nil
+	}
+	return false, wrap("checking table "+relation.String(), err)
+}
+
+// ListColumns loads the table's schema, partition columns included.
+func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) ([]sqlconnect.ColumnRef, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, mcerr.Context(err, "", "")
+	}
+	if db.otherCatalog(relation.Catalog) {
+		return nil, mcerr.Local(mcerr.CategoryNotFound, "relation "+relation.String()+" not found in this project")
+	}
+	table, err := db.table(relation)
+	if err != nil {
+		return nil, err
+	}
+	if err := call(ctx, table.Load); err != nil {
+		if httpStatus(err) == http.StatusNotFound {
+			return nil, mcerr.Local(mcerr.CategoryNotFound, "relation "+relation.String()+" not found")
+		}
+		return nil, wrap("listing columns of "+relation.String(), err)
+	}
+	s := table.Schema()
+	cols := make([]sqlconnect.ColumnRef, 0, len(s.Columns)+len(s.PartitionColumns))
+	for _, c := range append(s.Columns, s.PartitionColumns...) {
+		raw := c.Type.Name()
+		cols = append(cols, sqlconnect.ColumnRef{Name: c.Name, Type: canonicalType(raw), RawType: raw})
+	}
+	return cols, nil
+}
+
+// table returns the SDK table of relation in the configured project.
+func (db *DB) table(relation sqlconnect.RelationRef) (*odps.Table, error) {
+	schema, name := mcsql.Normalise(relation.Schema), mcsql.Normalise(relation.Name)
+	if mcsql.CheckName(name) != nil || (schema != "" && mcsql.CheckName(schema) != nil) {
+		return nil, mcerr.Local(mcerr.CategoryRefused, "invalid relation name "+relation.String())
+	}
+	return odps.NewTables(db.client, db.config.Project, schema).Get(name), nil
+}
+
+// ListColumnsForSqlQuery reads the column types of the query's result. The
+// query runs, so a query without a top-level LIMIT is wrapped with LIMIT 0;
+// rudder-sources already sends its own LIMIT 1.
+func (db *DB) ListColumnsForSqlQuery(ctx context.Context, sql string) ([]sqlconnect.ColumnRef, error) {
+	limited, err := mcsql.LimitZero(sql)
+	if err != nil {
+		return nil, mcerr.LocalWrap(mcerr.CategorySyntax, "the query cannot be scanned: "+err.Error(), err)
+	}
+	return db.DB.ListColumnsForSqlQuery(ctx, limited)
+}
+
+// RenameTable renames within one schema. MaxCompute accepts only a bare new
+// name after RENAME TO.
+func (db *DB) RenameTable(ctx context.Context, oldRef, newRef sqlconnect.RelationRef) error {
+	if mcsql.Normalise(oldRef.Schema) != mcsql.Normalise(newRef.Schema) {
+		return fmt.Errorf("moving table to another schema not supported, oldRef: %s newRef: %s", oldRef, newRef)
+	}
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s RENAME TO %s", db.QuoteTable(oldRef), db.QuoteIdentifier(mcsql.Normalise(newRef.Name)))); err != nil {
+		return fmt.Errorf("renaming table %s to %s: %w", oldRef, newRef, err)
+	}
+	return nil
+}
+
+// MoveTable copies the table with a CTAS and drops the old one.
+func (db *DB) MoveTable(ctx context.Context, oldRef, newRef sqlconnect.RelationRef) error {
+	if mcsql.Normalise(oldRef.Schema) != mcsql.Normalise(newRef.Schema) {
+		return fmt.Errorf("moving table to another schema not supported, oldRef: %s newRef: %s", oldRef, newRef)
+	}
+	if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s AS SELECT * FROM %s", db.QuoteTable(newRef), db.QuoteTable(oldRef))); err != nil {
+		return fmt.Errorf("copying table %s contents to %s: %w", oldRef, newRef, err)
+	}
+	if err := db.DropTable(ctx, oldRef); err != nil {
+		return sqlconnect.ErrDropOldTablePostCopy
+	}
+	return nil
+}
+
+// CreateTableFromQuery creates a table with a CTAS. MaxCompute does not
+// accept the parenthesised AS (…) form for every query, so none is added.
+func (db *DB) CreateTableFromQuery(ctx context.Context, table sqlconnect.RelationRef, query string) error {
+	_, err := db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s AS %s", db.QuoteTable(table), query))
+	return err
+}
+
+// httpStatus returns the HTTP status of an SDK REST error, or 0.
+func httpStatus(err error) int {
+	if e, ok := errors.AsType[restclient.HttpError](err); ok {
+		return e.StatusCode
+	}
+	if e, ok := errors.AsType[*restclient.HttpError](err); ok && e != nil {
+		return e.StatusCode
+	}
+	return 0
+}
+
+// wrap classifies an SDK error and names the operation.
+func wrap(op string, err error) error {
+	e := mcerr.FromSDK(err)
+	if e.Message != "" {
+		e.Message = op + ": " + e.Message
+	}
+	return e
+}
+
+// call runs an SDK call that takes no context and returns early when ctx ends.
+func call(ctx context.Context, fn func() error) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- fn() }()
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}

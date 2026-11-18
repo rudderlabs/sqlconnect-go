@@ -52,10 +52,10 @@ func TestConfigParse(t *testing.T) {
 		"role arn":                 `{"endpoint":"https://service.me-east-1.maxcompute.aliyun.com/api","project":"customer_project","accessKeyId":"a","accessKeySecret":"b","roleArn":"acs:ram::1:role/x"}`,
 		"external id":              `{"endpoint":"https://service.me-east-1.maxcompute.aliyun.com/api","project":"customer_project","accessKeyId":"a","accessKeySecret":"b","externalId":"x"}`,
 		"secret in a wrong type":   `{"endpoint":"https://service.me-east-1.maxcompute.aliyun.com/api","project":"customer_project","accessKeyId":"a","accessKeySecret":["` + testSecret + `"]}`,
-		"key in another case":     `{"endpoint":"https://service.me-east-1.maxcompute.aliyun.com/api","project":"customer_project","accessKeyId":"a","AccessKeySecret":"` + testSecret + `"}`,
-		"duplicate key":           `{"endpoint":"https://service.me-east-1.maxcompute.aliyun.com/api","project":"customer_project","accessKeyId":"a","accessKeySecret":"b","accessKeySecret":"` + testSecret + `"}`,
-		"duplicate key, folded":   `{"endpoint":"https://service.me-east-1.maxcompute.aliyun.com/api","project":"customer_project","accessKeyId":"a","accessKeySecret":"b","accesskeysecret":"` + testSecret + `"}`,
-		"array":                   `[1]`,
+		"key in another case":      `{"endpoint":"https://service.me-east-1.maxcompute.aliyun.com/api","project":"customer_project","accessKeyId":"a","AccessKeySecret":"` + testSecret + `"}`,
+		"duplicate key":            `{"endpoint":"https://service.me-east-1.maxcompute.aliyun.com/api","project":"customer_project","accessKeyId":"a","accessKeySecret":"b","accessKeySecret":"` + testSecret + `"}`,
+		"duplicate key, folded":    `{"endpoint":"https://service.me-east-1.maxcompute.aliyun.com/api","project":"customer_project","accessKeyId":"a","accessKeySecret":"b","accesskeysecret":"` + testSecret + `"}`,
+		"array":                    `[1]`,
 		"secret in the key id key": `{"endpoint":"https://service.me-east-1.maxcompute.aliyun.com/api","project":"customer_project","accessKeyId":"` + testSecret + `-x","accessKeySecret":"b"}`,
 	}
 	for name, cfg := range refused {
