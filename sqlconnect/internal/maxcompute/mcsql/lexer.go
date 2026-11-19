@@ -5,6 +5,7 @@ package mcsql
 
 import (
 	"errors"
+	"slices"
 	"strings"
 )
 
@@ -173,8 +174,8 @@ func Statements(tokens []Token) [][]Token {
 // new line when the text ends in a line comment, which would swallow it.
 func Terminate(sql string, tokens []Token) string {
 	sql = strings.TrimRight(sql, " \t\n\r\f\v")
-	for i := len(tokens) - 1; i >= 0; i-- {
-		t := tokens[i]
+	for _, t := range slices.Backward(tokens) {
+
 		if t.Kind == Semicolon {
 			return sql
 		}
