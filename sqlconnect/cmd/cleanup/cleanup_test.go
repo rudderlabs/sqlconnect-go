@@ -13,7 +13,7 @@ func TestMaxComputeSweepable(t *testing.T) {
 	old := now.Add(-25 * time.Hour).Unix()
 	fresh := now.Add(-time.Hour).Unix()
 	for name, want := range map[string]bool{
-		fmt.Sprintf("tsqlcon_gppbuorscrfk_%d", old):                           true,
+		fmt.Sprintf("tsqlcon_gppbuorscrfk_%d", old):                           false, // bare: not attributable to this repo
 		fmt.Sprintf("rs_retl_probe_sc_e692d7f4_tsqlcon_gppbuorscrfk_%d", old): true,
 		fmt.Sprintf("rs_retl_probe_sc_e692d7f4_tsqlcon_meta_%d", old):         true,
 		fmt.Sprintf("tsqlcon_gppbuorscrfk_%d", fresh):                         false, // a run in progress
