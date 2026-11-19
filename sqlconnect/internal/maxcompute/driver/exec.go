@@ -235,8 +235,10 @@ func (c *Connector) wait(ctx context.Context, inst *odps.Instance) error {
 
 // failure returns the classified failure text of a failed job.
 func (c *Connector) failure(ctx context.Context, inst *odps.Instance) error {
+	// A transport error here would turn a failed job into a retryable
+	// network error, so the read of the failure text is retried.
 	var results []odps.TaskResult
-	err := call(ctx, func() error {
+	err := retryCall(ctx, func() error {
 		var err error
 		results, err = inst.GetResult()
 		return err
@@ -288,7 +290,9 @@ func (c *Connector) stopped(ctxErr error, inst *odps.Instance) error {
 func stopInstance(ctx context.Context, inst *odps.Instance, wait, interval time.Duration) (sqlconnect.StopOutcome, error) {
 	ctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
-	err := call(ctx, inst.Terminate)
+	// A retried Terminate that answers 409 [Terminated] to [Terminated] means
+	// the first one landed; alreadyEnded counts it as ended.
+	err := retryCall(ctx, inst.Terminate)
 	if err != nil {
 		if alreadyEnded(err) {
 			return sqlconnect.StopMissed, nil

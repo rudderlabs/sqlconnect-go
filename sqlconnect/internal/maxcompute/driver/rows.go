@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"regexp"
 	"sync"
+	"time"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/data"
@@ -29,7 +30,7 @@ func (c *Connector) tunnel(ctx context.Context) (*tunnel.Tunnel, error) {
 	}
 	client := c.cfg.Client
 	var endpoint string
-	err := call(ctx, func() error {
+	err := retryCall(ctx, func() error {
 		var err error
 		endpoint, err = client.Project(client.DefaultProjectName()).GetTunnelEndpoint()
 		return err
@@ -74,7 +75,9 @@ func (c *Connector) openRows(ctx context.Context, inst *odps.Instance) (driver.R
 	}
 	project := c.cfg.Client.DefaultProjectName()
 	var session *tunnel.InstanceResultDownloadSession
-	err = call(ctx, func() error {
+	// A second download session for the same instance is harmless, so the
+	// create is retried after a transport error.
+	err = retryCall(ctx, func() error {
 		var err error
 		session, err = tun.CreateInstanceResultDownloadSession(project, inst.Id(), tunnel.InstanceSessionCfg.WithDefaultDeflateCompressor())
 		return err
@@ -208,7 +211,20 @@ func (r *rows) open(session *tunnel.InstanceResultDownloadSession, start, n int)
 	}
 	done := make(chan opened, 1)
 	go func() {
-		reader, err := session.OpenRecordReader(start, n, 0, nil)
+		var reader *tunnel.RecordProtocReader
+		var err error
+		for attempt := 0; ; attempt++ {
+			reader, err = session.OpenRecordReader(start, n, 0, nil)
+			if err == nil || attempt >= transportRetries || !mcerr.IsTransport(err) {
+				break
+			}
+			select {
+			case <-r.done:
+			case <-time.After(retryBackoff(attempt + 1)):
+				continue
+			}
+			break
+		}
 		done <- opened{reader, err}
 	}()
 	select {

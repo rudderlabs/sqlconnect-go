@@ -301,3 +301,60 @@ func TestResultCountsAreNotSupported(t *testing.T) {
 		require.ErrorIs(t, err, sqlconnect.ErrNotSupported)
 	}
 }
+
+func TestTransportRetries(t *testing.T) {
+	saved := retryBackoff
+	retryBackoff = func(int) time.Duration { return time.Millisecond }
+	defer func() { retryBackoff = saved }()
+
+	t.Run("a dropped result read keeps a failed job FAILED", func(t *testing.T) {
+		f := newFakeODPS(t)
+		f.set(func(f *fakeODPS) {
+			f.statuses = []string{"Failed"}
+			f.failureText = "ODPS-0130131:[1,15] Table not found - table p.s.t cannot be resolved"
+			f.resultFailures = 2
+		})
+		_, err := f.db(t).ExecContext(context.Background(), "SELECT * FROM s.t")
+		var e *mcerr.Error
+		require.ErrorAs(t, err, &e)
+		require.Equal(t, mcerr.CategoryNotFound, e.Category, "not network: the job really failed")
+		require.False(t, e.Retryable)
+		f.mu.Lock()
+		require.Equal(t, 3, f.results)
+		f.mu.Unlock()
+	})
+
+	t.Run("retries are bounded", func(t *testing.T) {
+		f := newFakeODPS(t)
+		f.set(func(f *fakeODPS) {
+			f.statuses = []string{"Failed"}
+			f.resultFailures = 10
+		})
+		_, err := f.db(t).ExecContext(context.Background(), "SELECT 1")
+		var e *mcerr.Error
+		require.ErrorAs(t, err, &e)
+		require.Equal(t, mcerr.CategoryNetwork, e.Category)
+		f.mu.Lock()
+		require.Equal(t, 1+transportRetries, f.results)
+		f.mu.Unlock()
+	})
+
+	t.Run("a terminate whose answer is lost counts as landed on retry", func(t *testing.T) {
+		f := newFakeODPS(t)
+		f.set(func(f *fakeODPS) {
+			f.statuses = []string{"Running"}
+			f.terminateFailures = 1
+		})
+		outcome, err := StopInstance(context.Background(), f.client(), "inst1", time.Second)
+		require.NoError(t, err)
+		require.Contains(t, []sqlconnect.StopOutcome{sqlconnect.StopLanded, sqlconnect.StopMissed}, outcome)
+		require.Equal(t, 2, f.snapshot().terminates)
+	})
+
+	t.Run("a non-transport error is not retried", func(t *testing.T) {
+		calls := 0
+		err := retryCall(context.Background(), func() error { calls++; return errors.New("ODPS-0130131: x") })
+		require.Error(t, err)
+		require.Equal(t, 1, calls)
+	})
+}

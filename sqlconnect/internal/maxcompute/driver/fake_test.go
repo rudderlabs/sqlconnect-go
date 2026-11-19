@@ -41,6 +41,10 @@ type fakeODPS struct {
 	terminateBody string
 	// pollFailures makes the first n polls fail at the transport.
 	pollFailures int
+	// resultFailures and terminateFailures make the first n result reads and
+	// terminate calls fail at the transport.
+	resultFailures, terminateFailures int
+	results                           int
 	// pollDelay delays each poll answer.
 	pollDelay time.Duration
 
@@ -138,9 +142,21 @@ func (f *fakeODPS) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		_, _ = fmt.Fprintf(w, `<Instance><Tasks><Task Type="SQL"><Name>AnonymousSQLTask</Name><Status>%s</Status></Task></Tasks></Instance>`, status)
 	case r.Method == http.MethodGet && r.URL.Path == "/projects/p/instances/inst1" && r.URL.Query().Has("result"):
+		f.results++
+		if f.resultFailures > 0 {
+			f.resultFailures--
+			f.drop(w)
+			return
+		}
 		_, _ = io.WriteString(w, taskResultXML("Failed", f.failureText))
 	case r.Method == http.MethodPut && r.URL.Path == "/projects/p/instances/inst1":
 		f.terminates++
+		if f.terminateFailures > 0 {
+			f.terminateFailures--
+			f.terminated = true // the terminate landed; only its answer is lost
+			f.drop(w)
+			return
+		}
 		if f.terminateStatus != 0 {
 			w.WriteHeader(f.terminateStatus)
 			body := f.terminateBody
@@ -155,6 +171,16 @@ func (f *fakeODPS) serve(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>NoSuchObject</Code><Message><![CDATA[ODPS-0420111: Project not found - 'p'.]]></Message></Error>`)
 	}
+}
+
+// drop closes the connection without an answer, as a load balancer closing a
+// stale keep-alive connection does: the client sees EOF.
+func (f *fakeODPS) drop(w http.ResponseWriter) {
+	hj, ok := w.(http.Hijacker)
+	require.True(f.t, ok)
+	conn, _, err := hj.Hijack()
+	require.NoError(f.t, err)
+	_ = conn.Close()
 }
 
 func taskResultXML(status, content string) string {
