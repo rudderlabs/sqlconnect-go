@@ -170,3 +170,75 @@ func TestRangeResume(t *testing.T) {
 		require.Equal(t, sequence(total), ids)
 	})
 }
+
+// racyStream's Close writes state its Read reads, as the SDK's zlib reader
+// does: under -race, a Close during a Read is reported.
+type racyStream struct {
+	next, end int
+	closed    bool
+	stall     chan struct{} // when set, Read blocks on it once next reaches stallAt
+	stallAt   int
+
+	closeStall sync.Once
+}
+
+func (s *racyStream) Read() (data.Record, error) {
+	if s.closed {
+		return nil, io.ErrUnexpectedEOF
+	}
+	if s.stall != nil && s.next == s.stallAt {
+		<-s.stall
+		return nil, io.ErrUnexpectedEOF
+	}
+	if s.next >= s.end {
+		return nil, io.EOF
+	}
+	s.next++
+	return data.Record{data.BigInt(s.next - 1)}, nil
+}
+
+func (s *racyStream) Close() error {
+	if s.stall != nil {
+		// A stalled stream is closed by stop while its Read blocks, by
+		// design; closing the channel is the only thing that touches it.
+		s.closeStall.Do(func() { close(s.stall) })
+		return nil
+	}
+	s.closed = true
+	return nil
+}
+
+func TestStopDoesNotCloseDuringRead(t *testing.T) {
+	cfg := Config{RangeBufferRows: 2}
+	cfg.applyDefaults()
+	r := newRows(nil, "inst1")
+	r.startWith(func(start, count int) (recordReader, error) {
+		return &racyStream{next: start, end: start + count}, nil
+	}, 100000, cfg)
+	dest := make([]driver.Value, 1)
+	require.NoError(t, r.Next(dest))
+	// The caller stops after one row (QueryRow) while the reader streams.
+	require.NoError(t, r.Close())
+}
+
+func TestStopClosesAStalledReaderAfterGrace(t *testing.T) {
+	saved := stopGrace
+	stopGrace = 50 * time.Millisecond
+	defer func() { stopGrace = saved }()
+	cfg := Config{RangeBufferRows: 100}
+	cfg.applyDefaults()
+	var mu sync.Mutex
+	var stream *racyStream
+	r := newRows(nil, "inst1")
+	r.startWith(func(start, count int) (recordReader, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		stream = &racyStream{next: start, end: start + count, stall: make(chan struct{}), stallAt: start + 1}
+		return stream, nil
+	}, 10, cfg)
+	dest := make([]driver.Value, 1)
+	require.NoError(t, r.Next(dest))
+	start := time.Now()
+	require.NoError(t, r.Close(), "Close returns once the stalled reader is closed")
+	require.Less(t, time.Since(start), 2*time.Second)
+}

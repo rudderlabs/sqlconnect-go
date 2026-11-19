@@ -217,13 +217,15 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 		if opened == nil {
 			return
 		}
-		// The reader is closed here after a break and by stop on a cancel;
-		// the once-closer keeps the two from closing it concurrently.
+		// This goroutine closes its reader on every exit. stop closes it too,
+		// but only after a grace period, for a stream stuck in a Read; the
+		// once-closer keeps the two from closing it twice.
 		reader := &onceCloser{recordReader: opened}
 		if !r.track(reader) {
 			return
 		}
 		var readErr error
+		stopped := false
 		for {
 			var rec data.Record
 			rec, readErr = readRecord(reader)
@@ -236,10 +238,14 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 			}
 			got++
 			if !send(item{record: rec}) {
-				return
+				stopped = true
+				break
 			}
 		}
 		_ = reader.Close()
+		if stopped {
+			return
+		}
 		if errors.Is(readErr, io.EOF) && got == n {
 			return
 		}
@@ -383,14 +389,34 @@ func (r *rows) abort(err error) {
 	r.stop()
 }
 
+// stopGrace is how long stop lets the readers notice it and close their own
+// readers before it closes them itself.
+var stopGrace = 3 * time.Second
+
+// stop ends the read. The SDK's reader (a zlib stream over the HTTP body) must
+// not be closed while a Read on it runs, so each range goroutine closes its
+// own reader once it sees stop: between records, or when its send is refused.
+// A goroutine stuck in a Read on a stalled stream never sees it, so after
+// stopGrace stop closes the remaining readers itself to unblock it.
 func (r *rows) stop() {
 	r.stopOnce.Do(func() {
 		close(r.done)
-		r.mu.Lock()
-		for _, rd := range r.readers {
-			_ = rd.Close()
-		}
-		r.mu.Unlock()
+		finished := make(chan struct{})
+		go func() {
+			r.wg.Wait()
+			close(finished)
+		}()
+		go func() {
+			select {
+			case <-finished:
+			case <-time.After(stopGrace):
+				r.mu.Lock()
+				for _, rd := range r.readers {
+					_ = rd.Close()
+				}
+				r.mu.Unlock()
+			}
+		}()
 	})
 }
 
