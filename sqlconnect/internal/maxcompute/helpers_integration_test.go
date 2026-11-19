@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -50,11 +52,12 @@ var runID = func() string {
 func objectName(name string) string { return "rs_retl_probe_sc_" + runID + "_" + name }
 
 // testSchema creates a fresh schema for the test and drops it, with
-// everything in it, when the test ends. The name also holds tsqlcon_, so the
-// scheduled sweeper (sqlconnect/cmd/cleanup) drops a schema a killed run leaked.
+// everything in it, when the test ends. The name holds tsqlcon_ and its unix
+// time, so the scheduled sweeper (sqlconnect/cmd/cleanup) drops a schema a
+// killed run leaked once it is a day old.
 func testSchema(t *testing.T, db *maxcompute.DB, name string) string {
 	t.Helper()
-	schema := objectName("tsqlcon_" + name)
+	schema := objectName(fmt.Sprintf("tsqlcon_%s_%d", name, time.Now().Unix()))
 	ctx := context.Background()
 	require.NoError(t, db.CreateSchema(ctx, sqlconnect.SchemaRef{Name: schema}))
 	t.Cleanup(func() {

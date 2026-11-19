@@ -4,7 +4,10 @@ import (
 	"context"
 	"log"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/tidwall/sjson"
 	"golang.org/x/sync/errgroup"
@@ -33,9 +36,12 @@ func main() {
 			s, _ = sjson.Delete(s, "fabricWorkspaceId")
 			return s
 		}},
-		// MaxCompute: DropSchema drops with CASCADE. Only tsqlcon_ schemas are
-		// touched; the shared dev project holds other teams' objects.
-		{Env: "MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS", Type: maxcompute.DatabaseType},
+		// MaxCompute: the dev project is shared with other teams' probes and
+		// DropSchema drops with CASCADE, so only this repo's exact test names
+		// older than 24 h are dropped; a run in progress is never touched.
+		{Env: "MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS", Type: maxcompute.DatabaseType, Sweep: func(name string) bool {
+			return maxComputeSweepable(name, time.Now())
+		}},
 		{Env: "REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS", Type: redshift.DatabaseType},
 		{Env: "REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS", Type: redshift.DatabaseType},
 		{Env: "SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS", Type: snowflake.DatabaseType},
@@ -61,8 +67,12 @@ func main() {
 			if err != nil {
 				log.Fatalf("[%s] failed to list schemas: %v", c.Type, err)
 			}
+			sweep := c.Sweep
+			if sweep == nil {
+				sweep = func(name string) bool { return strings.Contains(strings.ToLower(name), "tsqlcon_") }
+			}
 			for _, schema := range schemas {
-				if strings.Contains(strings.ToLower(schema.Name), "tsqlcon_") {
+				if sweep(schema.Name) {
 					err := db.DropSchema(ctx, schema)
 					if err != nil {
 						log.Printf("[%s] failed to drop schema: %v", c.Type, err)
@@ -84,4 +94,31 @@ type cleanupConfig struct {
 	Type string
 	Env  string
 	Fn   func(string) string
+	// Sweep reports whether a schema may be dropped. Nil means any schema
+	// whose name contains tsqlcon_.
+	Sweep func(name string) bool
+}
+
+// maxComputeTestSchema matches the schemas the MaxCompute tests create, and
+// nothing else: the shared suite's tsqlcon_<random>_<unix> (bare, or prefixed
+// rs_retl_probe_sc_<run>_ since the suite prefixes it) and the package's own
+// rs_retl_probe_sc_<run>_tsqlcon_<name>_<unix>. The last group is the unix
+// time the name was made.
+var maxComputeTestSchema = regexp.MustCompile(`^(?:rs_retl_probe_sc_[0-9a-f]{8}_)?tsqlcon_[a-z0-9_]+_([0-9]{10})$`)
+
+// maxComputeSweepAge is the age below which a test schema may still be in use.
+const maxComputeSweepAge = 24 * time.Hour
+
+// maxComputeSweepable reports whether name is a MaxCompute test schema made
+// more than 24 hours before now.
+func maxComputeSweepable(name string, now time.Time) bool {
+	m := maxComputeTestSchema.FindStringSubmatch(name)
+	if m == nil {
+		return false
+	}
+	created, err := strconv.ParseInt(m[1], 10, 64)
+	if err != nil {
+		return false
+	}
+	return now.Sub(time.Unix(created, 0)) > maxComputeSweepAge
 }
