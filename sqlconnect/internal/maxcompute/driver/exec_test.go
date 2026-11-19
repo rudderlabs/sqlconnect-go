@@ -288,3 +288,16 @@ func TestJobTag(t *testing.T) {
 	_, err = db.ExecContext(WithScript(context.Background()), "SET rudderstack.job.tag=other; SELECT 1")
 	require.ErrorIs(t, err, ErrProtectedSet, "the tag cannot be overridden from SQL")
 }
+
+func TestResultCountsAreNotSupported(t *testing.T) {
+	f := newFakeODPS(t)
+	db := f.db(t)
+	for _, ctx := range []context.Context{context.Background(), WithScript(context.Background())} {
+		res, err := db.ExecContext(ctx, "INSERT INTO t SELECT 1")
+		require.NoError(t, err)
+		_, err = res.RowsAffected()
+		require.ErrorIs(t, err, sqlconnect.ErrNotSupported, "a caller must not trust a count of 0")
+		_, err = res.LastInsertId()
+		require.ErrorIs(t, err, sqlconnect.ErrNotSupported)
+	}
+}
