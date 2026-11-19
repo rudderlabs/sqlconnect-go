@@ -116,6 +116,9 @@ func (c *Connector) submit(ctx context.Context, text string) (*odps.Instance, er
 	opt.TaskName = TaskName
 	opt.Hints = jobHints(ctx, c.cfg.DefaultSchema)
 	client := c.cfg.Client
+	if c.cfg.SubmitClient != nil {
+		client = c.cfg.SubmitClient
+	}
 	done := make(chan submitted, 1)
 	go func() {
 		inst, err := client.ExecSQlWithOption(text, opt)
@@ -133,6 +136,11 @@ func (c *Connector) submit(ctx context.Context, text string) (*odps.Instance, er
 		}
 		if s.inst == nil || s.inst.Id() == "" {
 			return nil, mcerr.Local(mcerr.CategoryUnknown, "the server returned no instance")
+		}
+		if client != c.cfg.Client && !s.inst.IsSync() {
+			// Polls, results, terminates and tunnel reads go through the main
+			// client and its shorter timeout, not the submit client.
+			return c.cfg.Client.Instance(s.inst.Id()), nil
 		}
 		return s.inst, nil
 	case <-ctx.Done():

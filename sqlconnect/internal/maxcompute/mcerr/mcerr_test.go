@@ -132,3 +132,15 @@ type timeoutErr struct{}
 func (timeoutErr) Error() string   { return "i/o timeout" }
 func (timeoutErr) Timeout() bool   { return true }
 func (timeoutErr) Temporary() bool { return true }
+
+func TestClientTimeoutIsNotACallerCancel(t *testing.T) {
+	clientTimeout := &url.Error{Op: "Post", URL: "https://x", Err: fmt.Errorf("%w (Client.Timeout exceeded while awaiting headers)", context.DeadlineExceeded)}
+	require.ErrorIs(t, clientTimeout, context.DeadlineExceeded, "what net/http returns")
+	e := FromSubmit(pkgerrors.WithStack(clientTimeout))
+	require.Equal(t, CategoryNetwork, e.Category)
+	require.True(t, e.OutcomeUnknown)
+	require.NotErrorIs(t, e, context.DeadlineExceeded)
+
+	require.Equal(t, CategoryCancelled, FromSDK(context.DeadlineExceeded).Category)
+	require.Equal(t, CategoryCancelled, FromSDK(pkgerrors.WithStack(context.Canceled)).Category)
+}

@@ -108,7 +108,7 @@ func FromSDK(err error) *Error {
 	if e, ok := errors.AsType[*Error](err); ok {
 		return e
 	}
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	if callerContext(err) {
 		return Context(err, "", "")
 	}
 	if IsTransport(err) {
@@ -151,6 +151,24 @@ func FromSubmit(err error) *Error {
 func FromJob(text string) *Error {
 	c := classifyText(text)
 	return &Error{Category: c.category, Code: c.code, Message: safe(errors.New(text)), Retryable: c.retryable}
+}
+
+// callerContext reports a context error that is not inside an HTTP error. An
+// http.Client timeout also satisfies errors.Is(err, context.DeadlineExceeded)
+// ("Client.Timeout exceeded while awaiting headers"), but it comes wrapped in
+// a *url.Error and is a network failure, not the caller's deadline: on a
+// submit the job may exist (RC3 R1).
+func callerContext(err error) bool {
+	if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	if _, ok := errors.AsType[*url.Error](err); ok {
+		return false
+	}
+	if _, ok := errors.AsType[*net.OpError](err); ok {
+		return false
+	}
+	return true
 }
 
 // IsTransport reports whether err is a network failure.

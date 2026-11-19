@@ -13,11 +13,10 @@ import (
 func TestConvertValueUTC(t *testing.T) {
 	kolkata, err := time.LoadLocation("Asia/Kolkata")
 	require.NoError(t, err)
-	saved := time.Local
-	time.Local = kolkata
-	defer func() { time.Local = saved }()
-
-	instant := time.Unix(1763460000, 123456789) // in time.Local, as the SDK builds it
+	// The SDK builds these values in time.Local; a non-UTC location stands in
+	// for it without mutating the process-wide time.Local, which other
+	// goroutines (an abandoned SDK submit) read.
+	instant := time.Unix(1763460000, 123456789).In(kolkata)
 	for _, v := range []data.Data{data.Timestamp(instant), data.DateTime(instant)} {
 		got, err := convertValue(v)
 		require.NoError(t, err)

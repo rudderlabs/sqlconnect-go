@@ -30,6 +30,11 @@ type fakeODPS struct {
 	statuses []string
 	// failureText is the job result when a task fails.
 	failureText string
+	// submitDelay delays the submit answer, as a hung connection does.
+	submitDelay time.Duration
+	// conflicts answers the first n submits with HTTP 409 and Retry-After: 1,
+	// which the SDK retries on its own for up to 180 s.
+	conflicts int
 	// submitStatus and submitBody, when set, reject the submit.
 	submitStatus int
 	submitBody   string
@@ -108,6 +113,20 @@ func (f *fakeODPS) serve(w http.ResponseWriter, r *http.Request) {
 			require.NoError(f.t, json.Unmarshal([]byte(html.UnescapeString(string(m[1]))), &s.Hints))
 		}
 		f.submits = append(f.submits, s)
+		if f.submitDelay > 0 {
+			d := f.submitDelay
+			f.mu.Unlock()
+			time.Sleep(d)
+			f.mu.Lock()
+		}
+		if f.conflicts > 0 {
+			f.conflicts--
+			w.Header().Set("Location", f.srv.URL+"/projects/p/instances/inst1")
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusConflict)
+			_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>Busy</Code><Message><![CDATA[try later]]></Message></Error>`)
+			return
+		}
 		if f.submitStatus != 0 {
 			w.WriteHeader(f.submitStatus)
 			_, _ = io.WriteString(w, f.submitBody)

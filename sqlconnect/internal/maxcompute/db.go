@@ -23,6 +23,11 @@ const (
 	// DatabaseType is the name the driver registers under.
 	DatabaseType = "maxcompute"
 
+	// submitTimeout bounds a job submit (POST), which is never retried: a
+	// timed-out submit leaves the outcome unknown, so it waits longer than the
+	// idempotent calls, which retry.
+	submitTimeout = 120 * time.Second
+
 	// connectionTimeout bounds each REST call and TCP connect, as the
 	// destination's applyConnectionTimeout does.
 	connectionTimeout = 30 * time.Second
@@ -60,7 +65,15 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	}
 	client.SetHttpTimeout(connectionTimeout)
 	client.SetTcpConnectTimeout(connectionTimeout)
-	connector, err := driver.NewConnector(driver.Config{Client: client, DefaultSchema: config.Schema})
+	// The SDK keeps one HTTP client per Odps value, with no per-call timeout,
+	// so submits get a second Odps with its own client and timeout.
+	submitClient, err := odpsclient.NewWithAccessKey(config.Project, config.Region(), config.Endpoint, config.AccessKeyID, config.AccessKeySecret)
+	if err != nil {
+		return nil, err
+	}
+	submitClient.SetHttpTimeout(submitTimeout)
+	submitClient.SetTcpConnectTimeout(connectionTimeout)
+	connector, err := driver.NewConnector(driver.Config{Client: client, SubmitClient: submitClient, DefaultSchema: config.Schema})
 	if err != nil {
 		return nil, err
 	}

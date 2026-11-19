@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aliyun/aliyun-odps-go-sdk/odps"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/data"
 	pkgerrors "github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
@@ -371,5 +372,68 @@ func TestTransportRetries(t *testing.T) {
 		err := retryCall(context.Background(), func() error { calls++; return errors.New("ODPS-0130131: x") })
 		require.Error(t, err)
 		require.Equal(t, 1, calls)
+	})
+}
+
+func TestSubmitTimeouts(t *testing.T) {
+	submitClient := func(f *fakeODPS, timeout time.Duration) *odps.Odps {
+		o := f.client()
+		o.SetHttpTimeout(timeout)
+		return o
+	}
+
+	t.Run("a submit HTTP timeout is a network error with an unknown outcome, not a cancel", func(t *testing.T) {
+		f := newFakeODPS(t)
+		f.set(func(f *fakeODPS) { f.submitDelay = 600 * time.Millisecond })
+		db := f.db(t, func(c *Config) { c.SubmitClient = submitClient(f, 150*time.Millisecond) })
+		_, err := db.ExecContext(context.Background(), "SELECT 1")
+		var e *mcerr.Error
+		require.ErrorAs(t, err, &e)
+		require.Equal(t, mcerr.CategoryNetwork, e.Category, err.Error())
+		require.True(t, e.OutcomeUnknown, "the server may have created the job")
+		require.False(t, errors.Is(err, context.DeadlineExceeded), "the caller's context did not end")
+		require.Empty(t, e.Stop)
+	})
+
+	t.Run("the caller's own deadline is still a cancel", func(t *testing.T) {
+		f := newFakeODPS(t)
+		f.set(func(f *fakeODPS) { f.submitDelay = 600 * time.Millisecond })
+		db := f.db(t, func(c *Config) { c.SubmitClient = submitClient(f, 5*time.Second) })
+		ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+		defer cancel()
+		_, err := db.ExecContext(ctx, "SELECT 1")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		var e *mcerr.Error
+		require.ErrorAs(t, err, &e)
+		require.Equal(t, mcerr.CategoryCancelled, e.Category)
+		require.True(t, e.OutcomeUnknown)
+	})
+
+	t.Run("polls after a submit use the main client", func(t *testing.T) {
+		f := newFakeODPS(t)
+		f.set(func(f *fakeODPS) { f.statuses = []string{"Running", "Success"} })
+		db := f.db(t, func(c *Config) { c.SubmitClient = submitClient(f, 5*time.Second) })
+		var ids []string
+		_, err := db.ExecContext(WithInstanceIDHandler(context.Background(), func(id string) { ids = append(ids, id) }), "SELECT 1")
+		require.NoError(t, err)
+		require.Equal(t, []string{"inst1"}, ids)
+		require.Equal(t, 2, f.snapshot().polls)
+	})
+
+	t.Run("the SDK's 409 loop retries the submit, bounded by the caller's context", func(t *testing.T) {
+		f := newFakeODPS(t)
+		f.set(func(f *fakeODPS) { f.conflicts = 1 })
+		_, err := f.db(t).ExecContext(context.Background(), "SELECT 1")
+		require.NoError(t, err, "one 409 with Retry-After: 1, then created")
+		require.Len(t, f.snapshot().submits, 2)
+
+		f2 := newFakeODPS(t)
+		f2.set(func(f *fakeODPS) { f.conflicts = 100 })
+		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+		defer cancel()
+		start := time.Now()
+		_, err = f2.db(t).ExecContext(ctx, "SELECT 1")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Less(t, time.Since(start), 2*time.Second, "the context, not the SDK's 180 s loop, bounds the wait")
 	})
 }

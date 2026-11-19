@@ -16,6 +16,11 @@ type Config struct {
 	// Client is the configured ODPS client. Its default project is the project
 	// every statement runs in.
 	Client *odps.Odps
+	// SubmitClient, when set, creates the jobs, with an HTTP timeout of its own:
+	// a job submit is never retried, so it gets a longer timeout than the
+	// polls, metadata reads and result reads made with Client. It must be for
+	// the same account, endpoint and project as Client.
+	SubmitClient *odps.Odps
 	// DefaultSchema is sent as odps.default.schema on every job when not empty.
 	DefaultSchema string
 
