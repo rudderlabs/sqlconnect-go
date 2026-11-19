@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/restclient"
@@ -69,8 +70,9 @@ func (db *DB) ListTables(ctx context.Context, schema sqlconnect.SchemaRef, opts 
 
 func (db *DB) listTableNames(ctx context.Context, schema string, filters ...odps.TFilterFunc) ([]string, error) {
 	var names []string
-	var listErr error
-	err := call(ctx, func() error {
+	err := readCall(ctx, func() error {
+		names = nil
+		var listErr error
 		odps.NewTables(db.client, db.config.Project, schema).List(func(t *odps.Table, err error) {
 			if err != nil {
 				listErr = err
@@ -95,7 +97,7 @@ func (db *DB) TableExists(ctx context.Context, relation sqlconnect.RelationRef) 
 	if err != nil {
 		return false, nil //nolint:nilerr // a name MaxCompute cannot hold names no table
 	}
-	err = call(ctx, table.Load)
+	err = readCall(ctx, table.Load)
 	if err == nil {
 		return true, nil
 	}
@@ -117,7 +119,7 @@ func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) 
 	if err != nil {
 		return nil, err
 	}
-	if err := call(ctx, table.Load); err != nil {
+	if err := readCall(ctx, table.Load); err != nil {
 		if httpStatus(err) == http.StatusNotFound {
 			return nil, mcerr.Local(mcerr.CategoryNotFound, "relation "+relation.String()+" not found")
 		}
@@ -203,6 +205,26 @@ func wrap(op string, err error) error {
 		e.Message = op + ": " + e.Message
 	}
 	return e
+}
+
+// readRetries bounds the retries of a read-only REST call after a transport
+// error: a metadata read is idempotent, unlike a job submit.
+const readRetries = 3
+
+// readCall is call with retries of transport errors, for read-only REST calls.
+func readCall(ctx context.Context, fn func() error) error {
+	var err error
+	for attempt := 0; ; attempt++ {
+		err = call(ctx, fn)
+		if err == nil || attempt == readRetries || ctx.Err() != nil || !mcerr.IsTransport(err) {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Duration(attempt+1) * 300 * time.Millisecond):
+		}
+	}
 }
 
 // call runs an SDK call that takes no context and returns early when ctx ends.

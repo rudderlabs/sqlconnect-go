@@ -26,19 +26,20 @@ func (db *DB) ListSchemas(ctx context.Context, opts ...sqlconnect.Option) ([]sql
 		return nil, nil
 	}
 	var schemas []sqlconnect.SchemaRef
-	var listErr error
-	err = call(ctx, func() error {
-		return db.client.Schemas().List(func(s *odps.Schema, err error) {
+	err = readCall(ctx, func() error {
+		schemas = nil
+		var listErr error
+		if err := db.client.Schemas().List(func(s *odps.Schema, err error) {
 			if err != nil {
 				listErr = err
 				return
 			}
 			schemas = append(schemas, sqlconnect.SchemaRef{Name: s.Name()})
-		})
+		}); err != nil {
+			return err
+		}
+		return listErr
 	})
-	if err == nil {
-		err = listErr
-	}
 	if err != nil {
 		return nil, wrap("listing schemas", err)
 	}
@@ -61,7 +62,7 @@ func (db *DB) SchemaExists(ctx context.Context, schemaRef sqlconnect.SchemaRef, 
 	if mcsql.CheckName(name) != nil {
 		return false, nil //nolint:nilerr // a name MaxCompute cannot hold names no schema
 	}
-	err = call(ctx, func() error { return db.client.Schema(name).Load() })
+	err = readCall(ctx, func() error { return db.client.Schema(name).Load() })
 	if err == nil {
 		return true, nil
 	}
