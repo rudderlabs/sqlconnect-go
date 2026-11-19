@@ -22,6 +22,7 @@ func GoquDialectOptions() *sqlgen.SQLDialectOptions {
 	o := sqlgen.DefaultDialectOptions()
 	o.QuoteIdentifiers = false
 	o.QuoteRune = '`'
+	o.UseEqForBooleanDataTypes = true // MaxCompute does not parse IS TRUE
 	o.EscapedRunes = map[rune][]byte{
 		'\'': []byte(`\'`),
 		'\\': []byte(`\\`),

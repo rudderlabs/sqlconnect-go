@@ -5,6 +5,7 @@ Sqlconnect provides a uniform client interface for accessing multiple warehouses
 - bigquery ([configuration](sqlconnect/internal/bigquery/config.go))
 - clickhouse ([configuration](sqlconnect/internal/clickhouse/config.go))
 - databricks ([configuration](sqlconnect/internal/databricks/config.go))
+- maxcompute (Alibaba Cloud MaxCompute / ODPS, AccessKey accounts; [configuration](sqlconnect/internal/maxcompute/config.go))
 - Microsoft Fabric ([configuration](sqlconnect/internal/fabric/config.go)); unlike
   other dialects, its deprecated FormatTableName method preserves identifier case
   because Fabric's default collation is case-sensitive
@@ -58,6 +59,23 @@ DROP DATABASE IF EXISTS <working_database> SYNC;
 
 Revoke `ALTER DELETE` on `<working_database>.sync_log` first if you granted it.
 Drop the database only when no sync uses its tables.
+
+## MaxCompute notes
+
+- MaxCompute keeps no session. The driver sends a fixed hint map on every job
+  (`maxcomputequery.FixedHints`) and never sends `odps.sql.timezone`, so every
+  job runs in the project's time zone. `maxcomputequery.WithHints` accepts only
+  `odps.sql.allow.fullscan`.
+- Several statements in one call need `maxcomputequery.WithScript`; otherwise
+  the driver refuses them before any job is created.
+- Bind arguments are rendered as literals (`maxcomputequery.RenderLiteral`);
+  `time.Time` binds are refused.
+- Rows are read through the Instance Tunnel, never through the 10,000-row
+  screen result. Scanned times are in UTC.
+- A multi-byte `VARCHAR(n)`/`CHAR(n)` value longer than `n` bytes fails the read:
+  the SDK would otherwise return it empty. Cast such columns to `STRING`.
+- Errors are classified (`ErrorClassifier`, `maxcomputequery.Describe`) and
+  redacted: no key id, STS id, principal, ARN, URL or Context ID leaves the driver.
 
 ## Usage
 

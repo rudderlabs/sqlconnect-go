@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/bigquery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/databricks"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/fabric"
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/redshift"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/snowflake"
 )
@@ -32,6 +33,9 @@ func main() {
 			s, _ = sjson.Delete(s, "fabricWorkspaceId")
 			return s
 		}},
+		// MaxCompute: DropSchema drops with CASCADE. Only tsqlcon_ schemas are
+		// touched; the shared dev project holds other teams' objects.
+		{Env: "MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS", Type: maxcompute.DatabaseType},
 		{Env: "REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS", Type: redshift.DatabaseType},
 		{Env: "REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS", Type: redshift.DatabaseType},
 		{Env: "SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS", Type: snowflake.DatabaseType},
