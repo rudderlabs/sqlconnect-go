@@ -166,12 +166,13 @@ func (db *DB) RenameTable(ctx context.Context, oldRef, newRef sqlconnect.Relatio
 	return nil
 }
 
-// MoveTable copies the table with a CTAS and drops the old one.
+// MoveTable copies the table with a CTAS and drops the old one. The copy gets
+// the lifecycle of maxcomputequery.WithLifecycle when ctx has one.
 func (db *DB) MoveTable(ctx context.Context, oldRef, newRef sqlconnect.RelationRef) error {
 	if mcsql.Normalise(oldRef.Schema) != mcsql.Normalise(newRef.Schema) {
 		return fmt.Errorf("moving table to another schema not supported, oldRef: %s newRef: %s", oldRef, newRef)
 	}
-	if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s AS SELECT * FROM %s", db.QuoteTable(newRef), db.QuoteTable(oldRef))); err != nil {
+	if _, err := db.ExecContext(ctx, ctasSQL(db.QuoteTable(newRef), lifecycleFrom(ctx), "SELECT * FROM "+db.QuoteTable(oldRef))); err != nil {
 		return fmt.Errorf("copying table %s contents to %s: %w", oldRef, newRef, err)
 	}
 	if err := db.DropTable(ctx, oldRef); err != nil {
@@ -181,10 +182,21 @@ func (db *DB) MoveTable(ctx context.Context, oldRef, newRef sqlconnect.RelationR
 }
 
 // CreateTableFromQuery creates a table with a CTAS. MaxCompute does not
-// accept the parenthesised AS (…) form for every query, so none is added.
+// accept the parenthesised AS (…) form for every query, so none is added. The
+// table gets the lifecycle of maxcomputequery.WithLifecycle when ctx has one;
+// a project with odps.table.lifecycle=mandatory refuses a table without one.
 func (db *DB) CreateTableFromQuery(ctx context.Context, table sqlconnect.RelationRef, query string) error {
-	_, err := db.ExecContext(ctx, fmt.Sprintf("CREATE TABLE %s AS %s", db.QuoteTable(table), query))
+	_, err := db.ExecContext(ctx, ctasSQL(db.QuoteTable(table), lifecycleFrom(ctx), query))
 	return err
+}
+
+// ctasSQL is a CREATE TABLE … AS. The LIFECYCLE clause, when days > 0, goes
+// before AS, the only place MaxCompute accepts it in a CTAS (findings 18).
+func ctasSQL(table string, days int, query string) string {
+	if days > 0 {
+		return fmt.Sprintf("CREATE TABLE %s LIFECYCLE %d AS %s", table, days, query)
+	}
+	return fmt.Sprintf("CREATE TABLE %s AS %s", table, query)
 }
 
 // httpStatus returns the HTTP status of an SDK REST error, or 0.

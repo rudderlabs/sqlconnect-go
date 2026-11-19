@@ -72,15 +72,21 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 			base.WithColumnTypeMapper(columnTypeMapper),
 			base.WithJsonRowMapper(jsonRowMapper),
 			base.WithSQLCommandsOverride(func(cmds base.SQLCommands) base.SQLCommands {
-				cmds.CreateTestTable = func(table base.QuotedIdentifier) string {
-					return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (c1 INT, c2 VARCHAR(255)) LIFECYCLE 1", table)
-				}
+				cmds.CreateTestTable = createTestTableSQL
 				return cmds
 			}),
 		),
 		config: config,
 		client: client,
 	}, nil
+}
+
+// createTestTableSQL is the connection test's table. LIFECYCLE 1 keeps the
+// CREATE valid on a project with odps.table.lifecycle=mandatory, where a
+// table without a lifecycle is refused (findings 18), and lets a table a
+// failed validation leaked expire on its own.
+func createTestTableSQL(table base.QuotedIdentifier) string {
+	return fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (c1 INT, c2 VARCHAR(255)) LIFECYCLE 1", table)
 }
 
 func init() {

@@ -7,6 +7,7 @@ package maxcomputequery
 import (
 	"context"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/driver"
 )
 
@@ -67,4 +68,16 @@ func WithRowCountHandler(ctx context.Context, fn func(rows int64)) context.Conte
 // or credentials. A rudder-go-kit logger.Logger satisfies Logger.
 func WithLogger(ctx context.Context, l Logger) context.Context {
 	return driver.WithLogger(ctx, l)
+}
+
+// ErrLifecycle is returned by WithLifecycle for a value outside 1 to 37231.
+var ErrLifecycle = maxcompute.ErrLifecycle
+
+// WithLifecycle gives the tables the driver creates with
+// CreateTableFromQuery and MoveTable a LIFECYCLE of days (1 to 37231). A
+// project with odps.table.lifecycle=mandatory refuses a table without one.
+// SQL a caller sends itself must carry its own clause: LIFECYCLE n goes last
+// in a CREATE TABLE, after TBLPROPERTIES, and before AS in a CTAS.
+func WithLifecycle(ctx context.Context, days int) (context.Context, error) {
+	return maxcompute.WithLifecycle(ctx, days)
 }
