@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/data"
+	pkgerrors "github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
@@ -349,6 +351,19 @@ func TestTransportRetries(t *testing.T) {
 		require.NoError(t, err)
 		require.Contains(t, []sqlconnect.StopOutcome{sqlconnect.StopLanded, sqlconnect.StopMissed}, outcome)
 		require.Equal(t, 2, f.snapshot().terminates)
+	})
+
+	t.Run("a bare EOF is retried", func(t *testing.T) {
+		calls := 0
+		err := retryCall(context.Background(), func() error {
+			calls++
+			if calls < 3 {
+				return pkgerrors.WithStack(io.EOF)
+			}
+			return nil
+		})
+		require.NoError(t, err)
+		require.Equal(t, 3, calls)
 	})
 
 	t.Run("a non-transport error is not retried", func(t *testing.T) {

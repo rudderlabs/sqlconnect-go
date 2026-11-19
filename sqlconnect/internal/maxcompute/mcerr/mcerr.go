@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"syscall"
@@ -160,7 +161,10 @@ func IsTransport(err error) bool {
 	if _, ok := errors.AsType[*url.Error](err); ok {
 		return true
 	}
-	return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.EPIPE)
+	// A connection the load balancer closed can surface as a bare EOF, for
+	// example when the SDK decodes a truncated response body.
+	return errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
 }
 
 // notSent reports a transport failure that happened before the request was sent.

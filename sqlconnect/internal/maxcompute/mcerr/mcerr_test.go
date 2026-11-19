@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"strings"
@@ -54,6 +55,8 @@ func TestClassifyAndRedact(t *testing.T) {
 		{"throttled", httpErr(429, xmlError("Throttled", "slow down")), CategoryUnknown, "HTTP-429", true},
 		{"mcqa", httpErr(400, xmlError("InvalidParameter", "ODPS-0420061: Cannot find MCQA quota to start connection on project p")), CategoryInternal, "ODPS-0420061", false},
 		{"dns", &url.Error{Op: "Post", URL: "https://service.us-west-9.maxcompute.aliyun.com/api/projects/p/instances", Err: &net.DNSError{Err: "no such host", Name: "service.us-west-9.maxcompute.aliyun.com", IsNotFound: true}}, CategoryNetwork, "", true},
+		{"bare EOF", pkgerrors.WithStack(io.EOF), CategoryNetwork, "", true},
+		{"unexpected EOF", pkgerrors.WithStack(io.ErrUnexpectedEOF), CategoryNetwork, "", true},
 		{"reset", &net.OpError{Op: "read", Net: "tcp", Err: errors.New("connection reset by peer")}, CategoryNetwork, "", true},
 		{"job: missing table", errors.New("ODPS-0130131:[1,15] Table not found - table p.s.t cannot be resolved"), CategoryNotFound, "ODPS-0130131", false},
 		{"job: no select", errors.New("ODPS-0130013:Authorization exception - Authorization Failed [4009,4019], You have NO privilege 'odps:Select' on {acs:odps:*:projects/p/schemas/s/tables/t}. Deny as default for Resource. Context ID:" + fakeContextID + ".\t--->Tips: CurrentProject:p; Principal:" + fakePrincipal + ";"), CategoryPermission, "ODPS-0130013", false},
