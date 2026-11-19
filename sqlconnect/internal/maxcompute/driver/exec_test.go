@@ -489,3 +489,14 @@ func TestSubmitClientError(t *testing.T) {
 	require.Equal(t, mcerr.CategoryInternal, e.Category)
 	require.Empty(t, f.snapshot().submits)
 }
+
+func TestSubmitClientNil(t *testing.T) {
+	f := newFakeODPS(t)
+	db := f.db(t, func(c *Config) {
+		c.NewSubmitClient = func() (*odps.Odps, error) { return nil, nil } //nolint:nilnil // the case under test
+	})
+	_, err := db.ExecContext(context.Background(), "SELECT 1")
+	var e *mcerr.Error
+	require.ErrorAs(t, err, &e, "an error, not a panic")
+	require.Equal(t, mcerr.CategoryInternal, e.Category)
+}

@@ -114,6 +114,9 @@ func (c *Connector) submitter() (*odps.Odps, error) {
 	now := c.now()
 	if c.submitClient == nil || now.Sub(c.submitUsed) > c.cfg.SubmitIdle {
 		client, err := c.cfg.NewSubmitClient()
+		if err == nil && client == nil {
+			err = errors.New("NewSubmitClient returned no client")
+		}
 		if err != nil {
 			return nil, mcerr.LocalWrap(mcerr.CategoryInternal, "the submit client cannot be made", err)
 		}
