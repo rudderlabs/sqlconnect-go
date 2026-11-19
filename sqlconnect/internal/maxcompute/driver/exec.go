@@ -69,18 +69,26 @@ func prepareText(ctx context.Context, query string) (string, error) {
 	return mcsql.Terminate(query, tokens), nil
 }
 
-// run submits text as one job and waits for it to succeed.
-func (c *Connector) run(ctx context.Context, text string) (*odps.Instance, error) {
+// run submits text as one job and waits for it to succeed. kind is "exec" or
+// "query"; a script is logged as "script".
+func (c *Connector) run(ctx context.Context, text, kind string) (*odps.Instance, error) {
+	job := newJobLog(ctx, kind, text)
+	start := time.Now()
 	inst, err := c.submit(ctx, text)
+	submitted := time.Since(start)
 	if err != nil {
+		job.finished("", start, err)
 		return nil, err
 	}
+	job.submitted(inst.Id(), submitted)
 	if fn := instanceIDHandler(ctx); fn != nil {
 		fn(inst.Id())
 	}
 	if err := c.wait(ctx, inst); err != nil {
+		job.finished(inst.Id(), start, err)
 		return nil, err
 	}
+	job.finished(inst.Id(), start, nil)
 	return inst, nil
 }
 

@@ -34,7 +34,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if err != nil {
 		return nil, err
 	}
-	inst, err := c.connector.run(ctx, text)
+	inst, err := c.connector.run(ctx, text, "query")
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	if err != nil {
 		return nil, err
 	}
-	if _, err := c.connector.run(ctx, text); err != nil {
+	if _, err := c.connector.run(ctx, text, "exec"); err != nil {
 		return nil, err
 	}
 	return result{}, nil

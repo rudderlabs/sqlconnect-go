@@ -94,6 +94,7 @@ const (
 	keyHints
 	keyInstanceID
 	keyRowCount
+	keyLogger
 )
 
 // WithScript marks ctx so that the next statement runs as one script job

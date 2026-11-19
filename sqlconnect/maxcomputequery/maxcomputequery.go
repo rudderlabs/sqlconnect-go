@@ -19,6 +19,9 @@ var (
 	ErrMultipleStatements = driver.ErrMultipleStatements
 )
 
+// Logger is the part of a structured logger the driver uses (Infow, Warnw).
+type Logger = driver.Logger
+
 // HintAllowFullScan is the one per-call hint key [WithHints] accepts.
 const HintAllowFullScan = driver.HintAllowFullScan
 
