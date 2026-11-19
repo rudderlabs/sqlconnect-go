@@ -124,6 +124,7 @@ type rows struct {
 	names      []string
 	instanceID string
 
+	opener rangeOpener
 	ranges []chan item // one per range, consumed in order
 	cur    int
 	read   int // records returned
@@ -145,7 +146,31 @@ func newRows(columns []tableschema.Column, instanceID string) *rows {
 	return &rows{columns: columns, names: names, instanceID: instanceID, done: make(chan struct{})}
 }
 
+// recordReader reads the records of one range; the SDK's *tunnel.RecordProtocReader is one.
+type recordReader interface {
+	Read() (data.Record, error)
+	Close() error
+}
+
+// rangeOpener opens a reader over count records from start.
+type rangeOpener func(start, count int) (recordReader, error)
+
+func sessionOpener(session *tunnel.InstanceResultDownloadSession) rangeOpener {
+	return func(start, count int) (recordReader, error) {
+		reader, err := session.OpenRecordReader(start, count, 0, nil)
+		if err != nil {
+			return nil, err
+		}
+		return reader, nil
+	}
+}
+
 func (r *rows) start(session *tunnel.InstanceResultDownloadSession, count int, cfg Config) {
+	r.startWith(sessionOpener(session), count, cfg)
+}
+
+func (r *rows) startWith(opener rangeOpener, count int, cfg Config) {
+	r.opener = opener
 	r.want = count
 	parts := 1
 	if count > cfg.RangeThreshold && cfg.ReadParallelism > 1 {
@@ -157,12 +182,21 @@ func (r *rows) start(session *tunnel.InstanceResultDownloadSession, count int, c
 		ch := make(chan item, cfg.RangeBufferRows)
 		r.ranges = append(r.ranges, ch)
 		r.wg.Add(1)
-		go r.readRange(session, start, n, ch)
+		go r.readRange(start, n, ch)
 	}
 }
 
-// readRange reads one range into ch and closes it.
-func (r *rows) readRange(session *tunnel.InstanceResultDownloadSession, start, n int, ch chan<- item) {
+// maxResumes bounds how often one range is reopened after its stream broke.
+const maxResumes = 3
+
+// readRange reads one range of n records from start into ch, in order, and
+// closes ch. When the stream breaks mid-range (a transport error, an
+// unexpected EOF, or a clean end before n records), the range is reopened at
+// start+got for the n-got records still missing, up to maxResumes times. A
+// record is counted and sent only once the SDK has decoded it whole, so a
+// reopened stream starts exactly at the first record not yet sent: no record
+// is sent twice or skipped, and the range still ends only when got == n.
+func (r *rows) readRange(start, n int, ch chan<- item) {
 	defer r.wg.Done()
 	defer close(ch)
 	send := func(it item) bool {
@@ -173,48 +207,84 @@ func (r *rows) readRange(session *tunnel.InstanceResultDownloadSession, start, n
 			return false
 		}
 	}
-	reader, err := r.open(session, start, n)
-	if err != nil {
-		send(item{err: err})
-		return
-	}
-	if reader == nil || !r.track(reader) {
-		return
-	}
-	got := 0
+	got, resumes := 0, 0
 	for {
-		rec, err := readRecord(reader)
-		if errors.Is(err, io.EOF) {
-			if got != n {
-				send(item{err: mcerr.Local(mcerr.CategoryData, fmt.Sprintf("the result range ended after %d of %d rows", got, n)).WithInstance(r.instanceID)})
-			}
-			return
-		}
+		reader, err := r.open(start+got, n-got)
 		if err != nil {
-			send(item{err: r.readError(err)})
+			send(item{err: err})
 			return
 		}
-		got++
-		if !send(item{record: rec}) {
+		if reader == nil || !r.track(reader) {
 			return
 		}
+		var readErr error
+		for {
+			var rec data.Record
+			rec, readErr = readRecord(reader)
+			if readErr != nil {
+				break
+			}
+			if got == n {
+				readErr = errMoreRows
+				break
+			}
+			got++
+			if !send(item{record: rec}) {
+				return
+			}
+		}
+		_ = reader.Close()
+		if errors.Is(readErr, io.EOF) && got == n {
+			return
+		}
+		if resumable(readErr) && resumes < maxResumes {
+			resumes++
+			select {
+			case <-r.done:
+				return
+			case <-time.After(retryBackoff(resumes)):
+				continue
+			}
+		}
+		if errors.Is(readErr, io.EOF) {
+			send(item{err: mcerr.Local(mcerr.CategoryData, fmt.Sprintf("the result range ended after %d of %d rows", got, n)).WithInstance(r.instanceID)})
+			return
+		}
+		send(item{err: r.readError(readErr)})
+		return
 	}
+}
+
+// errMoreRows is a stream that sent more records than its range asked for.
+var errMoreRows = mcerr.Local(mcerr.CategoryData, "the result range sent more rows than it holds")
+
+// resumable reports a broken stream that a reopened range can continue: a
+// transport error, an unexpected EOF, or an EOF before the range's last
+// record. A decode, checksum or count error is not resumable.
+func resumable(err error) bool {
+	if errors.Is(err, errMoreRows) {
+		return false
+	}
+	if _, ok := errors.AsType[*mcerr.Error](err); ok {
+		return false
+	}
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || mcerr.IsTransport(err)
 }
 
 // open opens a range reader. The open is an HTTP request without a timeout, so
 // it runs aside: when the rows stop first, open returns nil and the reader that
 // may still arrive is closed.
-func (r *rows) open(session *tunnel.InstanceResultDownloadSession, start, n int) (*tunnel.RecordProtocReader, error) {
+func (r *rows) open(start, n int) (recordReader, error) {
 	type opened struct {
-		reader *tunnel.RecordProtocReader
+		reader recordReader
 		err    error
 	}
 	done := make(chan opened, 1)
 	go func() {
-		var reader *tunnel.RecordProtocReader
+		var reader recordReader
 		var err error
 		for attempt := 0; ; attempt++ {
-			reader, err = session.OpenRecordReader(start, n, 0, nil)
+			reader, err = r.opener(start, n)
 			if err == nil || attempt >= transportRetries || !mcerr.IsTransport(err) {
 				break
 			}
@@ -245,7 +315,7 @@ func (r *rows) open(session *tunnel.InstanceResultDownloadSession, start, n int)
 
 // readRecord reads one record and turns a panic in the SDK's decoder into an
 // error: a panic must not be reachable from customer data.
-func readRecord(reader *tunnel.RecordProtocReader) (rec data.Record, err error) {
+func readRecord(reader recordReader) (rec data.Record, err error) {
 	defer func() {
 		if p := recover(); p != nil {
 			err = mcerr.Local(mcerr.CategoryData, "the SDK failed to decode a record")
