@@ -79,6 +79,13 @@ func TestIntegrationRead(t *testing.T) {
 	})
 
 	t.Run("D-C7 time values scan as UTC whatever the process zone", func(t *testing.T) {
+		if raceEnabled {
+			// The test sets the process-wide time.Local, which SDK goroutines
+			// of earlier statements may still read; the race detector would
+			// flag the test's own write. driver.TestConvertValueUTC covers
+			// the conversion under -race.
+			t.Skip("sets time.Local; covered by the driver's unit test under -race")
+		}
 		shanghai, err := time.LoadLocation("Asia/Shanghai")
 		require.NoError(t, err)
 		saved := time.Local

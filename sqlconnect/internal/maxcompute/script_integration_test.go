@@ -30,9 +30,14 @@ func TestIntegrationScriptsAndCancel(t *testing.T) {
 	}
 
 	t.Run("D-C3 cancelling a running CTAS terminates it and creates nothing", func(t *testing.T) {
+		// Cancel 2 s after the job exists: a submit on a fresh connection can
+		// itself take more than 2 s, and a cancel during the submit is the
+		// abandoned-submit path, not a running CTAS.
+		ids := make(chan string, 1)
+		cctx, cancel := context.WithCancel(maxcomputequery.WithInstanceIDHandler(ctx, func(s string) { ids <- s }))
 		var id string
-		cctx, cancel := context.WithCancel(maxcomputequery.WithInstanceIDHandler(ctx, func(s string) { id = s }))
 		go func() {
+			id = <-ids
 			time.Sleep(2 * time.Second)
 			cancel()
 		}()
