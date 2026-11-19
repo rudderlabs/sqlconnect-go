@@ -100,11 +100,11 @@ type cleanupConfig struct {
 }
 
 // maxComputeTestSchema matches the schemas the MaxCompute tests create, and
-// nothing else: the shared suite's tsqlcon_<random>_<unix> (bare, or prefixed
-// rs_retl_probe_sc_<run>_ since the suite prefixes it) and the package's own
-// rs_retl_probe_sc_<run>_tsqlcon_<name>_<unix>. The last group is the unix
-// time the name was made.
-var maxComputeTestSchema = regexp.MustCompile(`^(?:rs_retl_probe_sc_[0-9a-f]{8}_)?tsqlcon_[a-z0-9_]+_([0-9]{10})$`)
+// nothing else: rs_retl_probe_sc_<run>_tsqlcon_<name>_<unix>, from the shared
+// suite and the package's own tests alike. A bare tsqlcon_ name is not
+// attributable to this repo in a shared project, so it is never matched. The
+// last group is the unix time the name was made.
+var maxComputeTestSchema = regexp.MustCompile(`^rs_retl_probe_sc_[0-9a-f]{8}_tsqlcon_[a-z0-9_]+_([0-9]{10})$`)
 
 // maxComputeSweepAge is the age below which a test schema may still be in use.
 const maxComputeSweepAge = 24 * time.Hour
