@@ -22,6 +22,13 @@ const credentialsEnv = "MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS"
 func testConfig(t *testing.T) []byte {
 	t.Helper()
 	configJSON, ok := os.LookupEnv(credentialsEnv)
+	if ok && configJSON == "" {
+		// CI passes the secret as an empty value until the repository secret
+		// exists (HLD OQ7), and on fork PRs. Skip loudly rather than fail on
+		// "invalid config"; an unset variable still fails under
+		// FORCE_RUN_INTEGRATION_TESTS.
+		t.Skip("skipping maxcompute integration test: " + credentialsEnv + " is empty (repository secret not configured)")
+	}
 	if !ok {
 		if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
 			t.Fatal(credentialsEnv + " environment variable not set")
