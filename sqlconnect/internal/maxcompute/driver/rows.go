@@ -124,11 +124,13 @@ type rows struct {
 	names      []string
 	instanceID string
 
-	opener rangeOpener
-	ranges []chan item // one per range, consumed in order
-	cur    int
-	read   int // records returned
-	want   int // records the session reported
+	opener  rangeOpener
+	backoff func(int) time.Duration // wait before resume or reopen n
+	grace   time.Duration           // see stopGrace
+	ranges  []chan item             // one per range, consumed in order
+	cur     int
+	read    int // records returned
+	want    int // records the session reported
 
 	mu       sync.Mutex
 	readers  []io.Closer
@@ -143,7 +145,9 @@ func newRows(columns []tableschema.Column, instanceID string) *rows {
 	for i, c := range columns {
 		names[i] = c.Name
 	}
-	return &rows{columns: columns, names: names, instanceID: instanceID, done: make(chan struct{})}
+	// The timings are read once here, not by the reader goroutines, which can
+	// outlive the call that started them.
+	return &rows{columns: columns, names: names, instanceID: instanceID, done: make(chan struct{}), backoff: retryBackoff, grace: stopGrace}
 }
 
 // recordReader reads the records of one range; the SDK's *tunnel.RecordProtocReader is one.
@@ -257,12 +261,12 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 			select {
 			case <-r.done:
 				return
-			case <-time.After(retryBackoff(resumes)):
+			case <-time.After(r.backoff(resumes)):
 				continue
 			}
 		}
 		if errors.Is(readErr, io.EOF) {
-			send(item{err: mcerr.Local(mcerr.CategoryData, fmt.Sprintf("the result range ended after %d of %d rows", got, n)).WithInstance(r.instanceID)})
+			send(item{err: mcerr.ShortRead(fmt.Sprintf("the result range ended after %d of %d rows", got, n)).WithInstance(r.instanceID)})
 			return
 		}
 		send(item{err: r.readError(readErr)})
@@ -317,7 +321,7 @@ func (r *rows) open(start, n int) (recordReader, error) {
 			}
 			select {
 			case <-r.done:
-			case <-time.After(retryBackoff(attempt + 1)):
+			case <-time.After(r.backoff(attempt + 1)):
 				continue
 			}
 			break
@@ -401,6 +405,7 @@ var stopGrace = 3 * time.Second
 func (r *rows) stop() {
 	r.stopOnce.Do(func() {
 		close(r.done)
+		grace := r.grace
 		finished := make(chan struct{})
 		go func() {
 			r.wg.Wait()
@@ -409,7 +414,7 @@ func (r *rows) stop() {
 		go func() {
 			select {
 			case <-finished:
-			case <-time.After(stopGrace):
+			case <-time.After(grace):
 				r.mu.Lock()
 				for _, rd := range r.readers {
 					_ = rd.Close()
@@ -462,7 +467,7 @@ func (r *rows) Next(dest []driver.Value) error {
 		return aborted
 	}
 	if r.read != r.want {
-		return mcerr.Local(mcerr.CategoryData, fmt.Sprintf("the result ended after %d of %d rows", r.read, r.want)).WithInstance(r.instanceID)
+		return mcerr.ShortRead(fmt.Sprintf("the result ended after %d of %d rows", r.read, r.want)).WithInstance(r.instanceID)
 	}
 	return io.EOF
 }

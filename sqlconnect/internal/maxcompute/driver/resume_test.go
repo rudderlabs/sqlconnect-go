@@ -138,6 +138,11 @@ func TestRangeResume(t *testing.T) {
 		}
 		_, err := readAll(t, &fakeOpener{plans: plans}, n, Config{})
 		require.ErrorContains(t, err, "the result range ended after 0 of 10 rows")
+		var e *mcerr.Error
+		require.ErrorAs(t, err, &e)
+		require.Equal(t, mcerr.CategoryNetwork, e.Category, "a short read is a broken stream, not bad data")
+		require.Equal(t, mcerr.CodeShortRead, e.Code)
+		require.True(t, e.Retryable)
 	})
 
 	t.Run("a break after the last row, before the trailer, fails", func(t *testing.T) {
@@ -241,4 +246,35 @@ func TestStopClosesAStalledReaderAfterGrace(t *testing.T) {
 	start := time.Now()
 	require.NoError(t, r.Close(), "Close returns once the stalled reader is closed")
 	require.Less(t, time.Since(start), 2*time.Second)
+}
+
+func TestShortResultIsRetryable(t *testing.T) {
+	r := newRows(nil, "inst1")
+	ch := make(chan item)
+	close(ch)
+	r.ranges = []chan item{ch}
+	r.want = 5
+	err := r.Next(make([]driver.Value, 1))
+	var e *mcerr.Error
+	require.ErrorAs(t, err, &e)
+	require.ErrorContains(t, err, "the result ended after 0 of 5 rows")
+	require.Equal(t, mcerr.CategoryNetwork, e.Category)
+	require.Equal(t, mcerr.CodeShortRead, e.Code)
+	require.True(t, e.Retryable)
+	require.Equal(t, "inst1", e.InstanceID)
+}
+
+func TestDataErrorsStayData(t *testing.T) {
+	_, err := convertValue(data.VarChar{})
+	var e *mcerr.Error
+	require.ErrorAs(t, err, &e)
+	require.Equal(t, mcerr.CategoryData, e.Category, "a VARCHAR overflow is permanent")
+	require.False(t, e.Retryable)
+
+	o := &fakeOpener{plans: []plan{{3, errors.New("crc value is error")}}}
+	_, err = readAll(t, o, 10, Config{})
+	require.Error(t, err)
+	_, err = readAll(t, &fakeOpener{extra: 1}, 10, Config{})
+	require.ErrorAs(t, err, &e)
+	require.Equal(t, mcerr.CategoryData, e.Category, "more rows than the range holds stays a data error")
 }

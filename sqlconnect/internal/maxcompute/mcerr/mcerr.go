@@ -80,6 +80,17 @@ func (e *Error) WithInstance(id string) *Error {
 	return e
 }
 
+// CodeShortRead marks a read that ended before the server's row count.
+const CodeShortRead = "MC_SHORT_READ"
+
+// ShortRead is a read that ended before the server's row count, after the
+// driver's resumes ran out. The stream broke (a cut connection ends it with a
+// clean EOF as often as with an error), so it is a retryable network error,
+// not a data error: rerunning the read can succeed.
+func ShortRead(message string) *Error {
+	return &Error{Category: CategoryNetwork, Code: CodeShortRead, Message: Redact(message), Retryable: true}
+}
+
 // Local returns an error the driver raises itself, with a fixed message.
 func Local(category, message string) *Error {
 	return &Error{Category: category, Message: Redact(message)}
