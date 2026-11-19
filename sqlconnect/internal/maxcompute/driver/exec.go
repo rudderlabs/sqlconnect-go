@@ -77,6 +77,12 @@ func (c *Connector) run(ctx context.Context, text, kind string) (*odps.Instance,
 	inst, err := c.submit(ctx, text)
 	submitted := time.Since(start)
 	if err != nil {
+		// A job that failed synchronously has an instance id on its error.
+		if e, ok := errors.AsType[*mcerr.Error](err); ok && e.InstanceID != "" {
+			job.submitted(e.InstanceID, submitted)
+			job.finished(e.InstanceID, start, err)
+			return nil, err
+		}
 		job.finished("", start, err)
 		return nil, err
 	}

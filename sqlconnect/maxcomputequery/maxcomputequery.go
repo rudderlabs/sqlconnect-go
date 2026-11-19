@@ -58,3 +58,13 @@ func FixedHints() map[string]string { return driver.FixedHints() }
 func WithRowCountHandler(ctx context.Context, fn func(rows int64)) context.Context {
 	return driver.WithRowCountHandler(ctx, fn)
 }
+
+// WithLogger makes the driver log retl_maxcompute_job_submitted and
+// retl_maxcompute_job_finished for each job under ctx: instance id, kind
+// (exec, query, script), statement count for scripts, submit_ms, wall_ms,
+// status (SUCCESS, FAILED, CANCELLED, SUBMIT_FAILED) and, on failure, the error
+// category, code, retryable flag and stop outcome. No SQL text, values, names
+// or credentials. A rudder-go-kit logger.Logger satisfies Logger.
+func WithLogger(ctx context.Context, l Logger) context.Context {
+	return driver.WithLogger(ctx, l)
+}

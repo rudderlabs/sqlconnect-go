@@ -118,6 +118,18 @@ func TestJobLogs(t *testing.T) {
 		require.Equal(t, "syntax", rec.lines[0].fields["category"])
 	})
 
+	t.Run("synchronous failure keeps the instance id", func(t *testing.T) {
+		f := newFakeODPS(t)
+		f.set(func(f *fakeODPS) { f.syncResult = "ODPS-0130161:[1,1] Parse exception - invalid token 'selec'" })
+		rec := &recordingLogger{}
+		_, err := f.db(t).ExecContext(WithLogger(context.Background(), rec), "selec 1")
+		require.Error(t, err)
+		require.Len(t, rec.lines, 2)
+		require.Equal(t, "inst1", rec.lines[0].fields["mc_instance_id"])
+		require.Equal(t, "inst1", rec.lines[1].fields["mc_instance_id"])
+		require.Equal(t, StatusFailed, rec.lines[1].fields["status"])
+	})
+
 	t.Run("no logger, no events", func(t *testing.T) {
 		f := newFakeODPS(t)
 		_, err := f.db(t).ExecContext(context.Background(), "SELECT 1")
