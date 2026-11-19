@@ -74,7 +74,10 @@ func WithLogger(ctx context.Context, l Logger) context.Context {
 var ErrLifecycle = maxcompute.ErrLifecycle
 
 // WithLifecycle gives the tables the driver creates with
-// CreateTableFromQuery and MoveTable a LIFECYCLE of days (1 to 37231). A
+// CreateTableFromQuery and MoveTable a LIFECYCLE of days (1 to 37231; 0 and
+// 37232 fail on the server with "table LIFECYCLE should be in range 1 and
+// 37231 inclusive", maxcompute-retl findings 18). It is opt-in: without it no
+// clause is sent. A
 // project with odps.table.lifecycle=mandatory refuses a table without one.
 // SQL a caller sends itself must carry its own clause: LIFECYCLE n goes last
 // in a CREATE TABLE, after TBLPROPERTIES, and before AS in a CTAS.
