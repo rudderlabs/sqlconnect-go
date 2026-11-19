@@ -81,3 +81,16 @@ var ErrLifecycle = maxcompute.ErrLifecycle
 func WithLifecycle(ctx context.Context, days int) (context.Context, error) {
 	return maxcompute.WithLifecycle(ctx, days)
 }
+
+// ErrJobTag is returned by WithJobTag for a tag it does not accept.
+var ErrJobTag = driver.ErrJobTag
+
+// WithJobTag tags every job under ctx with "rudderstack-retl:<tag>" (the
+// settings key rudderstack.job.tag; the SQL task is named rudderstack_retl), so
+// a customer can find RudderStack's jobs and their cost in the job history.
+// Pass the job run id. A tag holds 1 to 64 letters, digits, '_', '-', '.' or
+// ':', never customer data, names or SQL. Without it jobs carry
+// "rudderstack-retl".
+func WithJobTag(ctx context.Context, tag string) (context.Context, error) {
+	return driver.WithJobTag(ctx, tag)
+}

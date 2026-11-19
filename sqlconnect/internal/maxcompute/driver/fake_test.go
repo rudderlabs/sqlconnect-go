@@ -51,12 +51,14 @@ type fakeODPS struct {
 }
 
 type submission struct {
-	Query string
-	Hints map[string]string
+	Query    string
+	Hints    map[string]string
+	TaskName string
 }
 
 var (
 	queryPattern    = regexp.MustCompile(`(?s)<Query>(.*)</Query>`)
+	taskNamePattern = regexp.MustCompile(`<SQL>\s*<Name>([^<]*)</Name>`)
 	settingsPattern = regexp.MustCompile(`(?s)<Name>settings</Name>\s*<Value>(.*?)</Value>`)
 )
 
@@ -94,6 +96,9 @@ func (f *fakeODPS) serve(w http.ResponseWriter, r *http.Request) {
 		s := submission{Hints: map[string]string{}}
 		if m := queryPattern.FindSubmatch(body); m != nil {
 			s.Query = html.UnescapeString(strings.TrimSuffix(strings.TrimPrefix(string(m[1]), "<![CDATA["), "]]>"))
+		}
+		if m := taskNamePattern.FindSubmatch(body); m != nil {
+			s.TaskName = string(m[1])
 		}
 		if m := settingsPattern.FindSubmatch(body); m != nil {
 			require.NoError(f.t, json.Unmarshal([]byte(html.UnescapeString(string(m[1]))), &s.Hints))

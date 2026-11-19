@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +35,8 @@ func TestExecSubmitsWithHints(t *testing.T) {
 		"odps.namespace.schema":           "true",
 		"odps.sql.validate.orderby.limit": "false",
 		"odps.default.schema":             "s1",
-	}, s.submits[0].Hints, "the fixed map and the default schema; never a time zone")
+		"rudderstack.job.tag":             "rudderstack-retl",
+	}, s.submits[0].Hints, "the fixed map, the default schema and the job tag; never a time zone")
 	require.Equal(t, 3, s.polls)
 }
 
@@ -266,4 +268,23 @@ func TestShortRecordIsAnError(t *testing.T) {
 	r.want = 1
 	err := r.Next(make([]driver.Value, 2))
 	require.ErrorContains(t, err, "1 values for 2 columns")
+}
+
+func TestJobTag(t *testing.T) {
+	f := newFakeODPS(t)
+	db := f.db(t)
+	ctx, err := WithJobTag(context.Background(), "8f1c2a9e-0b7d-4c3e-9a1f-2d3e4f5a6b7c")
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, "SELECT 1")
+	require.NoError(t, err)
+	s := f.snapshot().submits[0]
+	require.Equal(t, "rudderstack-retl:8f1c2a9e-0b7d-4c3e-9a1f-2d3e4f5a6b7c", s.Hints["rudderstack.job.tag"])
+	require.Equal(t, "rudderstack_retl", s.TaskName)
+
+	for _, bad := range []string{"", "has space", "a'b", "select * from t", strings.Repeat("a", 65), "中文"} {
+		_, err := WithJobTag(context.Background(), bad)
+		require.ErrorIs(t, err, ErrJobTag, bad)
+	}
+	_, err = db.ExecContext(WithScript(context.Background()), "SET rudderstack.job.tag=other; SELECT 1")
+	require.ErrorIs(t, err, ErrProtectedSet, "the tag cannot be overridden from SQL")
 }

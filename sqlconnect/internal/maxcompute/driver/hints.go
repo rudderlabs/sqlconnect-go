@@ -58,6 +58,7 @@ var (
 var protectedKeys = map[string]bool{
 	HintTypeSystemODPS2: true, HintDecimalODPS2: true, HintNamespaceSchema: true, HintValidateOrderBy: true,
 	HintDefaultSchema: true, HintTimeZone: true, HintSubmitMode: true, HintAllowFullScan: true,
+	HintJobTag: true,
 }
 
 // ErrProtectedSet is returned for a SET statement on a setting the driver owns.
@@ -95,6 +96,7 @@ const (
 	keyInstanceID
 	keyRowCount
 	keyLogger
+	keyJobTag
 )
 
 // WithScript marks ctx so that the next statement runs as one script job
@@ -175,5 +177,44 @@ func jobHints(ctx context.Context, defaultSchema string) map[string]string {
 	if isScript(ctx) {
 		h[HintSubmitMode] = submitModeScript
 	}
+	h[HintJobTag] = jobTag(ctx)
 	return h
+}
+
+// Job tagging (D-C10, findings 19). Every job is a SQL task named TaskName,
+// and carries the settings key HintJobTag = "rudderstack-retl" or
+// "rudderstack-retl:<caller tag>". Both show in the job's definition (and so
+// in Logview and the job history settings), and neither changes how the job
+// runs. The instance JobName was not used: it accepts only letters, digits
+// and underscores, and the instance listing does not show it either.
+const (
+	// TaskName is the name of every SQL task the driver submits.
+	TaskName = "rudderstack_retl"
+	// HintJobTag is the settings key that carries the job tag.
+	HintJobTag = "rudderstack.job.tag"
+	// JobTagPrefix starts every job tag.
+	JobTagPrefix = "rudderstack-retl"
+)
+
+// ErrJobTag is returned by WithJobTag for a tag it does not accept.
+var ErrJobTag = errors.New("maxcompute: a job tag holds 1 to 64 letters, digits, '_', '-', '.' or ':'")
+
+var jobTagPattern = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,64}$`)
+
+// WithJobTag returns a context whose jobs carry the tag
+// "rudderstack-retl:<tag>", such as a job run id, so a customer can find
+// RudderStack's jobs and their cost in the job history. The tag must not hold
+// customer data, names or SQL; its character set keeps it that way.
+func WithJobTag(ctx context.Context, tag string) (context.Context, error) {
+	if !jobTagPattern.MatchString(tag) {
+		return ctx, ErrJobTag
+	}
+	return context.WithValue(ctx, keyJobTag, tag), nil
+}
+
+func jobTag(ctx context.Context) string {
+	if tag, _ := ctx.Value(keyJobTag).(string); tag != "" {
+		return JobTagPrefix + ":" + tag
+	}
+	return JobTagPrefix
 }

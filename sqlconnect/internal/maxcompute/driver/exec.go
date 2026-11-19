@@ -113,6 +113,7 @@ func (c *Connector) submit(ctx context.Context, text string) (*odps.Instance, er
 		return nil, e
 	}
 	opt := options.NewSQLTaskOptions()
+	opt.TaskName = TaskName
 	opt.Hints = jobHints(ctx, c.cfg.DefaultSchema)
 	client := c.cfg.Client
 	done := make(chan submitted, 1)
