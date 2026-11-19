@@ -150,7 +150,9 @@ func (c *Connector) submit(ctx context.Context, text string) (*odps.Instance, er
 		// terminated here; the caller already sees OutcomeUnknown.
 		go func() {
 			if s := <-done; s.err == nil && s.inst != nil {
-				_, _ = stopInstance(context.Background(), s.inst, terminateWait, c.cfg.PollInitial)
+				// Terminate through the main client and its 30 s timeout, not
+				// the submit client's 120 s.
+				_, _ = stopInstance(context.Background(), c.cfg.Client.Instance(s.inst.Id()), terminateWait, c.cfg.PollInitial)
 			}
 		}()
 		e := mcerr.Context(ctx.Err(), "", "abandoned during submit; a created job is terminated, best effort")
