@@ -24,6 +24,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/microsoft/go-mssqldb v1.11.0
 	github.com/ory/dockertest/v3 v3.12.0
+	github.com/pkg/errors v0.9.1
 	github.com/rudderlabs/clickhouse-go/v2 v2.48.0
 	github.com/rudderlabs/goqu/v10 v10.3.1
 	github.com/rudderlabs/rudder-go-kit v0.83.0
@@ -152,7 +153,6 @@ require (
 	github.com/phayes/freeport v0.0.0-20220201140144-74d24b5ae9f5 // indirect
 	github.com/pierrec/lz4/v4 v4.1.27 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rs/zerolog v1.28.0 // indirect
 	github.com/sagikazarmark/locafero v0.12.0 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
