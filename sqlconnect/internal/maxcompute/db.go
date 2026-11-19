@@ -23,11 +23,6 @@ const (
 	// DatabaseType is the name the driver registers under.
 	DatabaseType = "maxcompute"
 
-	// submitTimeout bounds a job submit (POST), which is never retried: a
-	// timed-out submit leaves the outcome unknown, so it waits longer than the
-	// idempotent calls, which retry.
-	submitTimeout = 120 * time.Second
-
 	// connectionTimeout bounds each REST call and TCP connect, as the
 	// destination's applyConnectionTimeout does.
 	connectionTimeout = 30 * time.Second
@@ -65,15 +60,19 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	}
 	client.SetHttpTimeout(connectionTimeout)
 	client.SetTcpConnectTimeout(connectionTimeout)
-	// The SDK keeps one HTTP client per Odps value, with no per-call timeout,
-	// so submits get a second Odps with its own client and timeout.
-	submitClient, err := odpsclient.NewWithAccessKey(config.Project, config.Region(), config.Endpoint, config.AccessKeyID, config.AccessKeySecret)
-	if err != nil {
-		return nil, err
+	// The SDK keeps one HTTP client, and so one connection pool, per Odps
+	// value. Submits get their own Odps, made anew after 20 s idle, so a
+	// submit never reuses a connection the load balancer dropped.
+	newSubmitClient := func() (*odps.Odps, error) {
+		submit, err := odpsclient.NewWithAccessKey(config.Project, config.Region(), config.Endpoint, config.AccessKeyID, config.AccessKeySecret)
+		if err != nil {
+			return nil, err
+		}
+		submit.SetHttpTimeout(connectionTimeout)
+		submit.SetTcpConnectTimeout(connectionTimeout)
+		return submit, nil
 	}
-	submitClient.SetHttpTimeout(submitTimeout)
-	submitClient.SetTcpConnectTimeout(connectionTimeout)
-	connector, err := driver.NewConnector(driver.Config{Client: client, SubmitClient: submitClient, DefaultSchema: config.Schema})
+	connector, err := driver.NewConnector(driver.Config{Client: client, NewSubmitClient: newSubmitClient, DefaultSchema: config.Schema})
 	if err != nil {
 		return nil, err
 	}

@@ -115,13 +115,14 @@ func (c *Connector) submit(ctx context.Context, text string) (*odps.Instance, er
 	opt := options.NewSQLTaskOptions()
 	opt.TaskName = TaskName
 	opt.Hints = jobHints(ctx, c.cfg.DefaultSchema)
-	client := c.cfg.Client
-	if c.cfg.SubmitClient != nil {
-		client = c.cfg.SubmitClient
+	client, err := c.submitter()
+	if err != nil {
+		return nil, err
 	}
 	done := make(chan submitted, 1)
 	go func() {
 		inst, err := client.ExecSQlWithOption(text, opt)
+		c.submitDone(client)
 		done <- submitted{inst, err}
 	}()
 	select {

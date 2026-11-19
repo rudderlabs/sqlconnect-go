@@ -2,6 +2,7 @@ package driver
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"io"
@@ -376,16 +377,18 @@ func TestTransportRetries(t *testing.T) {
 }
 
 func TestSubmitTimeouts(t *testing.T) {
-	submitClient := func(f *fakeODPS, timeout time.Duration) *odps.Odps {
-		o := f.client()
-		o.SetHttpTimeout(timeout)
-		return o
+	submitClient := func(f *fakeODPS, timeout time.Duration) func() (*odps.Odps, error) {
+		return func() (*odps.Odps, error) {
+			o := f.client()
+			o.SetHttpTimeout(timeout)
+			return o, nil
+		}
 	}
 
 	t.Run("a submit HTTP timeout is a network error with an unknown outcome, not a cancel", func(t *testing.T) {
 		f := newFakeODPS(t)
 		f.set(func(f *fakeODPS) { f.submitDelay = 600 * time.Millisecond })
-		db := f.db(t, func(c *Config) { c.SubmitClient = submitClient(f, 150*time.Millisecond) })
+		db := f.db(t, func(c *Config) { c.NewSubmitClient = submitClient(f, 150*time.Millisecond) })
 		_, err := db.ExecContext(context.Background(), "SELECT 1")
 		var e *mcerr.Error
 		require.ErrorAs(t, err, &e)
@@ -398,7 +401,7 @@ func TestSubmitTimeouts(t *testing.T) {
 	t.Run("the caller's own deadline is still a cancel", func(t *testing.T) {
 		f := newFakeODPS(t)
 		f.set(func(f *fakeODPS) { f.submitDelay = 600 * time.Millisecond })
-		db := f.db(t, func(c *Config) { c.SubmitClient = submitClient(f, 5*time.Second) })
+		db := f.db(t, func(c *Config) { c.NewSubmitClient = submitClient(f, 5*time.Second) })
 		ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
 		defer cancel()
 		_, err := db.ExecContext(ctx, "SELECT 1")
@@ -412,7 +415,7 @@ func TestSubmitTimeouts(t *testing.T) {
 	t.Run("polls after a submit use the main client", func(t *testing.T) {
 		f := newFakeODPS(t)
 		f.set(func(f *fakeODPS) { f.statuses = []string{"Running", "Success"} })
-		db := f.db(t, func(c *Config) { c.SubmitClient = submitClient(f, 5*time.Second) })
+		db := f.db(t, func(c *Config) { c.NewSubmitClient = submitClient(f, 5*time.Second) })
 		var ids []string
 		_, err := db.ExecContext(WithInstanceIDHandler(context.Background(), func(id string) { ids = append(ids, id) }), "SELECT 1")
 		require.NoError(t, err)
@@ -436,4 +439,53 @@ func TestSubmitTimeouts(t *testing.T) {
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 		require.Less(t, time.Since(start), 2*time.Second, "the context, not the SDK's 180 s loop, bounds the wait")
 	})
+}
+
+func TestSubmitClientIsReplacedAfterIdle(t *testing.T) {
+	f := newFakeODPS(t)
+	made := 0
+	cfg := Config{
+		Client: f.client(), PollInitial: 5 * time.Millisecond, PollMax: 10 * time.Millisecond, TerminateWait: time.Second,
+		NewSubmitClient: func() (*odps.Odps, error) { made++; return f.client(), nil },
+	}
+	connector, err := NewConnector(cfg)
+	require.NoError(t, err)
+	c := connector.(*Connector)
+	clock := time.Unix(1_800_000_000, 0)
+	c.now = func() time.Time { return clock }
+	db := sql.OpenDB(c)
+	defer func() { _ = db.Close() }()
+
+	exec := func() {
+		_, err := db.ExecContext(context.Background(), "SELECT 1")
+		require.NoError(t, err)
+	}
+	exec()
+	first := c.submitClient
+	require.Equal(t, 1, made)
+
+	clock = clock.Add(19 * time.Second)
+	exec()
+	require.Equal(t, 1, made, "a client used within 20 s is kept")
+	require.Same(t, first, c.submitClient)
+
+	clock = clock.Add(21 * time.Second)
+	exec()
+	require.Equal(t, 2, made, "a client idle for more than 20 s is replaced, with a new transport")
+	require.NotSame(t, first, c.submitClient)
+
+	f.set(func(f *fakeODPS) { f.statuses = []string{"Success"} })
+	require.Len(t, f.snapshot().submits, 3)
+}
+
+func TestSubmitClientError(t *testing.T) {
+	f := newFakeODPS(t)
+	db := f.db(t, func(c *Config) {
+		c.NewSubmitClient = func() (*odps.Odps, error) { return nil, errors.New("no client") }
+	})
+	_, err := db.ExecContext(context.Background(), "SELECT 1")
+	var e *mcerr.Error
+	require.ErrorAs(t, err, &e)
+	require.Equal(t, mcerr.CategoryInternal, e.Category)
+	require.Empty(t, f.snapshot().submits)
 }
