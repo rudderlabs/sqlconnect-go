@@ -9,6 +9,16 @@ import (
 )
 
 func TestSplitStatements(t *testing.T) {
+	t.Run("multi-byte text inside string literals", func(t *testing.T) {
+		query := "INSERT INTO t VALUES ('مرحبا', 'it''s ; 中文');\nSELECT 'é''x' AS a;\nSELECT 'ends with مرحبا'"
+		expected := []string{"INSERT INTO t VALUES ('مرحبا', 'it''s ; 中文')", "SELECT 'é''x' AS a", "SELECT 'ends with مرحبا'"}
+		require.Equal(t, expected, util.SplitStatements(query))
+
+		// The closing quote sits at a byte offset past the rune count.
+		query = "SELECT 'مرحبا مرحبا مرحبا مرحبا'; SELECT 1"
+		require.Equal(t, []string{"SELECT 'مرحبا مرحبا مرحبا مرحبا'", "SELECT 1"}, util.SplitStatements(query))
+	})
+
 	t.Run("single statement", func(t *testing.T) {
 		query := "SELECT * FROM table"
 		expected := []string{"SELECT * FROM table"}

@@ -2,6 +2,7 @@ package util
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"github.com/samber/lo"
 )
@@ -19,10 +20,14 @@ func SplitStatements(statements string) []string {
 	var stmt string
 	var previous rune
 
+	// next returns the rune after the one at byte offset i. range yields byte
+	// offsets, so indexing []rune(input) with i read the wrong rune, or ran past
+	// the end, after any multi-byte character.
 	next := func(input string, i int) (rune, bool) {
-		runes := []rune(input)
-		if len(input) > i+1 {
-			return runes[i+1], true
+		_, size := utf8.DecodeRuneInString(input[i:])
+		if j := i + size; j < len(input) {
+			r, _ := utf8.DecodeRuneInString(input[j:])
+			return r, true
 		}
 		return 0, false
 	}
