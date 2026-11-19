@@ -233,7 +233,9 @@ func TestIntegrationRead(t *testing.T) {
 	})
 
 	t.Run("a statement without rows through Query is not a query", func(t *testing.T) {
-		rows, err := db.QueryContext(ctx, "SET odps.sql.allow.fullscan=true")
+		// A SET of an unprotected key runs as a job without rows; a protected key
+		// is refused before submit (ErrProtectedSet, unit-tested in the driver).
+		rows, err := db.QueryContext(ctx, "SET odps.sql.mapper.split.size=256")
 		if err == nil {
 			_ = rows.Close()
 			require.NoError(t, rows.Err())
