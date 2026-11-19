@@ -225,7 +225,7 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 				break
 			}
 			if got == n {
-				readErr = errMoreRows
+				readErr = errMoreRows()
 				break
 			}
 			got++
@@ -237,7 +237,10 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 		if errors.Is(readErr, io.EOF) && got == n {
 			return
 		}
-		if resumable(readErr) && resumes < maxResumes {
+		// A stream that broke after its last record but before its trailer
+		// (the record count and checksum the SDK verifies) is not resumed:
+		// there is nothing left to reopen, and the trailer was never checked.
+		if got < n && resumable(readErr) && resumes < maxResumes {
 			resumes++
 			select {
 			case <-r.done:
@@ -255,16 +258,16 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 	}
 }
 
-// errMoreRows is a stream that sent more records than its range asked for.
-var errMoreRows = mcerr.Local(mcerr.CategoryData, "the result range sent more rows than it holds")
+// errMoreRows is a stream that sent more records than its range asked for. A
+// fresh error each time: readError sets the instance id on it.
+func errMoreRows() error {
+	return mcerr.Local(mcerr.CategoryData, "the result range sent more rows than it holds")
+}
 
 // resumable reports a broken stream that a reopened range can continue: a
 // transport error, an unexpected EOF, or an EOF before the range's last
 // record. A decode, checksum or count error is not resumable.
 func resumable(err error) bool {
-	if errors.Is(err, errMoreRows) {
-		return false
-	}
 	if _, ok := errors.AsType[*mcerr.Error](err); ok {
 		return false
 	}

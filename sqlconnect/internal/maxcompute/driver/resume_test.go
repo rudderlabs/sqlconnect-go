@@ -140,6 +140,16 @@ func TestRangeResume(t *testing.T) {
 		require.ErrorContains(t, err, "the result range ended after 0 of 10 rows")
 	})
 
+	t.Run("a break after the last row, before the trailer, fails", func(t *testing.T) {
+		o := &fakeOpener{plans: []plan{{n, io.ErrUnexpectedEOF}}}
+		ids, err := readAll(t, o, n, Config{})
+		var e *mcerr.Error
+		require.ErrorAs(t, err, &e, "the trailer was never verified")
+		require.Equal(t, mcerr.CategoryNetwork, e.Category)
+		require.Equal(t, sequence(n), ids)
+		require.Len(t, o.opens, 1, "no zero-row reopen")
+	})
+
 	t.Run("a checksum error is not resumed", func(t *testing.T) {
 		o := &fakeOpener{plans: []plan{{3, errors.New("crc value is error")}}}
 		_, err := readAll(t, o, n, Config{})
