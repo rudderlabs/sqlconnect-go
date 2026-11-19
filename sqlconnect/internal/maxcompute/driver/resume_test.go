@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"compress/flate"
 	"database/sql/driver"
 	"errors"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/data"
+	pkgerrors "github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcerr"
@@ -155,13 +157,6 @@ func TestRangeResume(t *testing.T) {
 		require.Len(t, o.opens, 1, "no zero-row reopen")
 	})
 
-	t.Run("a checksum error is not resumed", func(t *testing.T) {
-		o := &fakeOpener{plans: []plan{{3, errors.New("crc value is error")}}}
-		_, err := readAll(t, o, n, Config{})
-		require.Error(t, err)
-		require.Len(t, o.opens, 1)
-	})
-
 	t.Run("a stream with more rows than its range fails", func(t *testing.T) {
 		_, err := readAll(t, &fakeOpener{extra: 1}, n, Config{})
 		require.ErrorContains(t, err, "more rows than it holds")
@@ -271,10 +266,92 @@ func TestDataErrorsStayData(t *testing.T) {
 	require.Equal(t, mcerr.CategoryData, e.Category, "a VARCHAR overflow is permanent")
 	require.False(t, e.Retryable)
 
-	o := &fakeOpener{plans: []plan{{3, errors.New("crc value is error")}}}
-	_, err = readAll(t, o, 10, Config{})
-	require.Error(t, err)
 	_, err = readAll(t, &fakeOpener{extra: 1}, 10, Config{})
 	require.ErrorAs(t, err, &e)
 	require.Equal(t, mcerr.CategoryData, e.Category, "more rows than the range holds stays a data error")
+}
+
+// sdkCorrupt is an SDK tunnel integrity error as the SDK returns it.
+func sdkCorrupt(msg string) error { return pkgerrors.WithStack(pkgerrors.New(msg)) }
+
+// TestCorruptStreamResume: a stream that fails an integrity check is reopened
+// at the first record not yet sent. The SDK checks a record's CRC before it
+// returns the record, so a damaged record is never counted or sent: the fake
+// returns the error in place of the record at the break, as the SDK does.
+func TestCorruptStreamResume(t *testing.T) {
+	saved := retryBackoff
+	retryBackoff = func(int) time.Duration { return time.Millisecond }
+	defer func() { retryBackoff = saved }()
+
+	crc := sdkCorrupt("crc value is error")
+	tag := sdkCorrupt("invalid protobuf tag")
+	varint := sdkCorrupt("invalid bytes for varint")
+	inflate := pkgerrors.WithStack(flate.CorruptInputError(42))
+	reset := &net.OpError{Op: "read", Net: "tcp", Err: errors.New("connection reset by peer")}
+	const n = 10
+	for name, tc := range map[string]struct {
+		plans []plan
+		opens [][2]int
+	}{
+		"corrupt at the start":             {[]plan{{0, crc}}, [][2]int{{0, 10}, {0, 10}}},
+		"corrupt in the middle":            {[]plan{{4, tag}}, [][2]int{{0, 10}, {4, 6}}},
+		"corrupt in the last record":       {[]plan{{9, varint}}, [][2]int{{0, 10}, {9, 1}}},
+		"deflate corrupt in the middle":    {[]plan{{5, inflate}}, [][2]int{{0, 10}, {5, 5}}},
+		"corrupt, then dropped, then ok":   {[]plan{{2, crc}, {3, reset}, {1, inflate}}, [][2]int{{0, 10}, {2, 8}, {5, 5}, {6, 4}}},
+		"corrupt again right after reopen": {[]plan{{6, crc}, {0, crc}}, [][2]int{{0, 10}, {6, 4}, {6, 4}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			o := &fakeOpener{plans: tc.plans}
+			ids, err := readAll(t, o, n, Config{})
+			require.NoError(t, err)
+			require.Equal(t, sequence(n), ids, "every row once, in order: no partial or duplicate row")
+			require.Equal(t, tc.opens, o.opens, "each reopen starts at the first row not yet sent")
+		})
+	}
+
+	requireCorrupt := func(t *testing.T, err error) {
+		t.Helper()
+		var e *mcerr.Error
+		require.ErrorAs(t, err, &e)
+		require.Equal(t, mcerr.CategoryNetwork, e.Category, "never a data error")
+		require.Equal(t, mcerr.CodeStreamCorrupt, e.Code)
+		require.True(t, e.Retryable)
+		require.Equal(t, "inst1", e.InstanceID)
+	}
+
+	t.Run("gives up after maxResumes as MC_STREAM_CORRUPT", func(t *testing.T) {
+		for name, at := range map[string]int{"start": 0, "middle": 1} {
+			t.Run(name, func(t *testing.T) {
+				var plans []plan
+				for range maxResumes + 1 {
+					plans = append(plans, plan{at, crc})
+				}
+				o := &fakeOpener{plans: plans}
+				ids, err := readAll(t, o, n, Config{})
+				requireCorrupt(t, err)
+				require.Equal(t, sequence(at*(maxResumes+1)), append([]int64{}, ids...), "only whole rows, in order, before the error")
+				require.Len(t, o.opens, maxResumes+1, "resumes are bounded")
+			})
+		}
+	})
+
+	t.Run("a corrupt trailer after the last row fails as MC_STREAM_CORRUPT", func(t *testing.T) {
+		for _, msg := range []string{"checksum is invalid", "record count does not match", "invalid stream", "expect end of stream, but not"} {
+			t.Run(msg, func(t *testing.T) {
+				o := &fakeOpener{plans: []plan{{n, sdkCorrupt(msg)}}}
+				ids, err := readAll(t, o, n, Config{})
+				requireCorrupt(t, err)
+				require.Equal(t, sequence(n), ids, "every row once; the error comes after them, never silently")
+				require.Len(t, o.opens, 1, "no zero-row reopen")
+			})
+		}
+	})
+
+	t.Run("ranged parallel read resumes each corrupt range in order", func(t *testing.T) {
+		o := &fakeOpener{plans: []plan{{100, crc}, {0, inflate}, {7, tag}, {3, reset}}}
+		total := 1000
+		ids, err := readAll(t, o, total, Config{RangeThreshold: 10, ReadParallelism: 4, RangeBufferRows: 5})
+		require.NoError(t, err)
+		require.Equal(t, sequence(total), ids)
+	})
 }

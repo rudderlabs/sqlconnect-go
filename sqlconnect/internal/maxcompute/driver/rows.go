@@ -195,8 +195,9 @@ const maxResumes = 3
 
 // readRange reads one range of n records from start into ch, in order, and
 // closes ch. When the stream breaks mid-range (a transport error, an
-// unexpected EOF, or a clean end before n records), the range is reopened at
-// start+got for the n-got records still missing, up to maxResumes times. A
+// unexpected EOF, a failed integrity check, or a clean end before n records),
+// the range is reopened at start+got for the n-got records still missing, up
+// to maxResumes times. A
 // record is counted and sent only once the SDK has decoded it whole, so a
 // reopened stream starts exactly at the first record not yet sent: no record
 // is sent twice or skipped, and the range still ends only when got == n.
@@ -253,9 +254,10 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 		if errors.Is(readErr, io.EOF) && got == n {
 			return
 		}
-		// A stream that broke after its last record but before its trailer
-		// (the record count and checksum the SDK verifies) is not resumed:
-		// there is nothing left to reopen, and the trailer was never checked.
+		// A stream that broke after its last record but before or inside its
+		// trailer (the record count and checksum the SDK verifies) is not
+		// resumed: there is nothing left to reopen. It fails as a network
+		// error (MC_STREAM_CORRUPT for a failed check), so the caller rereads.
 		if got < n && resumable(readErr) && resumes < maxResumes {
 			resumes++
 			select {
@@ -293,13 +295,17 @@ func errMoreRows() error {
 }
 
 // resumable reports a broken stream that a reopened range can continue: a
-// transport error, an unexpected EOF, or an EOF before the range's last
-// record. A decode, checksum or count error is not resumable.
+// transport error, an unexpected EOF, an EOF before the range's last record,
+// or a failed integrity check (a record CRC, the count or the checksum, or a
+// deflate stream that does not decode). The SDK checks a record's CRC before
+// it returns the record, so a damaged record is never counted or sent and the
+// reopened range starts at it. A decoder panic and a range with too many
+// records are driver errors (*mcerr.Error, CategoryData) and are not resumed.
 func resumable(err error) bool {
 	if _, ok := errors.AsType[*mcerr.Error](err); ok {
 		return false
 	}
-	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || mcerr.IsTransport(err)
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || mcerr.IsTransport(err) || mcerr.IsStreamCorrupt(err)
 }
 
 // open opens a range reader. The open is an HTTP request without a timeout, so

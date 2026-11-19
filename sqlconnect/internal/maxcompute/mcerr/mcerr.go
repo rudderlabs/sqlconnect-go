@@ -122,6 +122,9 @@ func FromSDK(err error) *Error {
 	if callerContext(err) {
 		return Context(err, "", "")
 	}
+	if IsStreamCorrupt(err) {
+		return StreamCorrupt("the result stream failed an integrity check: " + err.Error())
+	}
 	if IsTransport(err) {
 		return &Error{Category: CategoryNetwork, Message: safe(err), Retryable: true}
 	}
