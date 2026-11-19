@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"bytes"
 	"compress/flate"
 	"database/sql/driver"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/data"
+	"github.com/aliyun/aliyun-odps-go-sdk/odps/tunnel"
 	pkgerrors "github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 
@@ -66,9 +68,14 @@ func (o *fakeOpener) open(start, count int) (recordReader, error) {
 
 func readAll(t *testing.T, o *fakeOpener, total int, cfg Config) ([]int64, error) {
 	t.Helper()
+	return readAllWith(t, o.open, total, cfg)
+}
+
+func readAllWith(t *testing.T, opener rangeOpener, total int, cfg Config) ([]int64, error) {
+	t.Helper()
 	cfg.applyDefaults()
 	r := newRows(nil, "inst1")
-	r.startWith(o.open, total, cfg)
+	r.startWith(opener, total, cfg)
 	defer func() { _ = r.Close() }()
 	var ids []int64
 	dest := make([]driver.Value, 1)
@@ -354,4 +361,107 @@ func TestCorruptStreamResume(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, sequence(total), ids)
 	})
+}
+
+// bodyStream reads its records through the SDK's own deflate wrapper, as the
+// SDK's record reader does: with a body cut inside the zlib header, the SDK
+// keeps a nil zlib reader, and Read and Close panic.
+type bodyStream struct {
+	body io.ReadCloser
+}
+
+func cutHeaderStream() *bodyStream {
+	return &bodyStream{body: tunnel.WrapByCompressor(io.NopCloser(bytes.NewReader([]byte{0x78})), "deflate")}
+}
+
+func (s *bodyStream) Read() (data.Record, error) {
+	_, err := s.body.Read(make([]byte, 1))
+	return nil, err
+}
+func (s *bodyStream) Close() error { return s.body.Close() }
+
+// panicStream sends `before` records, then panics with p.
+type panicStream struct {
+	next, before int
+	p            any
+}
+
+func (s *panicStream) Read() (data.Record, error) {
+	if s.next == s.before {
+		panic(s.p)
+	}
+	s.next++
+	return data.Record{data.BigInt(s.next - 1)}, nil
+}
+func (s *panicStream) Close() error { return nil }
+
+func TestUnreadableStreamHeader(t *testing.T) {
+	saved := retryBackoff
+	retryBackoff = func(int) time.Duration { return time.Millisecond }
+	defer func() { retryBackoff = saved }()
+
+	t.Run("the SDK panics on a cut header", func(t *testing.T) {
+		s := cutHeaderStream()
+		require.Panics(t, func() { _, _ = s.Read() }, "SDK v0.4.26 drops zlib.NewReader's error; if this stops panicking, the guard may be removable")
+		require.Panics(t, func() { _ = s.Close() })
+	})
+
+	const n = 10
+	t.Run("a cut header is resumed, and its panicking Close is contained", func(t *testing.T) {
+		var mu sync.Mutex
+		var opens [][2]int
+		opener := func(start, count int) (recordReader, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			opens = append(opens, [2]int{start, count})
+			if len(opens) == 1 {
+				return cutHeaderStream(), nil
+			}
+			return &fakeStream{next: start, end: start + count, breakAfter: -1}, nil
+		}
+		ids, err := readAllWith(t, opener, n, Config{})
+		require.NoError(t, err)
+		require.Equal(t, sequence(n), ids)
+		require.Equal(t, [][2]int{{0, 10}, {0, 10}}, opens)
+	})
+
+	t.Run("a cut header every time fails as MC_STREAM_CORRUPT", func(t *testing.T) {
+		opens := 0
+		opener := func(int, int) (recordReader, error) { opens++; return cutHeaderStream(), nil }
+		_, err := readAllWith(t, opener, n, Config{})
+		var e *mcerr.Error
+		require.ErrorAs(t, err, &e)
+		require.Equal(t, mcerr.CategoryNetwork, e.Category)
+		require.Equal(t, mcerr.CodeStreamCorrupt, e.Code)
+		require.True(t, e.Retryable)
+		require.Equal(t, maxResumes+1, opens)
+	})
+
+	var nilDeref any
+	func() {
+		defer func() { nilDeref = recover() }()
+		var p *int
+		_ = *p //nolint:govet // a real nil dereference, for its runtime.Error
+	}()
+	require.NotNil(t, nilDeref)
+
+	for name, tc := range map[string]struct {
+		before int
+		p      any
+	}{
+		"a nil dereference after a record is a decode error": {3, nilDeref},
+		"another panic on the first read is a decode error":  {0, "index out of range"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			opens := 0
+			opener := func(int, int) (recordReader, error) { opens++; return &panicStream{before: tc.before, p: tc.p}, nil }
+			ids, err := readAllWith(t, opener, n, Config{})
+			var e *mcerr.Error
+			require.ErrorAs(t, err, &e)
+			require.Equal(t, mcerr.CategoryData, e.Category)
+			require.False(t, e.Retryable)
+			require.Equal(t, 1, opens, "not resumed")
+			require.Equal(t, sequence(tc.before), append([]int64{}, ids...))
+		})
+	}
 }

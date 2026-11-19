@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"reflect"
 	"regexp"
+	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -233,7 +235,7 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 		stopped := false
 		for {
 			var rec data.Record
-			rec, readErr = readRecord(reader)
+			rec, readErr = reader.Read()
 			if readErr != nil {
 				break
 			}
@@ -322,7 +324,11 @@ func (r *rows) open(start, n int) (recordReader, error) {
 		var err error
 		for attempt := 0; ; attempt++ {
 			reader, err = r.opener(start, n)
-			if err == nil || attempt >= transportRetries || !mcerr.IsTransport(err) {
+			if err == nil {
+				reader = &guardedReader{recordReader: reader}
+				break
+			}
+			if attempt >= transportRetries || !mcerr.IsTransport(err) {
 				break
 			}
 			select {
@@ -350,15 +356,51 @@ func (r *rows) open(start, n int) (recordReader, error) {
 	}
 }
 
-// readRecord reads one record and turns a panic in the SDK's decoder into an
-// error: a panic must not be reachable from customer data.
-func readRecord(reader recordReader) (rec data.Record, err error) {
+// guardedReader keeps a panic in the SDK's reader from escaping: a panic must
+// not be reachable from customer data or from a damaged stream.
+//
+// SDK v0.4.26 builds its deflate reader with zlib.NewReader and drops the
+// error, so a body that is cut or damaged inside its two-byte zlib header
+// leaves a nil reader: the first Read and every Close then panic with a nil
+// dereference. Such a panic on a reader that has not yet returned a record is
+// a damaged stream (mcerr.ErrUnreadableStream, resumed like any corruption);
+// any other panic is the SDK failing to decode a value, a data error. The
+// panicking Close leaks that one HTTP body: the SDK closes it only after the
+// nil reader.
+type guardedReader struct {
+	recordReader
+	read bool // a record was read; touched only by the reading goroutine
+}
+
+func (g *guardedReader) Read() (rec data.Record, err error) {
 	defer func() {
 		if p := recover(); p != nil {
+			if !g.read && isNilDeref(p) {
+				err = mcerr.ErrUnreadableStream
+				return
+			}
 			err = mcerr.Local(mcerr.CategoryData, "the SDK failed to decode a record")
 		}
 	}()
-	return reader.Read()
+	rec, err = g.recordReader.Read()
+	if err == nil {
+		g.read = true
+	}
+	return rec, err
+}
+
+func (g *guardedReader) Close() (err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			err = mcerr.Local(mcerr.CategoryNetwork, "the SDK failed to close a result stream")
+		}
+	}()
+	return g.recordReader.Close()
+}
+
+func isNilDeref(p any) bool {
+	e, ok := p.(runtime.Error)
+	return ok && strings.Contains(e.Error(), "nil pointer dereference")
 }
 
 func (r *rows) readError(err error) error {
