@@ -209,12 +209,18 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 	}
 	got, resumes := 0, 0
 	for {
-		reader, err := r.open(start+got, n-got)
+		opened, err := r.open(start+got, n-got)
 		if err != nil {
 			send(item{err: err})
 			return
 		}
-		if reader == nil || !r.track(reader) {
+		if opened == nil {
+			return
+		}
+		// The reader is closed here after a break and by stop on a cancel;
+		// the once-closer keeps the two from closing it concurrently.
+		reader := &onceCloser{recordReader: opened}
+		if !r.track(reader) {
 			return
 		}
 		var readErr error
@@ -256,6 +262,18 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 		send(item{err: r.readError(readErr)})
 		return
 	}
+}
+
+// onceCloser closes its reader once, however many goroutines call Close.
+type onceCloser struct {
+	recordReader
+	once sync.Once
+	err  error
+}
+
+func (c *onceCloser) Close() error {
+	c.once.Do(func() { c.err = c.recordReader.Close() })
+	return c.err
 }
 
 // errMoreRows is a stream that sent more records than its range asked for. A
