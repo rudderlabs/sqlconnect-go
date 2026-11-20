@@ -17,19 +17,14 @@ import (
 
 const credentialsEnv = "MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS"
 
-// testConfig returns the dev project account, or skips the test when it is
-// not set (fails under FORCE_RUN_INTEGRATION_TESTS).
+// testConfig returns the dev project account. A missing or empty value fails
+// under FORCE_RUN_INTEGRATION_TESTS, as Snowflake's does: CI passes an empty
+// value when the secret is missing, and that must not leave the job green with
+// no live test run. Otherwise it skips.
 func testConfig(t *testing.T) []byte {
 	t.Helper()
 	configJSON, ok := os.LookupEnv(credentialsEnv)
-	if ok && configJSON == "" {
-		// CI passes the secret as an empty value until the repository secret
-		// exists (HLD OQ7), and on fork PRs. Skip loudly rather than fail on
-		// "invalid config"; an unset variable still fails under
-		// FORCE_RUN_INTEGRATION_TESTS.
-		t.Skip("skipping maxcompute integration test: " + credentialsEnv + " is empty (repository secret not configured)")
-	}
-	if !ok {
+	if !ok || configJSON == "" {
 		if os.Getenv("FORCE_RUN_INTEGRATION_TESTS") == "true" {
 			t.Fatal(credentialsEnv + " environment variable not set")
 		}
