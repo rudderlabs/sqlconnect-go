@@ -122,9 +122,9 @@ func maxComputeCleanupConfig() cleanupConfig {
 }
 
 // skipped reports whether the warehouse is skipped for configJSON, the value of
-// Env.
+// Env: empty or whitespace only.
 func (c cleanupConfig) skipped(configJSON string) bool {
-	return c.SkipIfEmpty && configJSON == ""
+	return c.SkipIfEmpty && strings.TrimSpace(configJSON) == ""
 }
 
 // dryRun reports whether the sweep only logs: DropEnv is set and not "true".

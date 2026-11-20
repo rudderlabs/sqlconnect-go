@@ -41,6 +41,7 @@ func TestCleanupConfigGates(t *testing.T) {
 
 	t.Run("an empty secret skips only a SkipIfEmpty warehouse", func(t *testing.T) {
 		require.True(t, mc.skipped(""))
+		require.True(t, mc.skipped(" \n\t"), "a whitespace-only secret is empty, not a config to parse")
 		require.False(t, mc.skipped(`{"project":"p"}`))
 		require.False(t, other.skipped(""), "other warehouses still fail on an empty secret")
 	})

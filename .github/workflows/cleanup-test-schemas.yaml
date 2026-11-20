@@ -39,6 +39,7 @@ jobs:
           MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS }}
           # The MaxCompute sweep is a dry run unless this is true; it drops only
           # rs_retl_probe_sc_<run>_tsqlcon_<name>_<unix time> schemas older than 24 hours.
-          MAXCOMPUTE_CLEANUP_DROP: "true"
+          # Ships as a dry run: flip to "true" after one reviewed dry-run log.
+          MAXCOMPUTE_CLEANUP_DROP: "false"
         run: |
           go run sqlconnect/cmd/cleanup/cleanup.go
