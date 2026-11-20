@@ -39,7 +39,9 @@ func main() {
 		// MaxCompute: the dev project is shared with other teams' probes and
 		// DropSchema drops with CASCADE, so only this repo's exact test names
 		// older than 24 h are dropped; a run in progress is never touched.
-		{Env: "MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS", Type: maxcompute.DatabaseType, Sweep: func(name string) bool {
+		// The workflow passes an empty value until the repository secret exists, and
+		// it drops only when MAXCOMPUTE_CLEANUP_DROP=true; otherwise it logs.
+		{Env: "MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS", Type: maxcompute.DatabaseType, SkipIfEmpty: true, DropEnv: "MAXCOMPUTE_CLEANUP_DROP", Sweep: func(name string) bool {
 			return maxComputeSweepable(name, time.Now())
 		}},
 		{Env: "REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS", Type: redshift.DatabaseType},
@@ -55,6 +57,10 @@ func main() {
 			configJSON, ok := os.LookupEnv(c.Env)
 			if !ok {
 				log.Fatalf("%s environment variable not set", c.Env)
+			}
+			if c.SkipIfEmpty && configJSON == "" {
+				log.Printf("[%s] skipped: %s is empty", c.Type, c.Env)
+				return nil
 			}
 			if c.Fn != nil {
 				configJSON = c.Fn(configJSON)
@@ -73,6 +79,10 @@ func main() {
 			}
 			for _, schema := range schemas {
 				if sweep(schema.Name) {
+					if c.DropEnv != "" && os.Getenv(c.DropEnv) != "true" {
+						log.Printf("[%s] dry run: would drop schema %s (set %s=true to drop)", c.Type, schema, c.DropEnv)
+						continue
+					}
 					err := db.DropSchema(ctx, schema)
 					if err != nil {
 						log.Printf("[%s] failed to drop schema: %v", c.Type, err)
@@ -97,6 +107,11 @@ type cleanupConfig struct {
 	// Sweep reports whether a schema may be dropped. Nil means any schema
 	// whose name contains tsqlcon_.
 	Sweep func(name string) bool
+	// SkipIfEmpty skips the warehouse, rather than failing the whole run, when Env
+	// is set but empty.
+	SkipIfEmpty bool
+	// DropEnv, when set, makes the sweep a dry run unless that variable is "true".
+	DropEnv string
 }
 
 // maxComputeTestSchema matches the schemas the MaxCompute tests create, and
