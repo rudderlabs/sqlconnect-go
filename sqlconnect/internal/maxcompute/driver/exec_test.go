@@ -260,6 +260,15 @@ func TestStopInstance(t *testing.T) {
 	outcome, err = StopInstance(context.Background(), f.client(), "", time.Second)
 	require.Error(t, err)
 	require.Equal(t, sqlconnect.StopError, outcome)
+
+	// The first terminate lands but its answer is lost; the retry is told the
+	// job is already terminated. That is our terminate landing, not a miss.
+	f2 := newFakeODPS(t)
+	f2.set(func(f *fakeODPS) { f.statuses = []string{"Running"}; f.terminateFailures = 1; f.terminateStatus = 409 })
+	outcome, err = StopInstance(context.Background(), f2.client(), "inst1", time.Second)
+	require.NoError(t, err)
+	require.Equal(t, sqlconnect.StopLanded, outcome)
+	require.Equal(t, 2, f2.snapshot().terminates)
 }
 
 func TestUnsupported(t *testing.T) {

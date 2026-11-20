@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps"
@@ -302,10 +303,15 @@ func stopInstance(ctx context.Context, inst *odps.Instance, wait, interval time.
 	ctx, cancel := context.WithTimeout(ctx, wait)
 	defer cancel()
 	// A retried Terminate that answers 409 [Terminated] to [Terminated] means
-	// the first one landed; alreadyEnded counts it as ended.
-	err := retryCall(ctx, inst.Terminate)
+	// the first one landed, its answer lost: that is StopLanded, not a miss.
+	// Only a first attempt told the job already ended is StopMissed.
+	var attempts atomic.Int32 // call may leave an abandoned attempt running
+	err := retryCall(ctx, func() error { attempts.Add(1); return inst.Terminate() })
 	if err != nil {
 		if alreadyEnded(err) {
+			if attempts.Load() > 1 {
+				return sqlconnect.StopLanded, nil
+			}
 			return sqlconnect.StopMissed, nil
 		}
 		return sqlconnect.StopError, mcerr.FromSDK(err).WithInstance(inst.Id())
