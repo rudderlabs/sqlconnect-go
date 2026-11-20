@@ -6,7 +6,9 @@ package maxcomputequery
 
 import (
 	"context"
+	"errors"
 
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/driver"
 )
@@ -96,4 +98,28 @@ var ErrJobTag = driver.ErrJobTag
 // "rudderstack-retl".
 func WithJobTag(ctx context.Context, tag string) (context.Context, error) {
 	return driver.WithJobTag(ctx, tag)
+}
+
+// partitionLister is the MaxCompute DB's partition column lookup.
+type partitionLister interface {
+	ListPartitionColumns(ctx context.Context, relation sqlconnect.RelationRef) ([]string, error)
+}
+
+var _ partitionLister = (*maxcompute.DB)(nil)
+
+// ErrPartitionColumnsUnsupported is returned by ListPartitionColumns for a DB
+// that is not a MaxCompute DB, or a wrapper that does not forward the call.
+var ErrPartitionColumnsUnsupported = errors.New("maxcompute: the DB does not list partition columns")
+
+// ListPartitionColumns returns the names of relation's partition columns, or
+// none for an unpartitioned table. db is the MaxCompute DB, or a wrapper with
+// the same ListPartitionColumns method. sqlconnect.DB.ListColumns lists
+// partition columns among the plain ones, so a caller that must refuse a
+// partitioned table uses this.
+func ListPartitionColumns(ctx context.Context, db sqlconnect.DB, relation sqlconnect.RelationRef) ([]string, error) {
+	p, ok := db.(partitionLister)
+	if !ok {
+		return nil, ErrPartitionColumnsUnsupported
+	}
+	return p.ListPartitionColumns(ctx, relation)
 }

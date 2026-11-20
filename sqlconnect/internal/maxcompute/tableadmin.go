@@ -109,6 +109,38 @@ func (db *DB) TableExists(ctx context.Context, relation sqlconnect.RelationRef) 
 
 // ListColumns loads the table's schema, partition columns included.
 func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) ([]sqlconnect.ColumnRef, error) {
+	table, err := db.loadTable(ctx, relation, "listing columns of ")
+	if err != nil {
+		return nil, err
+	}
+	s := table.Schema()
+	cols := make([]sqlconnect.ColumnRef, 0, len(s.Columns)+len(s.PartitionColumns))
+	for _, c := range append(s.Columns, s.PartitionColumns...) {
+		raw := c.Type.Name()
+		cols = append(cols, sqlconnect.ColumnRef{Name: c.Name, Type: canonicalType(raw), RawType: raw})
+	}
+	return cols, nil
+}
+
+// ListPartitionColumns returns the names of the table's partition columns, in
+// declaration order, or none for an unpartitioned table. ListColumns lists them
+// among the plain columns, so a caller that must tell them apart uses this.
+func (db *DB) ListPartitionColumns(ctx context.Context, relation sqlconnect.RelationRef) ([]string, error) {
+	table, err := db.loadTable(ctx, relation, "listing partition columns of ")
+	if err != nil {
+		return nil, err
+	}
+	pcs := table.Schema().PartitionColumns
+	names := make([]string, 0, len(pcs))
+	for _, c := range pcs {
+		names = append(names, c.Name)
+	}
+	return names, nil
+}
+
+// loadTable loads relation's SDK table with its schema. A missing table is a
+// not_found error; any other failure is wrapped with what, the action.
+func (db *DB) loadTable(ctx context.Context, relation sqlconnect.RelationRef, what string) (*odps.Table, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, mcerr.Context(err, "", "")
 	}
@@ -123,15 +155,9 @@ func (db *DB) ListColumns(ctx context.Context, relation sqlconnect.RelationRef) 
 		if httpStatus(err) == http.StatusNotFound {
 			return nil, mcerr.Local(mcerr.CategoryNotFound, "relation "+relation.String()+" not found")
 		}
-		return nil, wrap("listing columns of "+relation.String(), err)
+		return nil, wrap(what+relation.String(), err)
 	}
-	s := table.Schema()
-	cols := make([]sqlconnect.ColumnRef, 0, len(s.Columns)+len(s.PartitionColumns))
-	for _, c := range append(s.Columns, s.PartitionColumns...) {
-		raw := c.Type.Name()
-		cols = append(cols, sqlconnect.ColumnRef{Name: c.Name, Type: canonicalType(raw), RawType: raw})
-	}
-	return cols, nil
+	return table, nil
 }
 
 // table returns the SDK table of relation in the configured project.

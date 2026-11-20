@@ -82,6 +82,15 @@ func TestIntegrationMetadata(t *testing.T) {
 		_, err = db.ListColumns(ctx, ref("missing"))
 		require.ErrorContains(t, err, "not found")
 
+		parts, err := db.ListPartitionColumns(ctx, ref("parted"))
+		require.NoError(t, err)
+		require.Equal(t, []string{"ds"}, parts, "the partition column alone")
+		parts, err = db.ListPartitionColumns(ctx, ref("snap_a"))
+		require.NoError(t, err)
+		require.Empty(t, parts, "an unpartitioned table has none")
+		_, err = db.ListPartitionColumns(ctx, ref("missing"))
+		require.ErrorContains(t, err, "not found")
+
 		cols, err = db.ListColumnsForSqlQuery(ctx, "SELECT id, amount * 2 AS doubled FROM "+db.QuoteTable(ref("snap_a")))
 		require.NoError(t, err)
 		require.Equal(t, []sqlconnect.ColumnRef{
