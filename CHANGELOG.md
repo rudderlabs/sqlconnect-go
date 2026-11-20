@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.38.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.37.1...v1.38.0) (2026-11-20)
+
+
+### Features
+
+* **maxcompute:** add a MaxCompute driver for the reverse-ETL source ([#613](https://github.com/rudderlabs/sqlconnect-go/issues/613)) ([6191524](https://github.com/rudderlabs/sqlconnect-go/commit/6191524f1287da1eb630ebd333523f32c7e788b5))
+
+
+### Miscellaneous
+
+* bump andybalholm/brotli to v1.2.7 ([#601](https://github.com/rudderlabs/sqlconnect-go/issues/601)) ([3908168](https://github.com/rudderlabs/sqlconnect-go/commit/39081685ba98c426815f89fa2e951a2ee53d24de))
+
 ## [1.37.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.37.0...v1.37.1) (2026-11-04)
 
 
