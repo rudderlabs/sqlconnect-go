@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
+	"net/http"
 	"sync"
 	"time"
 
@@ -87,6 +88,7 @@ type Connector struct {
 
 	tunnelMu sync.Mutex
 	tun      *restclient.RestClient // the Instance Tunnel's; see tunnel
+	tunHTTP  *http.Client           // tun's client, shared by range opens
 }
 
 // Connect returns a new connection.

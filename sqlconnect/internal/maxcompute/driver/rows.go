@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -57,10 +58,11 @@ func (c *Connector) tunnel(ctx context.Context) (restclient.RestClient, error) {
 func (c *Connector) setTunnel(endpoint string) error {
 	rc := restclient.NewOdpsRestClient(c.cfg.Client.Account(), endpoint)
 	rc.HttpTimeout = 0 // unused: the http.Client below is ours
-	if err := setHTTPClient(&rc, idleHTTPClient(c.cfg.TunnelIdle, tunnel.DefaultTcpConnectionTimeout)); err != nil {
+	hc := idleHTTPClient(c.cfg.TunnelIdle, tunnel.DefaultTcpConnectionTimeout)
+	if err := setHTTPClient(&rc, hc); err != nil {
 		return mcerr.Local(mcerr.CategoryInternal, err.Error())
 	}
-	c.tun = &rc
+	c.tun, c.tunHTTP = &rc, hc
 	return nil
 }
 
@@ -117,10 +119,14 @@ func (c *Connector) openRows(ctx context.Context, inst *odps.Instance) (driver.R
 	}
 	r := newRows(session.Schema().Columns, inst.Id())
 	if count > 0 {
-		r.start(session, count, c.cfg)
+		c.tunnelMu.Lock()
+		hc := c.tunHTTP
+		c.tunnelMu.Unlock()
+		r.startWith(sessionOpener(session, hc), count, c.cfg)
 	}
 	// database/sql closes rows when ctx ends, but only after a Next that is
-	// blocked in a read returns; closing the readers unblocks it.
+	// blocked in a read returns; stopping the rows cancels the range
+	// requests, which unblocks it.
 	go func() {
 		select {
 		case <-ctx.Done():
@@ -146,16 +152,19 @@ type rows struct {
 
 	opener  rangeOpener
 	backoff func(int) time.Duration // wait before resume or reopen n
-	grace   time.Duration           // see stopGrace
 	ranges  []chan item             // one per range, consumed in order
 	cur     int
 	read    int // records returned
 	want    int // records the session reported
 
-	mu       sync.Mutex
-	readers  []io.Closer
-	aborted  error
+	mu      sync.Mutex
+	aborted error
+	// done closes and ctx is cancelled when the rows stop. ctx is the
+	// context of every range request, so a stop aborts a Read in progress
+	// at the HTTP layer instead of closing the decoder under it.
 	done     chan struct{}
+	ctx      context.Context
+	cancel   context.CancelFunc
 	stopOnce sync.Once
 	wg       sync.WaitGroup
 }
@@ -167,7 +176,8 @@ func newRows(columns []tableschema.Column, instanceID string) *rows {
 	}
 	// The timings are read once here, not by the reader goroutines, which can
 	// outlive the call that started them.
-	return &rows{columns: columns, names: names, instanceID: instanceID, done: make(chan struct{}), backoff: retryBackoff, grace: stopGrace}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &rows{columns: columns, names: names, instanceID: instanceID, done: make(chan struct{}), ctx: ctx, cancel: cancel, backoff: retryBackoff}
 }
 
 // recordReader reads the records of one range; the SDK's *tunnel.RecordProtocReader is one.
@@ -176,12 +186,21 @@ type recordReader interface {
 	Close() error
 }
 
-// rangeOpener opens a reader over count records from start.
-type rangeOpener func(start, count int) (recordReader, error)
+// rangeOpener opens a reader over count records from start. The request,
+// and every Read of the reader, ends when ctx is cancelled.
+type rangeOpener func(ctx context.Context, start, count int) (recordReader, error)
 
-func sessionOpener(session *tunnel.InstanceResultDownloadSession) rangeOpener {
-	return func(start, count int) (recordReader, error) {
-		reader, err := session.OpenRecordReader(start, count, 0, nil)
+// sessionOpener opens ranges of session through hc, the tunnel's client.
+// The SDK builds the range request without a context, so each open uses a
+// copy of the session whose client puts ctx on every request; the copy
+// shares hc's transport and its connections.
+func sessionOpener(session *tunnel.InstanceResultDownloadSession, hc *http.Client) rangeOpener {
+	return func(ctx context.Context, start, count int) (recordReader, error) {
+		s := *session
+		if err := setHTTPClient(&s.RestClient, &http.Client{Transport: contextTransport{base: hc.Transport, ctx: ctx}}); err != nil {
+			return nil, mcerr.Local(mcerr.CategoryInternal, err.Error())
+		}
+		reader, err := s.OpenRecordReader(start, count, 0, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -189,8 +208,14 @@ func sessionOpener(session *tunnel.InstanceResultDownloadSession) rangeOpener {
 	}
 }
 
-func (r *rows) start(session *tunnel.InstanceResultDownloadSession, count int, cfg Config) {
-	r.startWith(sessionOpener(session), count, cfg)
+// contextTransport sends every request with ctx.
+type contextTransport struct {
+	base http.RoundTripper
+	ctx  context.Context
+}
+
+func (t contextTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.base.RoundTrip(req.WithContext(t.ctx))
 }
 
 func (r *rows) startWith(opener rangeOpener, count int, cfg Config) {
@@ -242,13 +267,11 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 		if opened == nil {
 			return
 		}
-		// This goroutine closes its reader on every exit. stop closes it too,
-		// but only after a grace period, for a stream stuck in a Read; the
-		// once-closer keeps the two from closing it twice.
-		reader := &onceCloser{recordReader: opened}
-		if !r.track(reader) {
-			return
-		}
+		// Only this goroutine closes its reader, and only after its Read
+		// returned: the SDK's decoder (a zlib stream over the HTTP body) must
+		// not be closed during a Read. A stop cancels the range request,
+		// which ends a Read in progress.
+		reader := opened
 		var readErr error
 		stopped := false
 		for {
@@ -296,18 +319,6 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 	}
 }
 
-// onceCloser closes its reader once, however many goroutines call Close.
-type onceCloser struct {
-	recordReader
-	once sync.Once
-	err  error
-}
-
-func (c *onceCloser) Close() error {
-	c.once.Do(func() { c.err = c.recordReader.Close() })
-	return c.err
-}
-
 // errMoreRows is a stream that sent more records than its range asked for. A
 // fresh error each time: readError sets the instance id on it.
 func errMoreRows() error {
@@ -341,7 +352,7 @@ func (r *rows) open(start, n int) (recordReader, error) {
 		var reader recordReader
 		var err error
 		for attempt := 0; ; attempt++ {
-			reader, err = r.opener(start, n)
+			reader, err = r.opener(r.ctx, start, n)
 			if err == nil {
 				reader = &guardedReader{recordReader: reader}
 				break
@@ -434,21 +445,6 @@ func (r *rows) readError(err error) error {
 	return mcerr.FromSDK(err).WithInstance(r.instanceID)
 }
 
-// track registers a reader for closing; it reports false, closing the reader,
-// when the rows are already stopped.
-func (r *rows) track(reader io.Closer) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	select {
-	case <-r.done:
-		_ = reader.Close()
-		return false
-	default:
-	}
-	r.readers = append(r.readers, reader)
-	return true
-}
-
 // abort stops the readers with err as the error of the next Next.
 func (r *rows) abort(err error) {
 	r.mu.Lock()
@@ -459,35 +455,13 @@ func (r *rows) abort(err error) {
 	r.stop()
 }
 
-// stopGrace is how long stop lets the readers notice it and close their own
-// readers before it closes them itself.
-var stopGrace = 3 * time.Second
-
-// stop ends the read. The SDK's reader (a zlib stream over the HTTP body) must
-// not be closed while a Read on it runs, so each range goroutine closes its
-// own reader once it sees stop: between records, or when its send is refused.
-// A goroutine stuck in a Read on a stalled stream never sees it, so after
-// stopGrace stop closes the remaining readers itself to unblock it.
+// stop ends the read: the range goroutines see done between records, and
+// cancelling ctx aborts their range requests, so a Read in progress returns
+// with an error. Each goroutine then closes its own reader.
 func (r *rows) stop() {
 	r.stopOnce.Do(func() {
 		close(r.done)
-		grace := r.grace
-		finished := make(chan struct{})
-		go func() {
-			r.wg.Wait()
-			close(finished)
-		}()
-		go func() {
-			select {
-			case <-finished:
-			case <-time.After(grace):
-				r.mu.Lock()
-				for _, rd := range r.readers {
-					_ = rd.Close()
-				}
-				r.mu.Unlock()
-			}
-		}()
+		r.cancel()
 	})
 }
 

@@ -3,11 +3,13 @@ package driver
 import (
 	"bytes"
 	"compress/flate"
+	"context"
 	"database/sql/driver"
 	"errors"
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -55,7 +57,7 @@ type fakeOpener struct {
 	extra int // records past the range end on every stream
 }
 
-func (o *fakeOpener) open(start, count int) (recordReader, error) {
+func (o *fakeOpener) open(_ context.Context, start, count int) (recordReader, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.opens = append(o.opens, [2]int{start, count})
@@ -178,24 +180,38 @@ func TestRangeResume(t *testing.T) {
 	})
 }
 
-// racyStream's Close writes state its Read reads, as the SDK's zlib reader
-// does: under -race, a Close during a Read is reported.
+// racyStream records a Close that arrives while a Read is in flight, which
+// the SDK's zlib reader does not survive (a data race on its state). Its
+// Read takes `delay` per record, or blocks for good from record stallAt, and
+// returns early with ctx's error when the range request is cancelled, as an
+// HTTP body read does.
 type racyStream struct {
+	ctx       context.Context
 	next, end int
-	closed    bool
-	stall     chan struct{} // when set, Read blocks on it once next reaches stallAt
-	stallAt   int
+	delay     time.Duration
+	stallAt   int // <0 never stalls
 
-	closeStall sync.Once
+	inRead           atomic.Int32
+	closedDuringRead atomic.Bool
+	closed           atomic.Bool
 }
 
 func (s *racyStream) Read() (data.Record, error) {
-	if s.closed {
+	s.inRead.Add(1)
+	defer s.inRead.Add(-1)
+	if s.closed.Load() {
 		return nil, io.ErrUnexpectedEOF
 	}
-	if s.stall != nil && s.next == s.stallAt {
-		<-s.stall
-		return nil, io.ErrUnexpectedEOF
+	wait := s.delay
+	if s.stallAt >= 0 && s.next == s.stallAt {
+		wait = time.Hour
+	}
+	if wait > 0 {
+		select {
+		case <-s.ctx.Done():
+			return nil, s.ctx.Err()
+		case <-time.After(wait):
+		}
 	}
 	if s.next >= s.end {
 		return nil, io.EOF
@@ -205,49 +221,58 @@ func (s *racyStream) Read() (data.Record, error) {
 }
 
 func (s *racyStream) Close() error {
-	if s.stall != nil {
-		// A stalled stream is closed by stop while its Read blocks, by
-		// design; closing the channel is the only thing that touches it.
-		s.closeStall.Do(func() { close(s.stall) })
-		return nil
+	if s.inRead.Load() > 0 {
+		s.closedDuringRead.Store(true)
 	}
-	s.closed = true
+	s.closed.Store(true)
 	return nil
 }
 
-func TestStopDoesNotCloseDuringRead(t *testing.T) {
-	cfg := Config{RangeBufferRows: 2}
-	cfg.applyDefaults()
-	r := newRows(nil, "inst1")
-	r.startWith(func(start, count int) (recordReader, error) {
-		return &racyStream{next: start, end: start + count}, nil
-	}, 100000, cfg)
-	dest := make([]driver.Value, 1)
-	require.NoError(t, r.Next(dest))
-	// The caller stops after one row (QueryRow) while the reader streams.
-	require.NoError(t, r.Close())
-}
-
-func TestStopClosesAStalledReaderAfterGrace(t *testing.T) {
-	saved := stopGrace
-	stopGrace = 50 * time.Millisecond
-	defer func() { stopGrace = saved }()
-	cfg := Config{RangeBufferRows: 100}
+// stopDuringRead starts one range over streams made by mk, takes one row,
+// waits until a Read is in flight, and closes the rows.
+func stopDuringRead(t *testing.T, mk func(ctx context.Context, start, count int) *racyStream) {
+	t.Helper()
+	cfg := Config{RangeBufferRows: 1}
 	cfg.applyDefaults()
 	var mu sync.Mutex
-	var stream *racyStream
+	var streams []*racyStream
 	r := newRows(nil, "inst1")
-	r.startWith(func(start, count int) (recordReader, error) {
+	r.startWith(func(ctx context.Context, start, count int) (recordReader, error) {
+		s := mk(ctx, start, count)
+		mu.Lock()
+		streams = append(streams, s)
+		mu.Unlock()
+		return s, nil
+	}, 100, cfg)
+	require.NoError(t, r.Next(make([]driver.Value, 1)))
+	require.Eventually(t, func() bool {
 		mu.Lock()
 		defer mu.Unlock()
-		stream = &racyStream{next: start, end: start + count, stall: make(chan struct{}), stallAt: start + 1}
-		return stream, nil
-	}, 10, cfg)
-	dest := make([]driver.Value, 1)
-	require.NoError(t, r.Next(dest))
+		return len(streams) > 0 && streams[len(streams)-1].inRead.Load() > 0
+	}, 2*time.Second, time.Millisecond, "a Read is in flight")
 	start := time.Now()
-	require.NoError(t, r.Close(), "Close returns once the stalled reader is closed")
-	require.Less(t, time.Since(start), 2*time.Second)
+	require.NoError(t, r.Close())
+	require.Less(t, time.Since(start), time.Second, "Close does not wait out the Read")
+	mu.Lock()
+	defer mu.Unlock()
+	for _, s := range streams {
+		require.False(t, s.closedDuringRead.Load(), "a reader was closed while its Read was in flight")
+		require.True(t, s.closed.Load(), "the reading goroutine closes its reader")
+	}
+}
+
+// A slow but moving stream: stop must not close the decoder under a Read.
+func TestStopDoesNotCloseDuringRead(t *testing.T) {
+	stopDuringRead(t, func(ctx context.Context, start, count int) *racyStream {
+		return &racyStream{ctx: ctx, next: start, end: start + count, delay: 300 * time.Millisecond, stallAt: -1}
+	})
+}
+
+// A stalled stream: stop cancels the range request, which ends the Read.
+func TestStopEndsAStalledRead(t *testing.T) {
+	stopDuringRead(t, func(ctx context.Context, start, count int) *racyStream {
+		return &racyStream{ctx: ctx, next: start, end: start + count, stallAt: start + 1}
+	})
 }
 
 func TestShortResultIsRetryable(t *testing.T) {
@@ -410,7 +435,7 @@ func TestUnreadableStreamHeader(t *testing.T) {
 	t.Run("a cut header is resumed, and its panicking Close is contained", func(t *testing.T) {
 		var mu sync.Mutex
 		var opens [][2]int
-		opener := func(start, count int) (recordReader, error) {
+		opener := func(_ context.Context, start, count int) (recordReader, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			opens = append(opens, [2]int{start, count})
@@ -427,7 +452,7 @@ func TestUnreadableStreamHeader(t *testing.T) {
 
 	t.Run("a cut header every time fails as MC_STREAM_CORRUPT", func(t *testing.T) {
 		opens := 0
-		opener := func(int, int) (recordReader, error) { opens++; return cutHeaderStream(), nil }
+		opener := func(context.Context, int, int) (recordReader, error) { opens++; return cutHeaderStream(), nil }
 		_, err := readAllWith(t, opener, n, Config{})
 		var e *mcerr.Error
 		require.ErrorAs(t, err, &e)
@@ -454,7 +479,10 @@ func TestUnreadableStreamHeader(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			opens := 0
-			opener := func(int, int) (recordReader, error) { opens++; return &panicStream{before: tc.before, p: tc.p}, nil }
+			opener := func(context.Context, int, int) (recordReader, error) {
+				opens++
+				return &panicStream{before: tc.before, p: tc.p}, nil
+			}
 			ids, err := readAllWith(t, opener, n, Config{})
 			var e *mcerr.Error
 			require.ErrorAs(t, err, &e)

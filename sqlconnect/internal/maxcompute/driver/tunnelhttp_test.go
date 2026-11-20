@@ -172,3 +172,46 @@ func TestTunnelSessionHasNoRowLimit(t *testing.T) {
 	require.Equal(t, 1, create)
 	require.Equal(t, fmt.Sprintf("(0,%d)", total), rowranges[0], "the whole result is requested, past 10,000 rows")
 }
+
+// With the SDK's own reader: a range whose deflate body stalls inside the
+// zlib stream holds a Read in the decoder. Close must cancel the range
+// request (the server sees it end) and return promptly; under -race, a
+// Close of the decoder during that Read would be reported.
+func TestCloseCancelsARangeReadInFlight(t *testing.T) {
+	var reading atomic.Bool
+	var cancelled atomic.Bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"DownloadID":"d1","Status":"normal","RecordCount":10,"Schema":{"columns":[{"name":"id","type":"bigint","nullable":true}]}}`)
+			return
+		}
+		w.Header().Set("Content-Encoding", "deflate")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte{0x78, 0x9c}) // a zlib header, then nothing
+		w.(http.Flusher).Flush()
+		reading.Store(true)
+		select {
+		case <-r.Context().Done():
+			cancelled.Store(true)
+		case <-time.After(8 * time.Second):
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	o := odps.NewOdps(account.NewAliyunAccount("id", "secret", "cn-test"), srv.URL)
+	o.SetDefaultProjectName("p")
+	cfg := Config{Client: o, TunnelIdle: 30 * time.Second}
+	cfg.applyDefaults()
+	c := &Connector{cfg: cfg}
+	require.NoError(t, c.setTunnel(srv.URL))
+
+	r, err := c.openRows(context.Background(), o.Instance("inst1"))
+	require.NoError(t, err)
+	require.Eventually(t, reading.Load, 3*time.Second, time.Millisecond)
+	time.Sleep(100 * time.Millisecond) // the reader is now blocked in the decoder
+	start := time.Now()
+	require.NoError(t, r.Close())
+	require.Less(t, time.Since(start), time.Second, "Close cancels the request rather than waiting on the stalled body")
+	require.Eventually(t, cancelled.Load, 2*time.Second, 10*time.Millisecond, "the range request was cancelled")
+}
