@@ -97,6 +97,8 @@ func TestRedact(t *testing.T) {
 		"token " + fakeSTSID + " expired":                      "token [credential] expired",
 		"Deny as default. Context ID:" + fakeContextID + ".":   "Deny as default. Context ID:[redacted].",
 		"principal " + fakePrincipal + " denied":               "principal [principal] denied",
+		"AccessKeyId \"" + fakePlainID + "\" is invalid.":      "AccessKeyId \"[credential]\" is invalid.",
+		"principal ALIYUN$owner@example.com denied":            "principal [principal] denied",
 		"text --->Tips: Principal:" + fakePrincipal:            "text",
 		"ODPS-0420111: Project not found DebugingInfo abcdefg": "ODPS-0420111: Project not found",
 	} {
@@ -151,10 +153,12 @@ func TestSafeRedactsBeforeSafeError(t *testing.T) {
 	echo := "ODPS-0410051:Invalid credentials - accessKeyId=abc found: " + fakePlainID
 	principal := "ODPS-0420095: Access Denied - principal " + fakePrincipal + " denied"
 	for name, err := range map[string]error{
-		"http key-id echo":  httpErr(403, xmlError("AccessKeyIdNotFound", echo)),
-		"plain key-id echo": errors.New(echo),
-		"http principal":    httpErr(403, xmlError("NoPermission", principal)),
-		"plain principal":   errors.New(principal),
+		"http key-id echo":     httpErr(403, xmlError("AccessKeyIdNotFound", echo)),
+		"plain key-id echo":    errors.New(echo),
+		"http principal":       httpErr(403, xmlError("NoPermission", principal)),
+		"plain principal":      errors.New(principal),
+		"double-quoted key id": errors.New("ODPS-0410051:Invalid credentials - AccessKeyId \"" + fakePlainID + "\" is invalid."),
+		"aliyun principal":     errors.New("ODPS-0420095: Access Denied - principal ALIYUN$owner@example.com denied"),
 		"http body principal": func() error {
 			e := restclient.HttpError{StatusCode: 403, Body: []byte(xmlError("NoPermission", principal))}
 			return pkgerrors.WithStack(e)
@@ -163,7 +167,7 @@ func TestSafeRedactsBeforeSafeError(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			for _, e := range []*Error{FromSDK(err), FromSubmit(err), FromJob(err.Error())} {
 				text := e.Error()
-				for _, secret := range []string{fakePlainID, "1234567890123456", "rudderstack-mc-min-access"} {
+				for _, secret := range []string{fakePlainID, "1234567890123456", "rudderstack-mc-min-access", "owner@example.com"} {
 					require.NotContains(t, text, secret)
 				}
 			}

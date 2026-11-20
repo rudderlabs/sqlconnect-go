@@ -9,15 +9,16 @@ import (
 )
 
 // The source's redaction beyond the destination's SafeError patterns: STS
-// token ids, the two forms in which MaxCompute echoes a key id, and Context
-// IDs. The destination's opaque-key pattern covers LTAI, CAIS and AKIA only.
+// token ids, the forms in which MaxCompute echoes a key id, RAM and ALIYUN$
+// principals, and Context IDs. The destination's opaque-key pattern covers LTAI, CAIS and AKIA only.
 var (
 	stsKeyPattern        = regexp.MustCompile(`\bSTS\.[A-Za-z0-9+/=._-]{4,}`)
 	keyIDNotFoundPattern = regexp.MustCompile(`(?i)(accessKeyId\s+not\s+found:\s*)\S+`)
 	keyIDQuotedPattern   = regexp.MustCompile(`(?i)(AccessKeyId\s*')[^']*(')`)
+	keyIDDoubleQuoted    = regexp.MustCompile(`(?i)(AccessKeyId\s*")[^"]*(")`)
 	keyIDFoundPattern    = regexp.MustCompile(`(?i)(accessKeyId\S*\s+found:\s*)\S+`)
 	contextIDPattern     = regexp.MustCompile(`(?i)(Context\s+ID:\s*)[A-Za-z0-9-]+`)
-	principalPattern     = regexp.MustCompile(`(?i)\bRAM\$[^\s;,'"]+`)
+	principalPattern     = regexp.MustCompile(`(?i)\b(?:RAM|ALIYUN)\$[^\s;,'"]+`)
 )
 
 // maxMessageRunes caps an error message.
@@ -56,6 +57,7 @@ func redactSource(text string) string {
 	text = stsKeyPattern.ReplaceAllString(text, "[credential]")
 	text = keyIDNotFoundPattern.ReplaceAllString(text, "${1}[credential]")
 	text = keyIDQuotedPattern.ReplaceAllString(text, "${1}[credential]${2}")
+	text = keyIDDoubleQuoted.ReplaceAllString(text, "${1}[credential]${2}")
 	text = keyIDFoundPattern.ReplaceAllString(text, "${1}[credential]")
 	text = contextIDPattern.ReplaceAllString(text, "${1}[redacted]")
 	text = principalPattern.ReplaceAllString(text, "[principal]")
