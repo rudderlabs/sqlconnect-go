@@ -47,8 +47,12 @@ func TestMaxComputeDB(t *testing.T) {
 	})
 	integrationtest.TestDatabaseScenarios(t, maxcompute.DatabaseType, configJSON, formatfn, integrationtest.Options{
 		SpecialCharactersInQuotedTable: "_12", // MaxCompute names refuse - and .
-		NoLegacyMappings:               true,
-		ReportsViews:                   true,
+		// Every table the suite creates by raw CREATE TABLE expires on its own if
+		// a killed run leaks it, and stays valid on a project with
+		// odps.table.lifecycle=mandatory.
+		CreateTableSuffix: " LIFECYCLE 1",
+		NoLegacyMappings:  true,
+		ReportsViews:      true,
 		ExtraTests: func(t *testing.T, db sqlconnect.DB) {
 			_, isController := db.(sqlconnect.QueryController)
 			_, isClassifier := db.(sqlconnect.ErrorClassifier)
