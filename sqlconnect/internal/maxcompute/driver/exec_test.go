@@ -160,20 +160,55 @@ func TestExecPollGiveUpStopsTheJob(t *testing.T) {
 		require.Eventually(t, func() bool { return f.snapshot().terminates == 1 }, 3*time.Second, 10*time.Millisecond)
 	})
 
-	t.Run("an HTTP 500 from the status poll", func(t *testing.T) {
+	t.Run("retryable HTTP answers past PollRetries", func(t *testing.T) {
 		f := newFakeODPS(t)
 		f.set(func(f *fakeODPS) { f.statuses = []string{"Running"}; f.pollStatus = http.StatusInternalServerError })
 		start := time.Now()
-		_, err := f.db(t).ExecContext(context.Background(), "SELECT 1")
+		_, err := f.db(t, func(c *Config) { c.PollRetries = 2 }).ExecContext(context.Background(), "SELECT 1")
 		var e *mcerr.Error
 		require.ErrorAs(t, err, &e)
 		require.Equal(t, "inst1", e.InstanceID)
 		require.NotEqual(t, mcerr.CategoryCancelled, e.Category, "the poll error is returned")
 		require.Less(t, time.Since(start), 2*time.Second, "the stop is bounded by TerminateWait")
 		require.Eventually(t, func() bool { return f.snapshot().terminates == 1 }, 3*time.Second, 10*time.Millisecond)
+		require.Equal(t, 3, f.snapshot().pollsAtTerminate, "a retryable answer is retried PollRetries times first")
+	})
+
+	t.Run("a non-retryable HTTP answer stops at once", func(t *testing.T) {
+		f := newFakeODPS(t)
+		f.set(func(f *fakeODPS) {
+			f.statuses = []string{"Running"}
+			f.pollStatus = http.StatusForbidden
+			f.pollBody = `<?xml version="1.0" encoding="UTF-8"?><Error><Code>NoPermission</Code><Message><![CDATA[ODPS-0420095: Access Denied]]></Message></Error>`
+		})
+		_, err := f.db(t).ExecContext(context.Background(), "SELECT 1")
+		var e *mcerr.Error
+		require.ErrorAs(t, err, &e)
+		require.Equal(t, mcerr.CategoryPermission, e.Category)
+		require.Eventually(t, func() bool { return f.snapshot().terminates == 1 }, 3*time.Second, 10*time.Millisecond)
+		require.Equal(t, 1, f.snapshot().pollsAtTerminate, "a non-retryable answer is not retried")
 	})
 }
 
+// One HTTP 429 or 503 from the status poll must not stop a healthy job: the
+// poll is retried like a transport error, within PollRetries.
+func TestExecPollRetriesRetryableHTTP(t *testing.T) {
+	for _, status := range []int{http.StatusTooManyRequests, http.StatusServiceUnavailable, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			f := newFakeODPS(t)
+			f.set(func(f *fakeODPS) {
+				f.statuses = []string{"Running", "Running", "Running", "Success"}
+				f.pollStatus = status
+				f.pollStatusTimes = 2
+			})
+			_, err := f.db(t).ExecContext(context.Background(), "SELECT 1")
+			require.NoError(t, err)
+			s := f.snapshot()
+			require.Equal(t, 0, s.terminates, "the healthy job is not terminated")
+			require.Equal(t, 4, s.polls)
+		})
+	}
+}
 func TestExecCancelTerminates(t *testing.T) {
 	f := newFakeODPS(t)
 	f.set(func(f *fakeODPS) { f.statuses = []string{"Running"} })

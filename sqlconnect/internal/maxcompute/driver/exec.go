@@ -211,7 +211,9 @@ func (c *Connector) wait(ctx context.Context, inst *odps.Instance) error {
 			return c.stopped(ctxErr, inst)
 		}
 		if err != nil {
-			if mcerr.IsTransport(err) && failures < c.cfg.PollRetries {
+			// A transport error or a retryable answer (HTTP 429, 503, other
+			// 5xx) is retried: one such answer must not stop a healthy job.
+			if (mcerr.IsTransport(err) || mcerr.FromSDK(err).Retryable) && failures < c.cfg.PollRetries {
 				failures++
 				sleep(ctx, interval*time.Duration(failures)) // a cancel is seen by the next poll
 				continue

@@ -24,8 +24,9 @@ type Config struct {
 	PollInitial, PollMax time.Duration
 	// TerminateWait bounds the wait for a terminated job to stop. Default 30 s.
 	TerminateWait time.Duration
-	// PollRetries is the number of consecutive transport failures a poll
-	// survives. The poll is retried, never the job. Default 5.
+	// PollRetries is the number of consecutive transport failures or
+	// retryable answers (HTTP 429, 5xx) a poll survives. The poll is
+	// retried, never the job. Default 5.
 	PollRetries int
 
 	// RangeThreshold is the result size above which ReadParallelism readers

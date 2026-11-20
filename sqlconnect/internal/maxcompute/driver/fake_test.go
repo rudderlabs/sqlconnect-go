@@ -52,13 +52,18 @@ type fakeODPS struct {
 	results                           int
 	// pollDelay delays each poll answer.
 	pollDelay time.Duration
-	// pollStatus, when set, answers every status poll with that HTTP status.
-	pollStatus int
+	// pollStatus, when set, answers status polls with that HTTP status and
+	// pollBody: the first pollStatusTimes polls, or every poll when it is 0.
+	pollStatus      int
+	pollStatusTimes int
+	pollBody        string
 
 	submits    []submission
 	polls      int
 	terminates int
 	terminated bool
+	// pollsAtTerminate is the poll count when the first terminate arrived.
+	pollsAtTerminate int
 }
 
 type submission struct {
@@ -157,9 +162,13 @@ func (f *fakeODPS) serve(w http.ResponseWriter, r *http.Request) {
 			_ = conn.Close()
 			return
 		}
-		if f.pollStatus != 0 {
+		if f.pollStatus != 0 && (f.pollStatusTimes == 0 || f.polls <= f.pollStatusTimes) {
 			w.WriteHeader(f.pollStatus)
-			_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>InternalServerError</Code><Message><![CDATA[ODPS-0010000:System internal error]]></Message></Error>`)
+			body := f.pollBody
+			if body == "" {
+				body = `<?xml version="1.0" encoding="UTF-8"?><Error><Code>InternalServerError</Code><Message><![CDATA[ODPS-0010000:System internal error]]></Message></Error>`
+			}
+			_, _ = io.WriteString(w, body)
 			return
 		}
 		status := f.statuses[min(f.polls-1, len(f.statuses)-1)]
@@ -176,6 +185,9 @@ func (f *fakeODPS) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		_, _ = io.WriteString(w, taskResultXML("Failed", f.failureText))
 	case r.Method == http.MethodPut && r.URL.Path == "/projects/p/instances/inst1":
+		if f.terminates == 0 {
+			f.pollsAtTerminate = f.polls
+		}
 		f.terminates++
 		if f.terminateFailures > 0 {
 			f.terminateFailures--
@@ -218,16 +230,17 @@ func taskResultXML(status, content string) string {
 }
 
 type fakeState struct {
-	submits    []submission
-	polls      int
-	terminates int
-	terminated bool
+	submits          []submission
+	polls            int
+	terminates       int
+	terminated       bool
+	pollsAtTerminate int
 }
 
 func (f *fakeODPS) snapshot() fakeState {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return fakeState{submits: append([]submission(nil), f.submits...), polls: f.polls, terminates: f.terminates, terminated: f.terminated}
+	return fakeState{submits: append([]submission(nil), f.submits...), polls: f.polls, terminates: f.terminates, terminated: f.terminated, pollsAtTerminate: f.pollsAtTerminate}
 }
 
 func (f *fakeODPS) set(fn func(*fakeODPS)) {
