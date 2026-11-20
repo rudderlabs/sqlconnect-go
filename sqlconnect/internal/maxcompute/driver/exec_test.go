@@ -269,6 +269,18 @@ func TestStopInstance(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, sqlconnect.StopLanded, outcome)
 	require.Equal(t, 2, f2.snapshot().terminates)
+
+	// A retry told the instance does not exist (404) is still a miss: no
+	// job was stopped.
+	f3 := newFakeODPS(t)
+	f3.set(func(f *fakeODPS) {
+		f.terminateFailures = 1
+		f.terminateStatus = 404
+		f.terminateBody = `<?xml version="1.0" encoding="UTF-8"?><Error><Code>NoSuchObject</Code><Message><![CDATA[instance not found]]></Message></Error>`
+	})
+	outcome, err = StopInstance(context.Background(), f3.client(), "inst1", time.Second)
+	require.NoError(t, err)
+	require.Equal(t, sqlconnect.StopMissed, outcome)
 }
 
 func TestUnsupported(t *testing.T) {

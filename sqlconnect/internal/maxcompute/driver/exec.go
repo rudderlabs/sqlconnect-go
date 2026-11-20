@@ -304,12 +304,12 @@ func stopInstance(ctx context.Context, inst *odps.Instance, wait, interval time.
 	defer cancel()
 	// A retried Terminate that answers 409 [Terminated] to [Terminated] means
 	// the first one landed, its answer lost: that is StopLanded, not a miss.
-	// Only a first attempt told the job already ended is StopMissed.
+	// A first attempt told the job already ended, or any 404, is StopMissed.
 	var attempts atomic.Int32 // call may leave an abandoned attempt running
 	err := retryCall(ctx, func() error { attempts.Add(1); return inst.Terminate() })
 	if err != nil {
 		if alreadyEnded(err) {
-			if attempts.Load() > 1 {
+			if attempts.Load() > 1 && terminatedConflict(err) {
 				return sqlconnect.StopLanded, nil
 			}
 			return sqlconnect.StopMissed, nil
@@ -355,6 +355,14 @@ func alreadyEnded(err error) bool {
 		return true
 	}
 	return false
+}
+
+// terminatedConflict reports the HTTP 409 "from [Terminated] to
+// [Terminated]" answer: the job was terminated, by an earlier attempt when
+// the Terminate was retried. A 404 is not one: no such job exists.
+func terminatedConflict(err error) bool {
+	httpErr, ok := httpError(err)
+	return ok && httpErr.StatusCode == http.StatusConflict && alreadyEnded(err)
 }
 
 func httpError(err error) (restclient.HttpError, bool) {
