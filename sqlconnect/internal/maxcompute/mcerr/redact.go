@@ -38,18 +38,26 @@ func cutDebugInfo(text string) string {
 // from text, and caps it at 512 runes. It runs on every message after the
 // destination's SafeError.
 func Redact(text string) string {
-	text = cutDebugInfo(text)
-	text = stsKeyPattern.ReplaceAllString(text, "[credential]")
-	text = keyIDNotFoundPattern.ReplaceAllString(text, "${1}[credential]")
-	text = keyIDQuotedPattern.ReplaceAllString(text, "${1}[credential]${2}")
-	text = keyIDFoundPattern.ReplaceAllString(text, "${1}[credential]")
-	text = contextIDPattern.ReplaceAllString(text, "${1}[redacted]")
-	text = principalPattern.ReplaceAllString(text, "[principal]")
+	text = redactSource(cutDebugInfo(text))
 	// The destination's patterns run last: they rewrite "accessKeyId=…",
 	// which the echo patterns above key on.
 	text = odpsclient.Scrub(text)
 	if utf8.RuneCountInString(text) > maxMessageRunes {
 		text = string([]rune(text)[:maxMessageRunes])
 	}
+	return text
+}
+
+// redactSource applies the source's own patterns. safe runs it on the raw text
+// before SafeError too: SafeError rewrites "accessKeyId=…" into
+// "[credential]", which keyIDFoundPattern keys on, and its principal pattern
+// stops at "/", leaving a role name that principalPattern would have taken.
+func redactSource(text string) string {
+	text = stsKeyPattern.ReplaceAllString(text, "[credential]")
+	text = keyIDNotFoundPattern.ReplaceAllString(text, "${1}[credential]")
+	text = keyIDQuotedPattern.ReplaceAllString(text, "${1}[credential]${2}")
+	text = keyIDFoundPattern.ReplaceAllString(text, "${1}[credential]")
+	text = contextIDPattern.ReplaceAllString(text, "${1}[redacted]")
+	text = principalPattern.ReplaceAllString(text, "[principal]")
 	return text
 }

@@ -144,3 +144,29 @@ func TestClientTimeoutIsNotACallerCancel(t *testing.T) {
 	require.Equal(t, CategoryCancelled, FromSDK(context.DeadlineExceeded).Category)
 	require.Equal(t, CategoryCancelled, FromSDK(pkgerrors.WithStack(context.Canceled)).Category)
 }
+
+// SafeError rewrites "accessKeyId=…" and cuts a RAM principal at "/", so the
+// key-id echo and principal patterns must run on the raw text first.
+func TestSafeRedactsBeforeSafeError(t *testing.T) {
+	echo := "ODPS-0410051:Invalid credentials - accessKeyId=abc found: " + fakePlainID
+	principal := "ODPS-0420095: Access Denied - principal " + fakePrincipal + " denied"
+	for name, err := range map[string]error{
+		"http key-id echo":  httpErr(403, xmlError("AccessKeyIdNotFound", echo)),
+		"plain key-id echo": errors.New(echo),
+		"http principal":    httpErr(403, xmlError("NoPermission", principal)),
+		"plain principal":   errors.New(principal),
+		"http body principal": func() error {
+			e := restclient.HttpError{StatusCode: 403, Body: []byte(xmlError("NoPermission", principal))}
+			return pkgerrors.WithStack(e)
+		}(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, e := range []*Error{FromSDK(err), FromSubmit(err), FromJob(err.Error())} {
+				text := e.Error()
+				for _, secret := range []string{fakePlainID, "1234567890123456", "rudderstack-mc-min-access"} {
+					require.NotContains(t, text, secret)
+				}
+			}
+		})
+	}
+}

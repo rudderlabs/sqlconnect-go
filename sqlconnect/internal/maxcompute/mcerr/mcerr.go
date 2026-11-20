@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"syscall"
 
+	"github.com/aliyun/aliyun-odps-go-sdk/odps/restclient"
+
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/odpsclient"
 )
 
@@ -136,16 +138,25 @@ func FromSDK(err error) *Error {
 }
 
 // safe is the destination's SafeError followed by the source's redaction.
-// The DebugingInfo tail is cut first, so SafeError never parses it.
+// The DebugingInfo tail is cut first, so SafeError never parses it, and the
+// source's patterns run on the raw text as well, before SafeError rewrites
+// the anchors they key on.
 func safe(err error) string {
-	if httpErr, ok := asHTTPError(err); ok && httpErr.ErrorMessage != nil {
-		cut := *httpErr.ErrorMessage
-		cut.Message = cutDebugInfo(cut.Message)
-		httpErr.ErrorMessage = &cut
-		err = httpErr
-	} else if !ok && !IsTransport(err) {
-		// A transport error keeps its type, so SafeError can report a timeout.
-		err = errors.New(cutDebugInfo(err.Error()))
+	if httpErr, ok := asHTTPError(err); ok {
+		msg := httpErr.ErrorMessage
+		if msg == nil {
+			msg = restclient.NewErrorMessage(httpErr.Body)
+		}
+		if msg != nil {
+			cut := *msg
+			cut.Message = redactSource(cutDebugInfo(cut.Message))
+			httpErr.ErrorMessage = &cut
+			err = httpErr
+		}
+	} else if netErr, isNet := errors.AsType[net.Error](err); !isNet || !netErr.Timeout() {
+		// A timeout keeps its type, so SafeError can report it; SafeError
+		// reads any other error only through its text.
+		err = errors.New(redactSource(cutDebugInfo(err.Error())))
 	}
 	return Redact(odpsclient.SafeError(err).Error())
 }
