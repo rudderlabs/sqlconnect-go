@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute"
 )
 
 func TestMaxComputeSweepable(t *testing.T) {
@@ -49,8 +51,15 @@ func TestCleanupConfigGates(t *testing.T) {
 		require.False(t, mc.dryRun(env(map[string]string{"MAXCOMPUTE_CLEANUP_DROP": "true"})))
 		require.False(t, other.dryRun(env(nil)), "other warehouses drop as before")
 	})
-	t.Run("the MaxCompute entry carries both gates", func(t *testing.T) {
-		require.True(t, maxComputeCleanupConfig().SkipIfEmpty)
-		require.Equal(t, "MAXCOMPUTE_CLEANUP_DROP", maxComputeCleanupConfig().DropEnv)
+	t.Run("the MaxCompute entry carries both gates and its own sweep", func(t *testing.T) {
+		c := maxComputeCleanupConfig()
+		require.Equal(t, "MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS", c.Env)
+		require.Equal(t, maxcompute.DatabaseType, c.Type)
+		require.True(t, c.SkipIfEmpty)
+		require.Equal(t, "MAXCOMPUTE_CLEANUP_DROP", c.DropEnv)
+		require.NotNil(t, c.Sweep, "nil would fall back to the default tsqlcon_ sweep")
+		old := time.Now().Add(-25 * time.Hour).Unix()
+		require.True(t, c.Sweep(fmt.Sprintf("rs_retl_probe_sc_e692d7f4_tsqlcon_meta_%d", old)))
+		require.False(t, c.Sweep(fmt.Sprintf("tsqlcon_gppbuorscrfk_%d", old)), "a bare tsqlcon_ name is not ours")
 	})
 }
