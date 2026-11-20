@@ -17,18 +17,21 @@ import (
 	"github.com/aliyun/aliyun-odps-go-sdk/odps"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/data"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/datatype"
+	"github.com/aliyun/aliyun-odps-go-sdk/odps/restclient"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/tableschema"
 	"github.com/aliyun/aliyun-odps-go-sdk/odps/tunnel"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcerr"
 )
 
-// tunnel returns the connector's Instance Tunnel, looking its endpoint up once.
-func (c *Connector) tunnel(ctx context.Context) (*tunnel.Tunnel, error) {
+// tunnel returns the rest client of the connector's Instance Tunnel, looking
+// its endpoint up once. Its http.Client has an idle deadline (tunnelhttp.go);
+// every copy of the returned value shares it.
+func (c *Connector) tunnel(ctx context.Context) (restclient.RestClient, error) {
 	c.tunnelMu.Lock()
 	defer c.tunnelMu.Unlock()
 	if c.tun != nil {
-		return c.tun, nil
+		return *c.tun, nil
 	}
 	client := c.cfg.Client
 	var endpoint string
@@ -38,13 +41,27 @@ func (c *Connector) tunnel(ctx context.Context) (*tunnel.Tunnel, error) {
 		return err
 	})
 	if err != nil {
-		return nil, mcerr.FromSDK(err)
+		return restclient.RestClient{}, mcerr.FromSDK(err)
 	}
 	if err := checkTunnelEndpoint(endpoint); err != nil {
-		return nil, err
+		return restclient.RestClient{}, err
 	}
-	c.tun = tunnel.NewTunnel(client, endpoint)
-	return c.tun, nil
+	if err := c.setTunnel(endpoint); err != nil {
+		return restclient.RestClient{}, err
+	}
+	return *c.tun, nil
+}
+
+// setTunnel builds the tunnel's rest client for endpoint, as the SDK's
+// tunnel.NewTunnel would, but with the idle-deadline http.Client.
+func (c *Connector) setTunnel(endpoint string) error {
+	rc := restclient.NewOdpsRestClient(c.cfg.Client.Account(), endpoint)
+	rc.HttpTimeout = 0 // unused: the http.Client below is ours
+	if err := setHTTPClient(&rc, idleHTTPClient(c.cfg.TunnelIdle, tunnel.DefaultTcpConnectionTimeout)); err != nil {
+		return mcerr.Local(mcerr.CategoryInternal, err.Error())
+	}
+	c.tun = &rc
+	return nil
 }
 
 // The check deliberately refuses private and VPC tunnel endpoints in v1, as
@@ -71,17 +88,18 @@ var tunnelHostPattern = regexp.MustCompile(`^[a-z0-9-]+(\.[a-z0-9-]+)*\.maxcompu
 // openRows opens an Instance Tunnel download session for the job's result.
 // It never sets EnableLimit, which caps a result at 10,000 rows.
 func (c *Connector) openRows(ctx context.Context, inst *odps.Instance) (driver.Rows, error) {
-	tun, err := c.tunnel(ctx)
+	rc, err := c.tunnel(ctx)
 	if err != nil {
 		return nil, err
 	}
 	project := c.cfg.Client.DefaultProjectName()
 	var session *tunnel.InstanceResultDownloadSession
 	// A second download session for the same instance is harmless, so the
-	// create is retried after a transport error.
+	// create is retried after a transport error, including the idle timeout
+	// of a create the server never answers.
 	err = retryCall(ctx, func() error {
 		var err error
-		session, err = tun.CreateInstanceResultDownloadSession(project, inst.Id(), tunnel.InstanceSessionCfg.WithDefaultDeflateCompressor())
+		session, err = tunnel.CreateInstanceResultDownloadSession(project, inst.Id(), "", rc, tunnel.InstanceSessionCfg.WithDefaultDeflateCompressor())
 		return err
 	})
 	if err != nil {

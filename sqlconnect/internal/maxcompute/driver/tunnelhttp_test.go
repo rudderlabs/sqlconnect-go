@@ -1,0 +1,112 @@
+package driver
+
+import (
+	"context"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/aliyun/aliyun-odps-go-sdk/odps"
+	"github.com/aliyun/aliyun-odps-go-sdk/odps/account"
+	"github.com/aliyun/aliyun-odps-go-sdk/odps/restclient"
+	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcerr"
+)
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestSetHTTPClient(t *testing.T) {
+	var used atomic.Bool
+	hc := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		used.Store(true)
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(nil), Request: r}, nil
+	})}
+	rc := restclient.NewOdpsRestClient(account.NewAliyunAccount("id", "secret", "cn-test"), "http://tunnel.invalid")
+	require.NoError(t, setHTTPClient(&rc, hc), "the pinned SDK keeps its http.Client in RestClient._client")
+	req, err := rc.NewRequest(http.MethodGet, "/projects/p", nil)
+	require.NoError(t, err)
+	_, err = rc.Do(req)
+	require.NoError(t, err)
+	require.True(t, used.Load(), "the rest client sent the request through the injected client")
+}
+
+// A tunnel server that accepts the session create and never answers must
+// not hold the request open: the idle deadline fails it, the create is
+// retried, and openRows returns a network error with every connection closed.
+func TestTunnelSessionCreateIdle(t *testing.T) {
+	var open, started atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		started.Add(1)
+		open.Add(1)
+		defer open.Add(-1)
+		select {
+		case <-r.Context().Done(): // the client closed the connection
+		case <-time.After(8 * time.Second): // bounded, so a regression fails instead of hanging srv.Close
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	o := odps.NewOdps(account.NewAliyunAccount("id", "secret", "cn-test"), srv.URL)
+	o.SetDefaultProjectName("p")
+	cfg := Config{Client: o, TunnelIdle: 200 * time.Millisecond}
+	cfg.applyDefaults()
+	c := &Connector{cfg: cfg, now: time.Now}
+	require.NoError(t, c.setTunnel(srv.URL))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	start := time.Now()
+	_, err := c.openRows(ctx, o.Instance("inst1"))
+	var e *mcerr.Error
+	require.ErrorAs(t, err, &e)
+	require.Equal(t, mcerr.CategoryNetwork, e.Category, err.Error())
+	require.Less(t, time.Since(start), 5*time.Second, "the idle deadline, not the caller's context, ended the create")
+	require.EqualValues(t, 1+transportRetries, started.Load(), "the create is retried after an idle timeout")
+	require.Eventually(t, func() bool { return open.Load() == 0 }, 2*time.Second, 10*time.Millisecond, "no request outlives openRows")
+}
+
+// A result stream that goes silent fails within the idle deadline with a
+// transport error, which readRange resumes; a slow but steady stream that
+// lasts longer than the deadline is not cut.
+func TestIdleHTTPClientStream(t *testing.T) {
+	const idle = 200 * time.Millisecond
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		for range 8 {
+			_, _ = w.Write([]byte("x"))
+			w.(http.Flusher).Flush()
+			time.Sleep(idle / 4)
+		}
+		if r.URL.Path == "/stall" {
+			<-r.Context().Done()
+		}
+	}))
+	t.Cleanup(srv.Close)
+	hc := idleHTTPClient(idle, time.Second)
+
+	res, err := hc.Get(srv.URL + "/steady")
+	require.NoError(t, err)
+	body, err := io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	require.NoError(t, err, "a stream that keeps sending is never cut, though it lasts 2x idle")
+	require.Equal(t, "xxxxxxxx", string(body))
+
+	res, err = hc.Get(srv.URL + "/stall")
+	require.NoError(t, err)
+	start := time.Now()
+	body, err = io.ReadAll(res.Body)
+	_ = res.Body.Close()
+	require.Error(t, err)
+	require.Equal(t, "xxxxxxxx", string(body))
+	require.Less(t, time.Since(start), 2*time.Second)
+	require.True(t, mcerr.IsTransport(err), "a stalled read is a transport error: %v", err)
+	require.True(t, resumable(err), "readRange resumes a stalled range")
+	require.False(t, errors.Is(err, context.Canceled))
+}

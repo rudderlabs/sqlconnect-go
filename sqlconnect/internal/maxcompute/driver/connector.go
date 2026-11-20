@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/aliyun/aliyun-odps-go-sdk/odps"
-	"github.com/aliyun/aliyun-odps-go-sdk/odps/tunnel"
+	"github.com/aliyun/aliyun-odps-go-sdk/odps/restclient"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/maxcompute/mcerr"
 )
@@ -48,6 +48,12 @@ type Config struct {
 	ReadParallelism int
 	// RangeBufferRows bounds the records each ranged reader buffers. Default 10,000.
 	RangeBufferRows int
+	// TunnelIdle is how long an Instance Tunnel request may wait without
+	// progress: a session create or range open with no answer, or a result
+	// stream that sends nothing. A stalled range is resumed. It is an idle
+	// deadline, not a request timeout, so a long stream is never cut.
+	// Default 60 s.
+	TunnelIdle time.Duration
 }
 
 func (c *Config) applyDefaults() {
@@ -75,6 +81,9 @@ func (c *Config) applyDefaults() {
 	if c.RangeBufferRows <= 0 {
 		c.RangeBufferRows = 10_000
 	}
+	if c.TunnelIdle <= 0 {
+		c.TunnelIdle = 60 * time.Second
+	}
 }
 
 // NewConnector returns a connector for [sql.OpenDB].
@@ -92,7 +101,7 @@ type Connector struct {
 	cfg Config
 
 	tunnelMu sync.Mutex
-	tun      *tunnel.Tunnel
+	tun      *restclient.RestClient // the Instance Tunnel's; see tunnel
 
 	submitMu     sync.Mutex
 	submitClient *odps.Odps
