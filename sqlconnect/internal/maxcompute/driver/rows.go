@@ -294,6 +294,12 @@ func (r *rows) readRange(start, n int, ch chan<- item) {
 		if stopped {
 			return
 		}
+		// A clean end after the range's last record completes it. The SDK
+		// checks the stream's row count and checksum only when it reads the
+		// trailer, and a body that ends cleanly without one also gives EOF,
+		// so such a body passes here: every record still passed its own
+		// CRC and got == n, but the stream-level check is skipped. The SDK
+		// v0.4.26 reader does not expose whether it reached the trailer.
 		if errors.Is(readErr, io.EOF) && got == n {
 			return
 		}
