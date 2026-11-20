@@ -36,14 +36,7 @@ func main() {
 			s, _ = sjson.Delete(s, "fabricWorkspaceId")
 			return s
 		}},
-		// MaxCompute: the dev project is shared with other teams' probes and
-		// DropSchema drops with CASCADE, so only this repo's exact test names
-		// older than 24 h are dropped; a run in progress is never touched.
-		// The workflow passes an empty value until the repository secret exists, and
-		// it drops only when MAXCOMPUTE_CLEANUP_DROP=true; otherwise it logs.
-		{Env: "MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS", Type: maxcompute.DatabaseType, SkipIfEmpty: true, DropEnv: "MAXCOMPUTE_CLEANUP_DROP", Sweep: func(name string) bool {
-			return maxComputeSweepable(name, time.Now())
-		}},
+		maxComputeCleanupConfig(),
 		{Env: "REDSHIFT_DATA_TEST_ENVIRONMENT_CREDENTIALS", Type: redshift.DatabaseType},
 		{Env: "REDSHIFT_TEST_ENVIRONMENT_CREDENTIALS", Type: redshift.DatabaseType},
 		{Env: "SNOWFLAKE_TEST_ENVIRONMENT_CREDENTIALS", Type: snowflake.DatabaseType},
@@ -58,7 +51,7 @@ func main() {
 			if !ok {
 				log.Fatalf("%s environment variable not set", c.Env)
 			}
-			if c.SkipIfEmpty && configJSON == "" {
+			if c.skipped(configJSON) {
 				log.Printf("[%s] skipped: %s is empty", c.Type, c.Env)
 				return nil
 			}
@@ -79,7 +72,7 @@ func main() {
 			}
 			for _, schema := range schemas {
 				if sweep(schema.Name) {
-					if c.DropEnv != "" && os.Getenv(c.DropEnv) != "true" {
+					if c.dryRun(os.Getenv) {
 						log.Printf("[%s] dry run: would drop schema %s (set %s=true to drop)", c.Type, schema, c.DropEnv)
 						continue
 					}
@@ -112,6 +105,31 @@ type cleanupConfig struct {
 	SkipIfEmpty bool
 	// DropEnv, when set, makes the sweep a dry run unless that variable is "true".
 	DropEnv string
+}
+
+// maxComputeCleanupConfig is MaxCompute's entry. The dev project is shared with
+// other teams' probes and DropSchema drops with CASCADE, so only this repo's
+// exact test names older than 24 h are dropped; a run in progress is never
+// touched. The workflow passes an empty value until the repository secret
+// exists, and the sweep drops only when MAXCOMPUTE_CLEANUP_DROP=true; otherwise
+// it logs.
+func maxComputeCleanupConfig() cleanupConfig {
+	return cleanupConfig{
+		Env: "MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS", Type: maxcompute.DatabaseType,
+		SkipIfEmpty: true, DropEnv: "MAXCOMPUTE_CLEANUP_DROP",
+		Sweep: func(name string) bool { return maxComputeSweepable(name, time.Now()) },
+	}
+}
+
+// skipped reports whether the warehouse is skipped for configJSON, the value of
+// Env.
+func (c cleanupConfig) skipped(configJSON string) bool {
+	return c.SkipIfEmpty && configJSON == ""
+}
+
+// dryRun reports whether the sweep only logs: DropEnv is set and not "true".
+func (c cleanupConfig) dryRun(getenv func(string) string) bool {
+	return c.DropEnv != "" && getenv(c.DropEnv) != "true"
 }
 
 // maxComputeTestSchema matches the schemas the MaxCompute tests create, and

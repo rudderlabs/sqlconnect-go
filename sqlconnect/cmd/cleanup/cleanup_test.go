@@ -29,3 +29,28 @@ func TestMaxComputeSweepable(t *testing.T) {
 		require.Equal(t, want, maxComputeSweepable(name, now), name)
 	}
 }
+
+func TestCleanupConfigGates(t *testing.T) {
+	env := func(vals map[string]string) func(string) string {
+		return func(k string) string { return vals[k] }
+	}
+	mc := cleanupConfig{SkipIfEmpty: true, DropEnv: "MAXCOMPUTE_CLEANUP_DROP"}
+	other := cleanupConfig{}
+
+	t.Run("an empty secret skips only a SkipIfEmpty warehouse", func(t *testing.T) {
+		require.True(t, mc.skipped(""))
+		require.False(t, mc.skipped(`{"project":"p"}`))
+		require.False(t, other.skipped(""), "other warehouses still fail on an empty secret")
+	})
+	t.Run("a DropEnv warehouse drops only when it is true", func(t *testing.T) {
+		require.True(t, mc.dryRun(env(nil)))
+		require.True(t, mc.dryRun(env(map[string]string{"MAXCOMPUTE_CLEANUP_DROP": "1"})))
+		require.True(t, mc.dryRun(env(map[string]string{"MAXCOMPUTE_CLEANUP_DROP": "TRUE"})))
+		require.False(t, mc.dryRun(env(map[string]string{"MAXCOMPUTE_CLEANUP_DROP": "true"})))
+		require.False(t, other.dryRun(env(nil)), "other warehouses drop as before")
+	})
+	t.Run("the MaxCompute entry carries both gates", func(t *testing.T) {
+		require.True(t, maxComputeCleanupConfig().SkipIfEmpty)
+		require.Equal(t, "MAXCOMPUTE_CLEANUP_DROP", maxComputeCleanupConfig().DropEnv)
+	})
+}
