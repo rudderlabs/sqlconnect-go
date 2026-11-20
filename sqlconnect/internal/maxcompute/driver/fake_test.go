@@ -52,6 +52,8 @@ type fakeODPS struct {
 	results                           int
 	// pollDelay delays each poll answer.
 	pollDelay time.Duration
+	// pollStatus, when set, answers every status poll with that HTTP status.
+	pollStatus int
 
 	submits    []submission
 	polls      int
@@ -153,6 +155,11 @@ func (f *fakeODPS) serve(w http.ResponseWriter, r *http.Request) {
 			conn, _, err := hj.Hijack()
 			require.NoError(f.t, err)
 			_ = conn.Close()
+			return
+		}
+		if f.pollStatus != 0 {
+			w.WriteHeader(f.pollStatus)
+			_, _ = io.WriteString(w, `<?xml version="1.0" encoding="UTF-8"?><Error><Code>InternalServerError</Code><Message><![CDATA[ODPS-0010000:System internal error]]></Message></Error>`)
 			return
 		}
 		status := f.statuses[min(f.polls-1, len(f.statuses)-1)]

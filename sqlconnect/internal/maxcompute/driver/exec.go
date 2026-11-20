@@ -228,7 +228,7 @@ func (c *Connector) wait(ctx context.Context, inst *odps.Instance) error {
 				sleep(ctx, interval*time.Duration(failures)) // a cancel is seen by the next poll
 				continue
 			}
-			return mcerr.FromSDK(err).WithInstance(id)
+			return c.abandoned(mcerr.FromSDK(err).WithInstance(id), inst)
 		}
 		failures = 0
 		switch taskState(tasks) {
@@ -291,6 +291,16 @@ func (c *Connector) stopped(ctxErr error, inst *odps.Instance) error {
 	e := mcerr.Context(ctxErr, inst.Id(), status)
 	e.Stop = string(outcome)
 	return e
+}
+
+// abandoned makes one stop attempt, bounded by TerminateWait, on a job whose
+// status poll gave up, so a running statement does not go on billing and, for
+// a CTAS, create its table after the caller has cleaned up. It returns the
+// poll error with the stop outcome.
+func (c *Connector) abandoned(pollErr *mcerr.Error, inst *odps.Instance) error {
+	outcome, _ := stopInstance(context.Background(), inst, c.cfg.TerminateWait, c.cfg.PollInitial)
+	pollErr.Stop = string(outcome)
+	return pollErr
 }
 
 // stopInstance terminates inst and waits up to wait for it to end.

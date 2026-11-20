@@ -39,9 +39,9 @@ type Details struct {
 	OutcomeUnknown bool
 }
 
-// StopInfo reports the stop of a statement whose context ended: the job's
-// instance id (empty when no job was created) and how the stop ended. ok is
-// false for any other error.
+// StopInfo reports the stop of a statement whose context ended, or whose
+// status poll gave up: the job's instance id (empty when no job was created)
+// and how the stop ended. ok is false for any other error.
 func StopInfo(err error) (instanceID string, outcome sqlconnect.StopOutcome, ok bool) {
 	e, isErr := errors.AsType[*mcerr.Error](err)
 	if !isErr || e.Stop == "" {

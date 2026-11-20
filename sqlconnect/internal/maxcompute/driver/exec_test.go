@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"io"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -146,6 +147,33 @@ func TestExecPollRetriesTransportFailures(t *testing.T) {
 	require.ErrorAs(t, err, &e)
 	require.Equal(t, mcerr.CategoryNetwork, e.Category)
 	require.Len(t, f2.snapshot().submits, 1)
+}
+
+func TestExecPollGiveUpStopsTheJob(t *testing.T) {
+	t.Run("transport failures past PollRetries", func(t *testing.T) {
+		f := newFakeODPS(t)
+		f.set(func(f *fakeODPS) { f.pollFailures = 10; f.statuses = []string{"Running"} })
+		_, err := f.db(t, func(c *Config) { c.PollRetries = 2 }).ExecContext(context.Background(), "SELECT 1")
+		var e *mcerr.Error
+		require.ErrorAs(t, err, &e)
+		require.Equal(t, mcerr.CategoryNetwork, e.Category, "the poll error is returned, not the stop's")
+		require.Equal(t, "inst1", e.InstanceID)
+		require.NotEmpty(t, e.Stop, "the stop attempt is reported")
+		require.Eventually(t, func() bool { return f.snapshot().terminates == 1 }, 3*time.Second, 10*time.Millisecond)
+	})
+
+	t.Run("an HTTP 500 from the status poll", func(t *testing.T) {
+		f := newFakeODPS(t)
+		f.set(func(f *fakeODPS) { f.statuses = []string{"Running"}; f.pollStatus = http.StatusInternalServerError })
+		start := time.Now()
+		_, err := f.db(t).ExecContext(context.Background(), "SELECT 1")
+		var e *mcerr.Error
+		require.ErrorAs(t, err, &e)
+		require.Equal(t, "inst1", e.InstanceID)
+		require.NotEqual(t, mcerr.CategoryCancelled, e.Category, "the poll error is returned")
+		require.Less(t, time.Since(start), 2*time.Second, "the stop is bounded by TerminateWait")
+		require.Eventually(t, func() bool { return f.snapshot().terminates == 1 }, 3*time.Second, 10*time.Millisecond)
+	})
 }
 
 func TestExecCancelTerminates(t *testing.T) {
@@ -410,6 +438,7 @@ func TestSubmitTimeouts(t *testing.T) {
 		require.ErrorAs(t, err, &e)
 		require.Equal(t, mcerr.CategoryCancelled, e.Category)
 		require.True(t, e.OutcomeUnknown)
+		require.Eventually(t, func() bool { return f.snapshot().terminates == 1 }, 3*time.Second, 10*time.Millisecond, "the job the submit created is terminated")
 	})
 
 	t.Run("polls after a submit use the main client", func(t *testing.T) {
