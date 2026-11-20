@@ -209,6 +209,7 @@ func TestExecPollRetriesRetryableHTTP(t *testing.T) {
 		})
 	}
 }
+
 func TestExecCancelTerminates(t *testing.T) {
 	f := newFakeODPS(t)
 	f.set(func(f *fakeODPS) { f.statuses = []string{"Running"} })
