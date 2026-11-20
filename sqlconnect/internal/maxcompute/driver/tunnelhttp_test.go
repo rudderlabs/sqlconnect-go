@@ -3,9 +3,12 @@ package driver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -109,4 +112,62 @@ func TestIdleHTTPClientStream(t *testing.T) {
 	require.True(t, mcerr.IsTransport(err), "a stalled read is a transport error: %v", err)
 	require.True(t, resumable(err), "readRange resumes a stalled range")
 	require.False(t, errors.Is(err, context.Canceled))
+}
+
+// The Instance Tunnel caps a result at 10,000 rows when a session is opened
+// with EnableLimit. The driver never sets it: no tunnel request carries
+// instance_tunnel_limit_enabled, and a 25,000-row result is reported and
+// requested whole.
+func TestTunnelSessionHasNoRowLimit(t *testing.T) {
+	const total = 25_000
+	var mu sync.Mutex
+	var queries []url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		queries = append(queries, r.URL.Query())
+		mu.Unlock()
+		if r.Method == http.MethodPost {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprintf(w, `{"DownloadID":"d1","Status":"normal","RecordCount":%d,"Schema":{"columns":[{"name":"id","type":"bigint","nullable":true}]}}`, total)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound) // no range body is needed
+	}))
+	t.Cleanup(srv.Close)
+
+	o := odps.NewOdps(account.NewAliyunAccount("id", "secret", "cn-test"), srv.URL)
+	o.SetDefaultProjectName("p")
+	cfg := Config{Client: o, TunnelIdle: time.Second}
+	cfg.applyDefaults()
+	c := &Connector{cfg: cfg, now: time.Now}
+	require.NoError(t, c.setTunnel(srv.URL))
+
+	var reported int64
+	ctx := WithRowCountHandler(context.Background(), func(n int64) { reported = n })
+	r, err := c.openRows(ctx, o.Instance("inst1"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = r.Close() })
+	require.EqualValues(t, total, reported, "the session reports the whole result")
+
+	ranges := func() (create int, rowranges []string, limited []url.Values) {
+		mu.Lock()
+		defer mu.Unlock()
+		for _, q := range queries {
+			if q.Has("instance_tunnel_limit_enabled") {
+				limited = append(limited, q)
+			}
+			if q.Has("downloads") {
+				create++
+			}
+			if q.Has("rowrange") {
+				rowranges = append(rowranges, q.Get("rowrange"))
+			}
+		}
+		return create, rowranges, limited
+	}
+	require.Eventually(t, func() bool { _, rr, _ := ranges(); return len(rr) > 0 }, 3*time.Second, 10*time.Millisecond)
+	create, rowranges, limited := ranges()
+	require.Empty(t, limited, "a tunnel request enabled the 10,000-row limit")
+	require.Equal(t, 1, create)
+	require.Equal(t, fmt.Sprintf("(0,%d)", total), rowranges[0], "the whole result is requested, past 10,000 rows")
 }
