@@ -61,7 +61,7 @@ func TestTunnelSessionCreateIdle(t *testing.T) {
 	o.SetDefaultProjectName("p")
 	cfg := Config{Client: o, TunnelIdle: 200 * time.Millisecond}
 	cfg.applyDefaults()
-	c := &Connector{cfg: cfg, now: time.Now}
+	c := &Connector{cfg: cfg}
 	require.NoError(t, c.setTunnel(srv.URL))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -140,7 +140,7 @@ func TestTunnelSessionHasNoRowLimit(t *testing.T) {
 	o.SetDefaultProjectName("p")
 	cfg := Config{Client: o, TunnelIdle: time.Second}
 	cfg.applyDefaults()
-	c := &Connector{cfg: cfg, now: time.Now}
+	c := &Connector{cfg: cfg}
 	require.NoError(t, c.setTunnel(srv.URL))
 
 	var reported int64

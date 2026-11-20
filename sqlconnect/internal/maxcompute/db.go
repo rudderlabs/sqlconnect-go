@@ -60,19 +60,7 @@ func NewDB(configJSON json.RawMessage) (*DB, error) {
 	}
 	client.SetHttpTimeout(connectionTimeout)
 	client.SetTcpConnectTimeout(connectionTimeout)
-	// The SDK keeps one HTTP client, and so one connection pool, per Odps
-	// value. Submits get their own Odps, made anew after 20 s idle, so a
-	// submit never reuses a connection the load balancer dropped.
-	newSubmitClient := func() (*odps.Odps, error) {
-		submit, err := odpsclient.NewWithAccessKey(config.Project, config.Region(), config.Endpoint, config.AccessKeyID, config.AccessKeySecret)
-		if err != nil {
-			return nil, err
-		}
-		submit.SetHttpTimeout(connectionTimeout)
-		submit.SetTcpConnectTimeout(connectionTimeout)
-		return submit, nil
-	}
-	connector, err := driver.NewConnector(driver.Config{Client: client, NewSubmitClient: newSubmitClient, DefaultSchema: config.Schema})
+	connector, err := driver.NewConnector(driver.Config{Client: client, DefaultSchema: config.Schema})
 	if err != nil {
 		return nil, err
 	}

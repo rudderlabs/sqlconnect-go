@@ -115,14 +115,9 @@ func (c *Connector) submit(ctx context.Context, text string) (*odps.Instance, er
 	opt := options.NewSQLTaskOptions()
 	opt.TaskName = TaskName
 	opt.Hints = jobHints(ctx, c.cfg.DefaultSchema)
-	client, err := c.submitter()
-	if err != nil {
-		return nil, err
-	}
 	done := make(chan submitted, 1)
 	go func() {
-		inst, err := client.ExecSQlWithOption(text, opt)
-		c.submitDone(client)
+		inst, err := c.cfg.Client.ExecSQlWithOption(text, opt)
 		done <- submitted{inst, err}
 	}()
 	select {
@@ -138,11 +133,6 @@ func (c *Connector) submit(ctx context.Context, text string) (*odps.Instance, er
 		if s.inst == nil || s.inst.Id() == "" {
 			return nil, mcerr.Local(mcerr.CategoryUnknown, "the server returned no instance")
 		}
-		if client != c.cfg.Client && !s.inst.IsSync() {
-			// Polls, results, terminates and tunnel reads go through the main
-			// client and its shorter timeout, not the submit client.
-			return c.cfg.Client.Instance(s.inst.Id()), nil
-		}
 		return s.inst, nil
 	case <-ctx.Done():
 		terminateWait := c.cfg.TerminateWait
@@ -151,8 +141,6 @@ func (c *Connector) submit(ctx context.Context, text string) (*odps.Instance, er
 		// terminated here; the caller already sees OutcomeUnknown.
 		go func() {
 			if s := <-done; s.err == nil && s.inst != nil {
-				// Terminate through the main client and its 30 s timeout, not
-				// the submit client's 120 s.
 				_, _ = stopInstance(context.Background(), c.cfg.Client.Instance(s.inst.Id()), terminateWait, c.cfg.PollInitial)
 			}
 		}()
