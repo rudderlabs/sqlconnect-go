@@ -29,14 +29,15 @@ func TestSetHTTPClient(t *testing.T) {
 	var used atomic.Bool
 	hc := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		used.Store(true)
-		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(nil), Request: r}, nil
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Request: r}, nil
 	})}
 	rc := restclient.NewOdpsRestClient(account.NewAliyunAccount("id", "secret", "cn-test"), "http://tunnel.invalid")
 	require.NoError(t, setHTTPClient(&rc, hc), "the pinned SDK keeps its http.Client in RestClient._client")
 	req, err := rc.NewRequest(http.MethodGet, "/projects/p", nil)
 	require.NoError(t, err)
-	_, err = rc.Do(req)
+	resp, err := rc.Do(req)
 	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
 	require.True(t, used.Load(), "the rest client sent the request through the injected client")
 }
 
