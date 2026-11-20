@@ -36,5 +36,10 @@ jobs:
           TRINO_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.TRINO_TEST_ENVIRONMENT_CREDENTIALS }}
           SNOWFLAKE_TEST_AUTH_KEYPAIR_ENCRYPTED_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_AUTH_KEYPAIR_ENCRYPTED_CREDENTIALS }}
           SNOWFLAKE_TEST_AUTH_KEYPAIR_UNENCRYPTED_CREDENTIALS: ${{ secrets.SNOWFLAKE_TEST_AUTH_KEYPAIR_UNENCRYPTED_CREDENTIALS }}
+          MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS: ${{ secrets.MAXCOMPUTE_TEST_ENVIRONMENT_CREDENTIALS }}
+          # The MaxCompute sweep is a dry run unless this is true; it drops only
+          # rs_retl_probe_sc_<run>_tsqlcon_<name>_<unix time> schemas older than 24 hours.
+          # Ships as a dry run: flip to "true" after one reviewed dry-run log.
+          MAXCOMPUTE_CLEANUP_DROP: "false"
         run: |
           go run sqlconnect/cmd/cleanup/cleanup.go

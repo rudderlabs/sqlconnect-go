@@ -1,0 +1,23 @@
+{
+    "_order": "int",
+    "_tinyint": "int",
+    "_smallint": "int",
+    "_int": "int",
+    "_bigint": "int",
+    "_float": "float",
+    "_double": "float",
+    "_decimal": "float",
+    "_string": "string",
+    "_varchar": "string",
+    "_char": "string",
+    "_boolean": "boolean",
+    "_date": "datetime",
+    "_datetime": "datetime",
+    "_timestamp": "datetime",
+    "_timestamp_ntz": "datetime",
+    "_binary": "string",
+    "_json": "json",
+    "_array": "array",
+    "_map": "json",
+    "_struct": "json"
+}
