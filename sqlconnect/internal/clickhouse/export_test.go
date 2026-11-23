@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	ch "github.com/rudderlabs/clickhouse-go/v2"
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chpolicy"
@@ -54,7 +54,7 @@ func NewDBForTestWith(cfg json.RawMessage, o TestEnv) (*DB, error) {
 // InspectOptions returns the options the pool was opened with.
 func InspectOptions(db *DB) *ch.Options { return db.opts }
 
-// InspectTransport returns a transport as the fork builds it for each
+// InspectTransport returns a transport as clickhouse-go builds it for each
 // connection, after the driver's TransportFunc has changed it.
 func InspectTransport(db *DB) *http.Transport {
 	rt := &http.Transport{Proxy: http.ProxyFromEnvironment}

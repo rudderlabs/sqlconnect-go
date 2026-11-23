@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	ch "github.com/rudderlabs/clickhouse-go/v2"
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
@@ -115,7 +115,7 @@ func newDB(configJSON json.RawMessage, env openEnv) (*DB, error) {
 	return d, nil
 }
 
-// connectGuard opens every pool connection. The fork sends a hello query when
+// connectGuard opens every pool connection. clickhouse-go sends a hello query when
 // it opens a connection; the guard gives that query the hello map and a fresh
 // query id, never the caller's statement map, and bounds any error.
 type connectGuard struct{ next driver.Connector }

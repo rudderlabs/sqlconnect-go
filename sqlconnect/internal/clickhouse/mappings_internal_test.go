@@ -8,10 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2/lib/chcol"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-
-	"github.com/rudderlabs/clickhouse-go/v2/lib/chcol"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
 )
@@ -76,7 +75,7 @@ func TestColumnError_KeepsCode(t *testing.T) {
 	require.Equal(t, "CH_TYPE_UNSUPPORTED: column 2: x", err.Error())
 }
 
-func TestJSONValue_ForkJSONObject(t *testing.T) {
+func TestJSONValue_CHColJSONObject(t *testing.T) {
 	o := chcol.NewJSON()
 	o.SetValueAtPath("a.b", int64(1))
 	o.SetValueAtPath("w", *big.NewInt(5))

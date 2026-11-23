@@ -74,7 +74,7 @@ func errEncoding(detail string) error { return cherr.New(cherr.CodeValueEncoding
 // jsonValue converts one scanned value of type t without loss. A value that
 // cannot be exported exactly is an error, never an approximation.
 func jsonValue(t chType, v any) (any, error) {
-	// big.Int first: the fork returns it by value (lib/column/bigint.go:46),
+	// big.Int first: clickhouse-go returns it by value (lib/column/bigint.go:46),
 	// and Text is on *big.Int only.
 	switch b := v.(type) {
 	case big.Int:
@@ -91,7 +91,7 @@ func jsonValue(t chType, v any) (any, error) {
 		return (*b).Text(10), nil
 	}
 	if u := t.unwrap(); u.Name == "JSON" || u.Name == "Object" {
-		// Before deref: the fork's *chcol.JSON has MarshalJSON on the pointer
+		// Before deref: clickhouse-go's *chcol.JSON has MarshalJSON on the pointer
 		// only, and its dereferenced struct marshals to {}.
 		return jsonNumbers(v)
 	}
@@ -292,7 +292,7 @@ func formatTimeOfDay(d time.Duration, t chType) string {
 }
 
 // jsonNumbers decodes a JSON column value with UseNumber, so numbers keep
-// their exact text. The fork sends the JSON text, or a *chcol.JSON object
+// their exact text. clickhouse-go sends the JSON text, or a *chcol.JSON object
 // that normalizeJSONValue turns into plain JSON values first.
 func jsonNumbers(v any) (any, error) {
 	if rv := reflect.ValueOf(v); rv.Kind() == reflect.Pointer {
@@ -337,9 +337,9 @@ func jsonNumbers(v any) (any, error) {
 	return out, nil
 }
 
-// normalizeJSONValue turns one value of the fork's JSON object into plain
+// normalizeJSONValue turns one value of clickhouse-go's JSON object into plain
 // JSON values: nil, bool, string, json.Number, []any and map[string]any.
-// json.Marshal must never see a fork type: it prints a big.Int or a
+// json.Marshal must never see a clickhouse-go type: it prints a big.Int or a
 // chcol.JSON value as {}, a []uint8 as base64, and it replaces invalid UTF-8
 // with U+FFFD. Any other struct is refused, never printed as {}.
 func normalizeJSONValue(v any) (any, error) {
@@ -523,7 +523,7 @@ func mapTuple(t chType, v any) (any, error) {
 	return out, nil
 }
 
-// mapNested maps a flatten_nested=0 column: the fork reads Nested(...) as
+// mapNested maps a flatten_nested=0 column: clickhouse-go reads Nested(...) as
 // Array(Tuple(...)), so the value is an array of objects. With
 // flatten_nested=1 the server sends dotted Array columns instead, which the
 // Array branch maps.

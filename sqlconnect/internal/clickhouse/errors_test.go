@@ -15,9 +15,8 @@ import (
 	"syscall"
 	"testing"
 
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/stretchr/testify/require"
-
-	ch "github.com/rudderlabs/clickhouse-go/v2"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
@@ -98,8 +97,8 @@ func TestSQ3_BoundedMessages(t *testing.T) {
 	var ex *ch.Exception
 	require.ErrorAs(t, err, &ex, "callers can still test the server code")
 	require.EqualValues(t, 516, ex.Code)
-	require.Empty(t, ex.Name, "the fork parses Name from the response text")
-	require.Empty(t, ex.CodeName, "the fork parses CodeName from the response text")
+	require.Empty(t, ex.Name, "clickhouse-go parses Name from the response text")
+	require.Empty(t, ex.CodeName, "clickhouse-go parses CodeName from the response text")
 	require.Empty(t, ex.Message)
 	require.Empty(t, ex.StackTrace)
 	var he *ch.HTTPError

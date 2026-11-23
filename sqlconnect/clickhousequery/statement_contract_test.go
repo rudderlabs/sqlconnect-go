@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	ch "github.com/rudderlabs/clickhouse-go/v2"
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chctx"
 )
 
-// The fork exposes no settings getter. Probe the same QueryOptions handed to
+// clickhouse-go exposes no settings getter. Probe the same QueryOptions handed to
 // the driver, without unsafe or changing the options (as queryIDOf does in the
 // driver's cancellation tests).
 func p12StatementOptions(t *testing.T, ctx context.Context) (map[string]any, string) {

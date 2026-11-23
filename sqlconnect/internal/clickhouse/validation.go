@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	ch "github.com/rudderlabs/clickhouse-go/v2"
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
@@ -25,7 +25,7 @@ import (
 var (
 	_ sqlconnect.ValidationReporter = (*DB)(nil)
 	// versionFloor is the lowest supported server version. It never sits below
-	// the fork's own minimum, 25.8.0.
+	// clickhouse-go's own minimum, 25.8.0.
 	versionFloor = [3]int{26, 3, 0}
 )
 
@@ -161,7 +161,7 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 		return stage2UnionSettings(int(clickhousequery.MaxRunBudget.Seconds()))
 	}}
 	var one uint8
-	// The fork replaces max_execution_time with the remaining deadline, so the
+	// clickhouse-go replaces max_execution_time with the remaining deadline, so the
 	// check runs without a deadline and sends the run budget itself.
 	budgetCtx, stopBudget := withoutDeadline(ctx)
 	defer stopBudget()
@@ -202,7 +202,7 @@ func (db *DB) ValidateContext(ctx context.Context) (sqlconnect.ValidationResult,
 	return res, nil
 }
 
-// readBudget is the time limit of the validation reads and the probe. The fork replaces
+// readBudget is the time limit of the validation reads and the probe. clickhouse-go replaces
 // max_execution_time with the remaining time of a context deadline plus 5 s,
 // so a read runs on a context without a deadline and sends the remaining
 // budget itself, as stage 2 does. A timer ends that context at the limit.
@@ -422,7 +422,7 @@ func (db *DB) refusedOpenSetting(ctx context.Context, code int32) string {
 }
 
 // withoutDeadline returns a context that ends when ctx ends but carries no
-// deadline. The fork adds max_execution_time from a context deadline and
+// deadline. clickhouse-go adds max_execution_time from a context deadline and
 // overwrites the statement's own value.
 func withoutDeadline(ctx context.Context) (context.Context, func()) {
 	c, cancel := context.WithCancel(context.WithoutCancel(ctx))

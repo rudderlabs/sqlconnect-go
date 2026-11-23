@@ -90,7 +90,7 @@ func openViaWithPassword(t *testing.T, srv *chtest.Server, p *chtest.Proxy, secu
 	return db
 }
 
-// isHello matches the query the fork sends when it opens a connection.
+// isHello matches the query clickhouse-go sends when it opens a connection.
 func isHello(r chtest.Request) bool {
 	return strings.HasPrefix(strings.TrimSpace(r.SQL), "SELECT displayName(), version(), revision(), timezone()")
 }
