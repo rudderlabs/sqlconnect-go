@@ -75,7 +75,8 @@ func stage2UnionSettings(budgetSeconds int) map[string]any {
 // sends no other driver setting: validation stage 2 checks those, so a
 // constraint on one of them is named there and does not fail the open.
 // clickhouse-go adds network_compression_method=LZ4, also the server default,
-// to every request. A profile that pins another value fails the open unnamed.
+// to every query, the hello included. A profile that pins another value fails
+// the open, and refusedOpenSetting names the setting.
 func helloSettings() map[string]any {
 	return map[string]any{"send_progress_in_http_headers": 0, "limit": 0, "offset": 0, "additional_result_filter": ""}
 }

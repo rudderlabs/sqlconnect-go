@@ -384,9 +384,11 @@ func openFailure(err error, refused func(code int32) string) error {
 }
 
 // refusedOpenSetting names the setting that a connection open refused with
-// code. The error text is redacted, so it opens connections outside the pool,
-// one per hello setting with only that setting and no deadline, and returns
-// the first one refused with the same code. If none is, it opens one with an
+// code. The error text is redacted, so it opens connections outside the pool.
+// The first has an empty map and no deadline: clickhouse-go still adds
+// network_compression_method, so a refusal names that setting. The next ones
+// carry one hello setting each and no deadline, and the first one refused
+// with the same code names its setting. If none is, it opens one with an
 // empty map and a deadline, which adds max_execution_time. The result is
 // always a fixed name, or "".
 func (db *DB) refusedOpenSetting(ctx context.Context, code int32) string {
@@ -407,6 +409,9 @@ func (db *DB) refusedOpenSetting(ctx context.Context, code int32) string {
 	defer stop()
 	timer := time.AfterFunc(validationOpenTimeout, cancel) // a deadline would add max_execution_time
 	defer timer.Stop()
+	if refusedWith(octx, map[string]any{}) {
+		return "network_compression_method"
+	}
 	hello := helloSettings()
 	for _, k := range slices.Sorted(maps.Keys(hello)) {
 		if refusedWith(octx, map[string]any{k: hello[k]}) {
