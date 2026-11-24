@@ -14,9 +14,8 @@ import (
 	"testing"
 	"time"
 
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/stretchr/testify/require"
-
-	ch "github.com/rudderlabs/clickhouse-go/v2"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
@@ -764,7 +763,7 @@ func TestValidation_ReadsCarryTheRemainingBudget(t *testing.T) {
 				}
 				seen[r.q]++
 				require.NoError(t, r.err, r.q)
-				require.False(t, r.deadline, "the fork replaces max_execution_time from a deadline: %s", r.q)
+				require.False(t, r.deadline, "clickhouse-go replaces max_execution_time from a deadline: %s", r.q)
 				limit, ok := r.settings["max_execution_time"].(int)
 				require.True(t, ok, "no time limit: %s", r.q)
 				want := c.limit
@@ -818,7 +817,7 @@ func TestValidation_ProbeCarriesTheRemainingBudget(t *testing.T) {
 			require.Positive(t, readBacks)
 			for _, r := range probe {
 				require.NoError(t, r.err, r.q)
-				require.False(t, r.deadline, "the fork replaces max_execution_time from a deadline: %s", r.q)
+				require.False(t, r.deadline, "clickhouse-go replaces max_execution_time from a deadline: %s", r.q)
 				limit, ok := r.settings["max_execution_time"].(int)
 				require.True(t, ok, "no time limit: %s", r.q)
 				require.True(t, limit >= c.limit-2 && limit <= c.limit, "%s: max_execution_time %d, want about %d", r.q, limit, c.limit)

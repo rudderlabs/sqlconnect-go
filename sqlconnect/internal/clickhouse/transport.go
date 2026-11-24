@@ -14,8 +14,8 @@ import (
 // server cannot park a sync for hours.
 const maxRetryAfter = 5 * time.Minute
 
-// guardedTransport sits between the fork's HTTP client and the pinned
-// transport. It returns an error for every 3xx answer, so neither the fork nor
+// guardedTransport sits between clickhouse-go's HTTP client and the pinned
+// transport. It returns an error for every 3xx answer, so neither clickhouse-go nor
 // http.Client ever follows a redirect to a second host, and it turns HTTP 429
 // into CH_RATE_LIMITED with a bounded Retry-After.
 type guardedTransport struct {
@@ -53,7 +53,7 @@ func (g *guardedTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-// CloseIdleConnections lets http.Client.CloseIdleConnections, which the fork
+// CloseIdleConnections lets http.Client.CloseIdleConnections, which clickhouse-go
 // calls on Close, reach the wrapped transport.
 func (g *guardedTransport) CloseIdleConnections() { g.next.CloseIdleConnections() }
 

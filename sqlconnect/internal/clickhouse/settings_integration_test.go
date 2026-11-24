@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/stretchr/testify/require"
 
-	ch "github.com/rudderlabs/clickhouse-go/v2"
 	"github.com/rudderlabs/rudder-go-kit/testhelper/rand"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
@@ -51,7 +51,7 @@ func TestSQ13_SQ29_StatementSettings(t *testing.T) {
 	short, cancel2 := context.WithTimeout(ctx, 900*time.Millisecond)
 	defer cancel2()
 	sid := run(db, short, map[string]any{})
-	// A sub-second deadline with a map bound of 77 s: the fork keeps the map
+	// A sub-second deadline with a map bound of 77 s: clickhouse-go keeps the map
 	// value, and the context still ends a slow statement on both paths.
 	for _, e := range []interface {
 		ExecContext(context.Context, string, ...any) (sql.Result, error)
@@ -254,10 +254,10 @@ func TestCP22_GoBindsTabString(t *testing.T) {
 	ctx := context.Background()
 	var n uint64
 	const q = "SELECT count() FROM (SELECT 'a\tb' AS s) WHERE s = "
-	require.NoError(t, db.QueryRowContext(ctx, q+"?", "a\tb").Scan(&n)) // the fork renders ? values into the text
+	require.NoError(t, db.QueryRowContext(ctx, q+"?", "a\tb").Scan(&n)) // clickhouse-go renders ? values into the text
 	require.EqualValues(t, 1, n, "the tab survives the ? path")
-	err := db.QueryRowContext(ctx, q+"{p:String}", ch.Named("p", "a\tb")).Scan(&n) // param_p goes unescaped
-	require.EqualValues(t, 457, db.ClassifyError(err).ServerCode, "a raw tab ends the value early")
+	require.NoError(t, db.QueryRowContext(ctx, q+"{p:String}", ch.Named("p", "a\tb")).Scan(&n)) // clickhouse-go escapes a Named string
+	require.EqualValues(t, 1, n, "the tab survives the named path")
 	require.NoError(t, db.QueryRowContext(ctx, q+"{p:String}", ch.Named("p", `a\tb`)).Scan(&n))
-	require.EqualValues(t, 1, n, "the escaped form matches; callers of the named path must escape")
+	require.EqualValues(t, 0, n, "a pre-escaped value is escaped again; callers must not escape")
 }

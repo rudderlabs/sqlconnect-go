@@ -68,6 +68,12 @@ func TestSQ14_ReadonlyAndConstraints(t *testing.T) {
 	require.Equal(t, "log_queries", d.Field)
 	require.EqualValues(t, 452, d.ServerCode)
 	requireStage(t, err, 2, "settings")
+	// clickhouse-go sends this one with the hello, so the pin fails the open.
+	_, err = openAs(t, srv, srv.CreateUserWithConstraint(t, "network_compression_method", "ZSTD")).ValidateContext(withWorkingDB(context.Background()))
+	d, _ = clickhousequery.Describe(err)
+	require.Equal(t, "network_compression_method", d.Field)
+	require.EqualValues(t, 452, d.ServerCode)
+	requireStage(t, err, 1, "settings")
 	_, err = openAs(t, srv, srv.CreateUserWithConstraint(t, "send_progress_in_http_headers", "1")).ValidateContext(withWorkingDB(context.Background()))
 	d, _ = clickhousequery.Describe(err)
 	require.Equal(t, [2]any{"send_progress_in_http_headers", int32(452)}, [2]any{d.Field, d.ServerCode}, "the open names the setting it refused")

@@ -10,9 +10,8 @@ import (
 	"testing"
 	"time"
 
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/stretchr/testify/require"
-
-	ch "github.com/rudderlabs/clickhouse-go/v2"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/clickhousequery"
@@ -325,7 +324,7 @@ func TestSQ28_RunningCheckContention(t *testing.T) {
 	}
 }
 
-// settingsOf reads the settings map the fork sends for ctx, as queryIDOf does
+// settingsOf reads the settings map clickhouse-go sends for ctx, as queryIDOf does
 // for the query id.
 func settingsOf(ctx context.Context) map[string]any {
 	got := map[string]any{}
@@ -345,7 +344,7 @@ func settingsOf(ctx context.Context) map[string]any {
 	return got
 }
 
-// queryIDOf reads the query id the fork sends for ctx. The fork has no public
+// queryIDOf reads the query id clickhouse-go sends for ctx. clickhouse-go has no public
 // getter, so a probe option reads the unexported field through reflection.
 func queryIDOf(ctx context.Context) string {
 	var got string

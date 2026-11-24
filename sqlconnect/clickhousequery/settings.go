@@ -4,7 +4,7 @@ import (
 	"context"
 	"maps"
 
-	ch "github.com/rudderlabs/clickhouse-go/v2"
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/chctx"
 )

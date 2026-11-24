@@ -25,7 +25,7 @@ type guardedDialer struct {
 	dynamicPolicy bool
 	resolver      resolver
 	dial          func(ctx context.Context, network, addr string) (net.Conn, error)
-	// timeout bounds the lookup and the TCP dial together. The fork applies
+	// timeout bounds the lookup and the TCP dial together. clickhouse-go applies
 	// DialTimeout only to its own dialer, not to a custom DialContext.
 	timeout time.Duration
 }

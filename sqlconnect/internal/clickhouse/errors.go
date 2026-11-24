@@ -1,5 +1,5 @@
 // Package clickhouse is the ClickHouse driver of sqlconnect. It talks HTTPS to
-// ClickHouse through the rudderlabs clickhouse-go fork.
+// ClickHouse through clickhouse-go.
 package clickhouse
 
 import (
@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"syscall"
 
-	ch "github.com/rudderlabs/clickhouse-go/v2"
+	ch "github.com/ClickHouse/clickhouse-go/v2"
 
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect"
 	"github.com/rudderlabs/sqlconnect-go/sqlconnect/internal/cherr"
@@ -187,7 +187,7 @@ func wrap(code, field, detail string, cause error) *cherr.Error {
 // ErrNotSupported, an adapter error, and a copy of a server exception without
 // its text fields. It returns nil when nothing is kept.
 //
-// The exception copy keeps only Code. The fork fills Name and CodeName from the
+// The exception copy keeps only Code. clickhouse-go fills Name and CodeName from the
 // response text, so a hostile endpoint controls them as much as Message.
 func redact(err error) error {
 	if err == nil {
