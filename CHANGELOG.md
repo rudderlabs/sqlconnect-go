@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.38.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.38.0...v1.38.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* **clickhouse:** use the upstream clickhouse-go driver ([#615](https://github.com/rudderlabs/sqlconnect-go/issues/615)) ([5939b32](https://github.com/rudderlabs/sqlconnect-go/commit/5939b3229cc2f6dea6031c9881fd81a5eca3f34b))
+
 ## [1.38.0](https://github.com/rudderlabs/sqlconnect-go/compare/v1.37.1...v1.38.0) (2026-11-20)
 
 
