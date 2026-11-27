@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.38.2](https://github.com/rudderlabs/sqlconnect-go/compare/v1.38.1...v1.38.2) (2026-11-27)
+
+
+### Bug Fixes
+
+* **snowflake:** validate account, region, host and protocol before building the DSN ([#614](https://github.com/rudderlabs/sqlconnect-go/issues/614)) ([64e1459](https://github.com/rudderlabs/sqlconnect-go/commit/64e1459420fc9a0447ff4513b3726b611b635b59))
+
 ## [1.38.1](https://github.com/rudderlabs/sqlconnect-go/compare/v1.38.0...v1.38.1) (2026-11-24)
 
 
