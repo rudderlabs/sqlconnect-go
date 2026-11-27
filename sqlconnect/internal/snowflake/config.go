@@ -6,6 +6,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/netip"
+	"regexp"
 	"strings"
 	"time"
 
@@ -50,7 +52,74 @@ type Config struct {
 	PasscodeInPassword bool   `json:"passcodeInPassword"`
 }
 
+var (
+	accountRegionPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$`)
+	hostLabelPattern     = regexp.MustCompile(`^[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?$`)
+)
+
+// validSnowflakeHost reports whether host is empty (driver-derived), a
+// canonical IPv4 address, or an ASCII DNS-style name with an optional final
+// root dot. Underscores are allowed in labels for PrivateLink hosts.
+func validSnowflakeHost(host string) bool {
+	if host == "" {
+		return true
+	}
+	if strings.Trim(host, "0123456789.") == "" {
+		addr, err := netip.ParseAddr(host)
+		return err == nil && addr.Is4()
+	}
+
+	name := strings.TrimSuffix(host, ".")
+	if len(name) > 253 {
+		return false
+	}
+	for label := range strings.SplitSeq(name, ".") {
+		if !hostLabelPattern.MatchString(label) {
+			return false
+		}
+	}
+	return true
+}
+
+// validateConnectionFields rejects values that could downgrade the connection
+// or inject driver parameters into the DSN. The protocol check comes first so
+// its error takes precedence. Identifier errors name the field only, never
+// the value.
+func (c Config) validateConnectionFields() error {
+	// The driver treats any protocol other than https as a downgrade request
+	// and honours it, which would put credentials and query results on the
+	// wire in cleartext. It is caller-supplied, so constrain it here.
+	if c.Protocol != "" && c.Protocol != "https" {
+		return fmt.Errorf("unsupported protocol %q: only https is supported", c.Protocol)
+	}
+	valid := func(value string) bool {
+		value = strings.Trim(value, " ")
+		return value == "" || accountRegionPattern.MatchString(value)
+	}
+
+	// gosnowflake.DSN splits account.region before validating either part.
+	// Keep its tolerance for ASCII space at the boundaries of those parts.
+	account, embeddedRegion, _ := strings.Cut(c.Account, ".")
+	if account == "" || embeddedRegion == "" {
+		account, embeddedRegion = c.Account, ""
+	}
+	if !valid(account) || !valid(embeddedRegion) {
+		return errors.New("invalid snowflake account identifier")
+	}
+	if !valid(c.Region) {
+		return errors.New("invalid snowflake region identifier")
+	}
+	if !validSnowflakeHost(c.Host) {
+		return errors.New("invalid snowflake host")
+	}
+	return nil
+}
+
 func (c Config) ConnectionString() (dsn string, err error) {
+	if err := c.validateConnectionFields(); err != nil {
+		return "", err
+	}
+
 	sc := gosnowflake.Config{
 		Authenticator:      gosnowflake.AuthTypeSnowflake,
 		User:               c.User,
@@ -105,11 +174,8 @@ func (c *Config) Parse(configJSON json.RawMessage) error {
 	if err := json.Unmarshal(configJSON, c); err != nil {
 		return err
 	}
-	// The driver treats any protocol other than https as a downgrade request
-	// and honours it, which would put credentials and query results on the
-	// wire in cleartext. It is caller-supplied, so constrain it here.
-	if c.Protocol != "" && c.Protocol != "https" {
-		return fmt.Errorf("unsupported protocol %q: only https is supported", c.Protocol)
+	if err := c.validateConnectionFields(); err != nil {
+		return err
 	}
 	// Host is optional for Snowflake — the driver derives it from Account when
 	// it is empty — so only validate what was actually supplied.
